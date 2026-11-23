@@ -14,7 +14,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 ureq = { version = "2", features = ["json"] }
 strsim = "0.11"
-eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow", "persistence"] }
+regex = "1"
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow"] }
 
 [dependencies.windows]
 version = "0.61"

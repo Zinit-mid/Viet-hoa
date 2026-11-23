@@ -11,6 +11,16 @@ use windows::Win32::Media::Multimedia::mciSendStringW;
 use crate::duong_dan;
 
 static SO: AtomicU64 = AtomicU64::new(0);
+static GIONG: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+/// Đặt giọng đọc (vi-VN-NamMinhNeural / vi-VN-HoaiMyNeural).
+pub fn dat_giong(g: &str) {
+    if let Ok(mut k) = GIONG.lock() {
+        if *k != g {
+            *k = g.to_string();
+        }
+    }
+}
 
 fn mci(lenh: &str) {
     unsafe {
@@ -18,11 +28,9 @@ fn mci(lenh: &str) {
     }
 }
 
-pub fn co_the_dung() -> bool {
-    duong_dan::python().is_some()
-}
-
-pub fn doc(chu: String, giong: String) {
+pub fn doc(chu: String) {
+    let giong = GIONG.lock().map(|g| g.clone()).unwrap_or_default();
+    let giong = if giong.is_empty() { "vi-VN-NamMinhNeural".to_string() } else { giong };
     let Some(py) = duong_dan::python() else { return };
     let so = SO.fetch_add(1, Ordering::SeqCst) + 1;
     std::thread::spawn(move || {

@@ -24,12 +24,27 @@ pub struct MucPhu {
     pub mau: Option<([u8; 3], [u8; 3])>,
 }
 
+/// Phím tắt (giống app cũ).
 #[derive(Clone, Copy, Debug)]
 pub enum PhimTat {
+    /// F6 / F7: chọn lại vùng 1 (Hội thoại) / vùng 2 (Nhiệm vụ)
     ChonVung(usize),
-    ToanMan,
+    /// F8: bật / tắt dịch tự động
     BatTatDich,
+    /// F9: dịch ngay
+    DichNgay,
+    /// F10: ẩn / hiện bản dịch
+    AnHien,
+    /// F11: chỉnh khung bằng chuột
+    ChinhKhung,
+    /// F12: dịch cả màn hình
+    ToanMan,
+    /// Ctrl+Shift+V: bật / tắt giọng đọc
     Giong,
+    /// Ctrl+Shift+C: bật / tắt Claude
+    Claude,
+    /// Ctrl(+Shift)+mũi tên: dời khung vùng 1 (2) – (vùng, dx, dy)
+    DoiKhung(usize, i32, i32),
 }
 
 const WM_VE_LAI: u32 = WM_APP + 1;
@@ -41,6 +56,8 @@ static NOI_DUNG: Mutex<Vec<MucPhu>> = Mutex::new(Vec::new());
 static HWND_DIEU_KHIEN: AtomicIsize = AtomicIsize::new(0);
 static GUI_PHIM: OnceLock<Mutex<Sender<PhimTat>>> = OnceLock::new();
 pub static AN_CHUP_OK: AtomicBool = AtomicBool::new(true);
+/// Bảng chính của app đã được ẩn khỏi ảnh chụp (đọc màn hình không thấy chữ của app).
+pub static APP_DA_AN: AtomicBool = AtomicBool::new(false);
 
 /// Dữ liệu vẽ của từng cửa sổ khung chữ (chỉ dùng trong luồng lớp phủ).
 struct VeO {
@@ -129,21 +146,32 @@ unsafe fn luong_phim() {
 
 unsafe extern "system" fn moc_phim(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     if code >= 0 && (wp.0 as u32 == WM_KEYDOWN || wp.0 as u32 == WM_SYSKEYDOWN) {
-        let k = &*(lp.0 as *const KBDLLHOOKSTRUCT);        // Bỏ lần lặp khi giữ phím (bit 31 không có ở LL hook → dùng cờ riêng)
+        let k = &*(lp.0 as *const KBDLLHOOKSTRUCT);
         let giu = |vk: VIRTUAL_KEY| (GetAsyncKeyState(vk.0 as i32) as u16 & 0x8000) != 0;
+        let (ctrl, shift) = (giu(VK_CONTROL), giu(VK_SHIFT));
+        let vung = if shift { 1 } else { 0 };
         let phim = match VIRTUAL_KEY(k.vkCode as u16) {
             VK_F6 => Some(PhimTat::ChonVung(0)),
             VK_F7 => Some(PhimTat::ChonVung(1)),
             VK_F8 => Some(PhimTat::BatTatDich),
+            VK_F9 => Some(PhimTat::DichNgay),
+            VK_F10 => Some(PhimTat::AnHien),
+            VK_F11 => Some(PhimTat::ChinhKhung),
             VK_F12 => Some(PhimTat::ToanMan),
-            VK_V if giu(VK_CONTROL) && giu(VK_SHIFT) => Some(PhimTat::Giong),
+            VK_V if ctrl && shift => Some(PhimTat::Giong),
+            VK_C if ctrl && shift => Some(PhimTat::Claude),
+            VK_UP if ctrl => Some(PhimTat::DoiKhung(vung, 0, -20)),
+            VK_DOWN if ctrl => Some(PhimTat::DoiKhung(vung, 0, 20)),
+            VK_LEFT if ctrl => Some(PhimTat::DoiKhung(vung, -20, 0)),
+            VK_RIGHT if ctrl => Some(PhimTat::DoiKhung(vung, 20, 0)),
             _ => None,
         };
+        let lap_duoc = matches!(phim, Some(PhimTat::DoiKhung(..)));
         if let (Some(p), Some(g)) = (phim, GUI_PHIM.get()) {
             static CUOI: Mutex<(u32, u32)> = Mutex::new((0, 0));
             let mut c = CUOI.lock().unwrap_or_else(|e| e.into_inner());
             // chống lặp phím khi giữ: cùng phím trong 350 ms thì bỏ
-            if !(c.0 == k.vkCode && k.time.wrapping_sub(c.1) < 350) {
+            if lap_duoc || !(c.0 == k.vkCode && k.time.wrapping_sub(c.1) < 350) {
                 *c = (k.vkCode, k.time);
                 crate::duong_dan::nhat_ky(&format!("Phím tắt: {p:?}"));
                 if let Ok(g) = g.lock() {
@@ -243,6 +271,17 @@ unsafe fn font(co: i32) -> HFONT {
     })
 }
 
+/// Đo chữ trên 1 dòng: trả bề rộng.
+unsafe fn rong_mot_dong(chu: &mut [u16], co: i32) -> i32 {
+    let dc = CreateCompatibleDC(None);
+    let cu = SelectObject(dc, font(co).into());
+    let mut r = RECT::default();
+    DrawTextW(dc, chu, &mut r, DT_SINGLELINE | DT_CALCRECT | DT_NOPREFIX);
+    SelectObject(dc, cu);
+    let _ = DeleteDC(dc);
+    r.right
+}
+
 /// Đo chữ: trả chiều cao cần với bề rộng cho trước.
 unsafe fn do_chu(chu: &mut [u16], co: i32, rong: i32) -> (i32, i32) {
     let dc = CreateCompatibleDC(None);
@@ -331,8 +370,13 @@ unsafe fn ve_o(hwnd: HWND, m: &MucPhu) {
     };
     let mut chu: Vec<u16> = m.chu.encode_utf16().collect();
     let co = m.co_chu.clamp(10, 60);
-    // Giữ nguyên cỡ chữ; chữ dài thì kéo khung xuống (không thu nhỏ chữ)
-    let rong = m.hop[2].max(160);
+    // Giữ nguyên cỡ chữ. Chữ Việt dài hơn tiếng Anh thì kéo khung rộng ra (tối đa
+    // ~2,5 lần, không vượt mép màn hình) để nằm trên 1 dòng; vẫn dài thì xuống dòng.
+    let man_w = GetSystemMetrics(SM_CXSCREEN);
+    let goc_w = m.hop[2].max(40);
+    let toi_da = (goc_w * 5 / 2).max(320).min(man_w - m.hop[0]).max(goc_w);
+    let can = rong_mot_dong(&mut chu, co) + 2 * LE + 2;
+    let rong = if can <= toi_da { can.max(goc_w) } else { toi_da };
     let (_, cao_chu) = do_chu(&mut chu, co, rong - 2 * LE);
     let cao = m.hop[3].max(cao_chu + 2 * LE);
     VE.with(|v| {
@@ -386,10 +430,15 @@ unsafe fn an_app_khoi_chup(an: bool) {
     unsafe extern "system" fn moi_cua_so(h: HWND, lp: LPARAM) -> windows::core::BOOL {
         let mut pid = 0u32;
         GetWindowThreadProcessId(h, Some(&mut pid));
-        if pid == windows::Win32::System::Threading::GetCurrentProcessId() {
+        // Chỉ bảng chính đang hiện của app. Không đụng cửa sổ ẩn (driver OpenGL
+        // tạo "NVOGLDC invisible", "__wglDummyWindowFodder" – đụng vào là hiện bảng trắng)
+        if pid == windows::Win32::System::Threading::GetCurrentProcessId() && IsWindowVisible(h).as_bool() {
             let mut ten = [0u16; 64];
             let n = GetClassNameW(h, &mut ten) as usize;
-            if !String::from_utf16_lossy(&ten[..n]).starts_with("VietHoa") {
+            let lop = String::from_utf16_lossy(&ten[..n]);
+            let mut tieu_de = [0u16; 64];
+            let m = GetWindowTextW(h, &mut tieu_de) as usize;
+            if !lop.starts_with("VietHoa") && String::from_utf16_lossy(&tieu_de[..m]) == "Việt Hóa" {
                 let ds = &mut *(lp.0 as *mut Vec<HWND>);
                 ds.push(h);
             }
@@ -398,9 +447,11 @@ unsafe fn an_app_khoi_chup(an: bool) {
     }
     let mut ds: Vec<HWND> = Vec::new();
     let _ = EnumWindows(Some(moi_cua_so), LPARAM(&mut ds as *mut _ as isize));
+    let mut da_an = false;
     for h in ds {
-        let _ = SetWindowDisplayAffinity(h, if an { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE });
+        da_an |= SetWindowDisplayAffinity(h, if an { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE }).is_ok() && an;
     }
+    APP_DA_AN.store(da_an, Ordering::Relaxed);
 }
 
 unsafe extern "system" fn thu_o(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
@@ -441,11 +492,13 @@ unsafe extern "system" fn thu_o(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) ->
 // ---------------- Chọn vùng bằng chuột ----------------
 
 static CHON: Mutex<(Option<POINT>, Option<POINT>, bool)> = Mutex::new((None, None, false));
+static TEN_CHON: Mutex<String> = Mutex::new(String::new());
 
 /// Hiện màn mờ, người dùng kéo chuột chọn vùng. Esc / chuột phải = hủy.
 /// Chặn luồng gọi cho tới khi chọn xong.
-pub fn chon_vung() -> Option<[i32; 4]> {
+pub fn chon_vung(ten: &str) -> Option<[i32; 4]> {
     *CHON.lock().unwrap() = (None, None, false);
+    *TEN_CHON.lock().unwrap() = ten.to_uppercase();
     unsafe {
         let h = hinst();
         let lop = WNDCLASSW {
@@ -540,8 +593,12 @@ unsafe extern "system" fn thu_chon(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, COLORREF(0x00FF_FFFF));
             let cu = SelectObject(hdc, font(26).into());
-            let mut huong_dan: Vec<u16> =
-                "Kéo chuột để chọn vùng chữ cần dịch  •  Esc / chuột phải: hủy".encode_utf16().collect();
+            let mut huong_dan: Vec<u16> = format!(
+                "Kéo chuột khoanh vùng chữ \"{}\"  •  Esc / chuột phải: hủy",
+                TEN_CHON.lock().unwrap()
+            )
+            .encode_utf16()
+            .collect();
             let mut o = RECT { left: 0, top: 40, right: rc.right, bottom: 100 };
             DrawTextW(hdc, &mut huong_dan, &mut o, DT_CENTER | DT_NOPREFIX);
             SelectObject(hdc, cu);

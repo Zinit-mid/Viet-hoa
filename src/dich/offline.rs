@@ -86,9 +86,6 @@ pub fn nap_san() {
     });
 }
 
-pub fn dich(chu: &str) -> Result<String> {
-    Ok(dich_lo(&[chu.to_string()])?.pop().unwrap_or_default())
-}
 
 pub fn tat() {
     if let Ok(mut k) = TT.lock() {

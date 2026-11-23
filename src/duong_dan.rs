@@ -13,7 +13,7 @@ pub fn goc() -> &'static Path {
     GOC.get_or_init(|| {
         let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
         let mut d = exe.parent().map(Path::to_path_buf).unwrap_or_default();
-        for _ in 0..4 {
+        for _ in 0..8 {
             if d.join("Cargo.toml").exists() {
                 return d;
             }
@@ -22,8 +22,44 @@ pub fn goc() -> &'static Path {
                 None => break,
             }
         }
-        exe.parent().map(Path::to_path_buf).unwrap_or_default()
+        let ben_exe = exe.parent().map(Path::to_path_buf).unwrap_or_default();
+        // Exe được chép ra chỗ khác (Desktop...) → dùng thư mục cài đặt chính
+        // để có chung dữ liệu, công cụ, mô hình dịch.
+        if !ben_exe.join("cong_cu").is_dir() {
+            if let Some(chinh) = thu_muc_cai_dat().filter(|p| p.join("cong_cu").is_dir()) {
+                return chinh;
+            }
+        }
+        ben_exe
     })
+}
+
+/// Thư mục cài đặt chính: biến môi trường VIET_HOA_GOC, nếu không có thì D:\Việt hóa.
+fn thu_muc_cai_dat() -> Option<PathBuf> {
+    std::env::var_os("VIET_HOA_GOC")
+        .map(PathBuf::from)
+        .or_else(|| Some(PathBuf::from(r"D:\Việt hóa")))
+}
+
+/// Tạo lối tắt "Việt Hóa" trên Desktop trỏ tới exe trong thư mục cài đặt.
+pub fn tao_loi_tat_desktop() -> Result<PathBuf, String> {
+    use std::os::windows::process::CommandExt;
+    let exe = goc().join("VietHoa.exe");
+    let exe = if exe.exists() { exe } else { std::env::current_exe().map_err(|e| e.to_string())? };
+    let lenh = format!(
+        "$d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'Việt Hóa.lnk')); $s.TargetPath='{}'; $s.WorkingDirectory='{}'; $s.Save(); Join-Path $d 'Việt Hóa.lnk'",
+        exe.display().to_string().replace('\'', "''"),
+        goc().display().to_string().replace('\'', "''"),
+    );
+    let ra = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &lenh])
+        .creation_flags(0x0800_0000)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !ra.status.success() {
+        return Err(String::from_utf8_lossy(&ra.stderr).trim().to_string());
+    }
+    Ok(PathBuf::from(String::from_utf8_lossy(&ra.stdout).trim()))
 }
 
 pub fn du_lieu() -> PathBuf {
@@ -72,6 +108,28 @@ pub fn nhat_ky(dong: &str) {
             giay % 60,
             t.subsec_millis()
         );
+    }
+}
+
+/// Giữ máy không ngủ trong lúc làm việc dài (quét / dịch / cài / lồng tiếng); hết phạm vi thì trả lại.
+pub struct GiuMayThuc;
+
+impl GiuMayThuc {
+    pub fn moi() -> Self {
+        use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED};
+        unsafe {
+            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+        }
+        GiuMayThuc
+    }
+}
+
+impl Drop for GiuMayThuc {
+    fn drop(&mut self) {
+        use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS};
+        unsafe {
+            SetThreadExecutionState(ES_CONTINUOUS);
+        }
     }
 }
 

@@ -46,35 +46,58 @@ impl Anh {
         Some(Anh { w, h, x0: self.x0 + x0 as i32, y0: self.y0 + y0 as i32, bgra })
     }
 
-    /// Phóng to nguyên lần (giúp OCR đọc chữ nhỏ).
-    pub fn phong(&self, k: u32) -> Anh {
-        if k <= 1 {
-            return self.clone();
+    /// Lọc chữ trắng (giống app cũ): độ sáng ≥ ngưỡng → chữ ĐEN, còn lại nền TRẮNG.
+    pub fn loc_trang(&mut self, nguong: u8) {
+        for p in self.bgra.chunks_exact_mut(4) {
+            let xam = (p[2] as u32 * 299 + p[1] as u32 * 587 + p[0] as u32 * 114) / 1000;
+            let v = if xam >= nguong as u32 { 0 } else { 255 };
+            p[0] = v;
+            p[1] = v;
+            p[2] = v;
         }
-        let (w, h) = (self.w * k, self.h * k);
+    }
+
+    /// Đổi cỡ ảnh mịn (nội suy song tuyến) – OCR đọc chữ nhỏ tốt hơn.
+    pub fn doi_co(&self, w: u32, h: u32) -> Anh {
+        let (w, h) = (w.max(1), h.max(1));
         let mut bgra = vec![0u8; (w * h * 4) as usize];
+        let sx = self.w as f32 / w as f32;
+        let sy = self.h as f32 / h as f32;
         for y in 0..h {
-            let hang_nguon = ((y / k) * self.w * 4) as usize;
-            let hang_dich = (y * w * 4) as usize;
+            let fy = ((y as f32 + 0.5) * sy - 0.5).max(0.0);
+            let y0 = (fy as u32).min(self.h - 1);
+            let y1 = (y0 + 1).min(self.h - 1);
+            let ty = fy - y0 as f32;
             for x in 0..w {
-                let s = hang_nguon + ((x / k) * 4) as usize;
-                let d = hang_dich + (x * 4) as usize;
-                bgra[d..d + 4].copy_from_slice(&self.bgra[s..s + 4]);
+                let fx = ((x as f32 + 0.5) * sx - 0.5).max(0.0);
+                let x0 = (fx as u32).min(self.w - 1);
+                let x1 = (x0 + 1).min(self.w - 1);
+                let tx = fx - x0 as f32;
+                let d = ((y * w + x) * 4) as usize;
+                for k in 0..4 {
+                    let p = |xx: u32, yy: u32| self.bgra[((yy * self.w + xx) * 4) as usize + k] as f32;
+                    let tren = p(x0, y0) * (1.0 - tx) + p(x1, y0) * tx;
+                    let duoi = p(x0, y1) * (1.0 - tx) + p(x1, y1) * tx;
+                    bgra[d + k] = (tren * (1.0 - ty) + duoi * ty).round() as u8;
+                }
             }
         }
         Anh { w, h, x0: self.x0, y0: self.y0, bgra }
     }
 
-    /// Lọc chữ trắng (phụ đề): điểm sáng gần trắng giữ, còn lại thành đen.
-    pub fn loc_trang(&mut self) {
-        for p in self.bgra.chunks_exact_mut(4) {
-            let mn = p[0].min(p[1]).min(p[2]);
-            let mx = p[0].max(p[1]).max(p[2]);
-            let v = if mn > 165 && mx - mn < 45 { 255 } else { 0 };
-            p[0] = v;
-            p[1] = v;
-            p[2] = v;
+    /// Dấu vân tay ảnh (96×24 xám) – ảnh không đổi thì khỏi đọc chữ lại.
+    pub fn van_tay(&self) -> Vec<u8> {
+        let (w, h) = (96u32, 24u32);
+        let mut ra = Vec::with_capacity((w * h) as usize);
+        for y in 0..h {
+            for x in 0..w {
+                let sx = (x * self.w / w).min(self.w - 1);
+                let sy = (y * self.h / h).min(self.h - 1);
+                let i = ((sy * self.w + sx) * 4) as usize;
+                ra.push(((self.bgra[i + 2] as u32 * 299 + self.bgra[i + 1] as u32 * 587 + self.bgra[i] as u32 * 114) / 1000) as u8);
+            }
         }
+        ra
     }
 }
 
@@ -147,6 +170,9 @@ impl MayChup for ChupDxgi {
     }
 
     fn kich_thuoc(&self) -> (u32, u32) {
+        if self.w == 0 {
+            return ChupGdi.kich_thuoc();
+        }
         (self.w, self.h)
     }
 
@@ -197,7 +223,8 @@ impl MayChup for ChupDxgi {
     }
 
     fn lay(&mut self, v: [i32; 4]) -> Option<Anh> {
-        let tam = self.tam.as_ref()?;
+        // Chưa nhận được khung hình nào (màn hình đứng yên từ lúc tạo) → chụp tạm bằng GDI
+        let Some(tam) = self.tam.as_ref() else { return ChupGdi.lay(v) };
         let (x0, y0, w, h) = kep(v, self.w, self.h)?;
         unsafe {
             let mut map = D3D11_MAPPED_SUBRESOURCE::default();

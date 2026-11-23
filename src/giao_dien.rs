@@ -10,7 +10,7 @@ use eframe::egui::{self, Color32, RichText};
 use crate::cau_hinh::{self, SO_VUNG_TOI_DA};
 use crate::dich_man_hinh::{self, Chung, Lenh};
 use crate::lop_phu::PhimTat;
-use crate::{dich, duong_dan, giong_doc, lop_phu};
+use crate::{dich, duong_dan};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Trang {
@@ -154,112 +154,137 @@ fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
 impl App {
     fn trang_dich(&mut self, ui: &mut egui::Ui) {
         ui.heading("Dịch màn hình");
-        ui.label("Đọc chữ tiếng Anh trên màn hình game rồi hiện bản dịch tiếng Việt đè lên.");
+        ui.label("Đọc chữ tiếng Anh trong các vùng bạn khoanh rồi hiện bản dịch tiếng Việt ở khung dịch.");
         ui.add_space(8.0);
         let chung = self.chung.clone();
+        let mut doi = false;
 
         the(ui, "ĐIỀU KHIỂN", |ui| {
             ui.horizontal_wrapped(|ui| {
                 let dang = chung.dang_dich.load(Ordering::SeqCst);
-                let nut = if dang { "■  Dừng dịch vùng (F8)" } else { "▶  Bắt đầu dịch vùng (F8)" };
-                if ui.add(egui::Button::new(RichText::new(nut).strong()).min_size(egui::vec2(220.0, 36.0))).clicked() {
+                let nut = if dang { "■  Dừng dịch tự động (F8)" } else { "▶  Bật dịch tự động (F8)" };
+                if ui.add(egui::Button::new(RichText::new(nut).strong()).min_size(egui::vec2(230.0, 36.0))).clicked() {
                     let _ = self.gui.send(Lenh::Phim(PhimTat::BatTatDich));
                 }
                 let tm = chung.toan_man.load(Ordering::SeqCst);
                 let nut2 = if tm { "■  Tắt dịch cả màn hình (F12)" } else { "⛶  Dịch cả màn hình (F12)" };
-                if ui.add(egui::Button::new(nut2).min_size(egui::vec2(220.0, 36.0))).clicked() {
+                if ui.add(egui::Button::new(nut2).min_size(egui::vec2(230.0, 36.0))).clicked() {
                     let _ = self.gui.send(Lenh::Phim(PhimTat::ToanMan));
                 }
+                let chinh = crate::khung_dich::dang_chinh();
+                let nut3 = if chinh { "✔  Đang chỉnh khung – bấm để khóa (F11)" } else { "Chỉnh khung bằng chuột (F11)" };
+                if ui.add(egui::Button::new(nut3).selected(chinh).min_size(egui::vec2(230.0, 36.0))).clicked() {
+                    let _ = self.gui.send(Lenh::Phim(PhimTat::ChinhKhung));
+                }
             });
-            ui.label(RichText::new("Phím tắt: F6 / F7 chọn lại vùng 1 / 2 • F8 bật/tắt dịch vùng • F12 cả màn hình • Ctrl+Shift+V bật/tắt giọng đọc").small().weak());
+            ui.label(
+                RichText::new(
+                    "F6 / F7 chọn lại vùng Hội thoại / Nhiệm vụ • F9 dịch ngay • F10 ẩn/hiện bản dịch • \
+                     Ctrl+mũi tên dời khung Hội thoại • Ctrl+Shift+mũi tên dời khung Nhiệm vụ • \
+                     Ctrl+Shift+V giọng đọc • Ctrl+Shift+C bật/tắt Claude",
+                )
+                .small()
+                .weak(),
+            );
         });
 
-        let mut doi = false;
-        {
-            let mut ch = chung.ch();
-            the(ui, "MÁY DỊCH", |ui| {
-                let ten = |m: &str| match m {
-                    "offline" => "Offline (nhanh, không cần mạng)",
-                    "offline_claude" => "Offline + Claude lưu ngầm (khuyên dùng)",
-                    "claude" => "Claude (hay nhất, tốn phí)",
-                    _ => "Google (miễn phí, cần mạng)",
-                };
-                egui::ComboBox::from_id_salt("che_do")
-                    .width(320.0)
-                    .selected_text(ten(&ch.che_do_hoi_thoai))
-                    .show_ui(ui, |ui| {
-                        for m in ["offline_claude", "offline", "claude", "google"] {
-                            doi |= ui.selectable_value(&mut ch.che_do_hoi_thoai, m.to_string(), ten(m)).changed();
-                        }
-                    });
-                if !dich::offline::co_the_dung() {
-                    ui.label(RichText::new("Chưa có Python riêng / mô hình offline → tạm dùng Google. Vào Cài đặt → Tải công cụ.").color(Color32::YELLOW));
-                }
-                if !dich::claude::co_khoa() {
-                    ui.label(RichText::new("Chưa có mã API Claude (Cài đặt → Mã API).").weak());
-                }
-            });
-            the(ui, "KHUNG CHỮ DỊCH", |ui| {
-                doi |= ui.checkbox(&mut ch.che_chu_goc, "Che chữ gốc (cùng màu nền, chữ Việt cùng màu chữ)").changed();
-                ui.horizontal(|ui| {
-                    ui.label("Cỡ chữ tối thiểu khi dịch cả màn hình:");
-                    doi |= ui.add(egui::Slider::new(&mut ch.co_chu_toan_man, 10..=40)).changed();
-                });
-                ui.horizontal(|ui| {
-                    doi |= ui.checkbox(&mut ch.giong_doc, "Đọc bản dịch thành tiếng").changed();
-                    egui::ComboBox::from_id_salt("giong")
-                        .selected_text(if ch.giong.contains("HoaiMy") { "Nữ – Hoài My" } else { "Nam – Nam Minh" })
-                        .show_ui(ui, |ui| {
-                            doi |= ui.selectable_value(&mut ch.giong, "vi-VN-NamMinhNeural".into(), "Nam – Nam Minh").changed();
-                            doi |= ui.selectable_value(&mut ch.giong, "vi-VN-HoaiMyNeural".into(), "Nữ – Hoài My").changed();
-                        });
-                    if !giong_doc::co_the_dung() {
-                        ui.label(RichText::new("(cần Python riêng + edge-tts)").weak());
-                    }
-                });
-            });
-        }
-
-        // Vùng dịch
+        // Các vùng
         let mut chon: Option<usize> = None;
         the(ui, &format!("VÙNG DỊCH (tối đa {SO_VUNG_TOI_DA})"), |ui| {
             let mut ch = chung.ch();
             let mut xoa = None;
             for (i, v) in ch.cac_vung.iter_mut().enumerate() {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(format!("{}.", i + 1)).strong());
-                    doi |= ui.add(egui::TextEdit::singleline(&mut v.ten).desired_width(110.0)).changed();
-                    egui::ComboBox::from_id_salt(("loai", &v.id))
-                        .selected_text(if v.loai == "co_dinh" { "Cố định" } else { "Phụ đề" })
-                        .show_ui(ui, |ui| {
-                            doi |= ui.selectable_value(&mut v.loai, "phu_de".into(), "Phụ đề (đọc liên tục)").changed();
-                            doi |= ui.selectable_value(&mut v.loai, "co_dinh".into(), "Cố định (giữ bản dịch)").changed();
-                        });
-                    doi |= ui.checkbox(&mut v.loc_trang, "Lọc chữ trắng").changed();
-                    ui.label("Cỡ chữ");
-                    doi |= ui.checkbox(&mut v.co_chu_tu_dong, "Tự động").changed();
-                    if !v.co_chu_tu_dong {
+                egui::Frame::NONE.inner_margin(4.0).show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(RichText::new(format!("{}.", i + 1)).strong());
+                        doi |= ui.add(egui::TextEdit::singleline(&mut v.ten).desired_width(110.0)).changed();
+                        egui::ComboBox::from_id_salt(("loai", &v.id))
+                            .selected_text(if v.loai == "co_dinh" { "Cố định (nhiệm vụ, menu)" } else { "Hội thoại / phụ đề" })
+                            .show_ui(ui, |ui| {
+                                doi |= ui.selectable_value(&mut v.loai, "phu_de".into(), "Hội thoại / phụ đề – dịch nhanh").changed();
+                                doi |= ui.selectable_value(&mut v.loai, "co_dinh".into(), "Cố định – nhiệm vụ, menu, vật phẩm").changed();
+                            });
+                        let ten_nut = if v.vung.is_some() { "Chọn lại vùng chữ" } else { "➤ Chọn vùng chữ" };
+                        if ui.button(ten_nut).clicked() {
+                            chon = Some(i);
+                        }
+                        doi |= ui.checkbox(&mut v.loc_trang, "Lọc chữ trắng").changed();
+                        ui.label("Cỡ chữ");
                         doi |= ui.add(egui::DragValue::new(&mut v.co_chu).range(10..=48)).changed();
-                    }
-                    ui.label(RichText::new(format!("{}×{} tại ({}, {})", v.vung[2], v.vung[3], v.vung[0], v.vung[1])).weak());
-                    if ui.button("Chọn lại").clicked() {
-                        chon = Some(i);
-                    }
-                    if ui.button("Xóa").clicked() {
-                        xoa = Some(i);
-                    }
+                        if i >= 2 && ui.button("Xóa").clicked() {
+                            xoa = Some(i);
+                        }
+                    });
+                    match v.vung {
+                        Some(r) => ui.label(RichText::new(format!("Vùng chữ {}×{} tại ({}, {})", r[2], r[3], r[0], r[1])).small().weak()),
+                        None => ui.label(RichText::new("Chưa chọn vùng chữ").small().color(Color32::YELLOW)),
+                    };
                 });
             }
             if let Some(i) = xoa {
                 ch.cac_vung.remove(i);
                 doi = true;
             }
-            if ch.cac_vung.len() < SO_VUNG_TOI_DA && ui.button("＋  Thêm vùng (kéo chuột trên màn hình)").clicked() {
+            if ch.cac_vung.len() < SO_VUNG_TOI_DA && ui.button("+ Thêm vùng").clicked() {
                 chon = Some(ch.cac_vung.len());
             }
         });
         if let Some(i) = chon {
             dich_man_hinh::chon_vung(&chung, &self.gui, i);
+        }
+
+        {
+            let mut ch = chung.ch();
+            the(ui, "MÁY DỊCH", |ui| {
+                let ten = |m: &str| match m {
+                    "offline" => "Offline (nhanh, không cần mạng)",
+                    "offline_claude" => "Offline + Claude dịch ngầm để lưu (khuyên dùng)",
+                    "claude" => "Claude (hay nhất, tốn phí)",
+                    _ => "Google (miễn phí, cần mạng)",
+                };
+                egui::ComboBox::from_id_salt("che_do")
+                    .width(360.0)
+                    .selected_text(ten(&ch.che_do_hoi_thoai))
+                    .show_ui(ui, |ui| {
+                        for m in ["offline_claude", "offline", "claude", "google"] {
+                            doi |= ui.selectable_value(&mut ch.che_do_hoi_thoai, m.to_string(), ten(m)).changed();
+                        }
+                    });
+                doi |= ui.checkbox(&mut ch.thay_bang_claude, "Hội thoại: đổi sang bản Claude khi dịch xong").changed();
+                if !dich::offline::co_the_dung() {
+                    ui.label(RichText::new("Chưa có Python riêng / mô hình offline → tạm dùng Google. Vào Cài đặt > Tải công cụ.").color(Color32::YELLOW));
+                }
+                if !dich::claude::co_khoa() {
+                    ui.label(RichText::new("Claude đang tắt hoặc chưa có mã API (Cài đặt > Mã API).").weak());
+                }
+            });
+            the(ui, "KHUNG CHỮ DỊCH", |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Kiểu hiện:");
+                    doi |= ui.selectable_value(&mut ch.kieu_hien, "phu_de".into(), "Phụ đề (chữ viền, nền trong suốt)").changed();
+                    doi |= ui.selectable_value(&mut ch.kieu_hien, "khung".into(), "Khung nền tối").changed();
+                });
+                doi |= ui.checkbox(&mut ch.che_chu_goc, "Che chữ gốc (ô cùng màu nền đè lên chữ tiếng Anh)").changed();
+                ui.horizontal(|ui| {
+                    ui.label("Độ đậm:");
+                    if ch.kieu_hien == "khung" {
+                        doi |= ui.add(egui::Slider::new(&mut ch.do_mo, 0.2..=1.0)).changed();
+                    } else {
+                        doi |= ui.add(egui::Slider::new(&mut ch.do_dam_chu, 0.2..=1.0)).changed();
+                        ui.label("Viền chữ:");
+                        doi |= ui.add(egui::Slider::new(&mut ch.vien_chu, 0..=5)).changed();
+                    }
+                });
+                ui.horizontal(|ui| {
+                    doi |= ui.checkbox(&mut ch.giong_doc, "Đọc hội thoại thành tiếng").changed();
+                    egui::ComboBox::from_id_salt("giong")
+                        .selected_text(if ch.giong.contains("HoaiMy") { "Nữ – Hoài My" } else { "Nam – Nam Minh" })
+                        .show_ui(ui, |ui| {
+                            doi |= ui.selectable_value(&mut ch.giong, "vi-VN-NamMinhNeural".into(), "Nam – Nam Minh").changed();
+                            doi |= ui.selectable_value(&mut ch.giong, "vi-VN-HoaiMyNeural".into(), "Nữ – Hoài My").changed();
+                        });
+                });
+            });
         }
         if doi {
             chung.ch().luu();
@@ -268,8 +293,8 @@ impl App {
         let tt = chung.tt();
         the(ui, "TÌNH TRẠNG", |ui| {
             ui.label(format!("Cách chụp: {}   •   OCR: {}", tt.may_chup, tt.ocr));
-            if !lop_phu::AN_CHUP_OK.load(Ordering::Relaxed) {
-                ui.label(RichText::new("Windows không cho ẩn lớp phủ khỏi ảnh chụp (cần Windows 10 2004+).").color(Color32::YELLOW));
+            if chung.an_ban_dich.load(Ordering::SeqCst) {
+                ui.label(RichText::new("Bản dịch đang ẨN (F10 để hiện).").color(Color32::YELLOW));
             }
             if chung.toan_man.load(Ordering::SeqCst) {
                 ui.label(format!("Cả màn hình: {} đoạn chữ", tt.so_doan_toan_man));
@@ -314,6 +339,13 @@ impl App {
             ui.label(format!("App:      {}", duong_dan::goc().display()));
             ui.label(format!("Dữ liệu:  {}", duong_dan::du_lieu().display()));
             ui.label(format!("Công cụ:  {}", duong_dan::cong_cu().display()));
+            if ui.button("Tạo lối tắt trên Desktop").clicked() {
+                self.thong_bao = match duong_dan::tao_loi_tat_desktop() {
+                    Ok(p) => format!("Đã tạo lối tắt: {}", p.display()),
+                    Err(e) => format!("Không tạo được lối tắt: {e}"),
+                };
+            }
+            ui.label(RichText::new("Đừng chép file VietHoa.exe ra chỗ khác – hãy dùng lối tắt.").small().weak());
             if ui.button("Mở thư mục dữ liệu").clicked() {
                 let _ = std::fs::create_dir_all(duong_dan::du_lieu());
                 let _ = std::process::Command::new("explorer").arg(duong_dan::du_lieu()).spawn();
