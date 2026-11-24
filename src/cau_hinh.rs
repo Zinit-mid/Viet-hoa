@@ -22,9 +22,19 @@ pub struct TuyLoai {
 
 pub fn tuy_loai(loai: &str) -> TuyLoai {
     if loai == "co_dinh" {
-        TuyLoai { an_trong: 30, an_lech: u32::MAX, bo_qua: 0.85, lech: 0.7 }
+        TuyLoai {
+            an_trong: 30,
+            an_lech: u32::MAX,
+            bo_qua: 0.85,
+            lech: 0.7,
+        }
     } else {
-        TuyLoai { an_trong: 3, an_lech: 5, bo_qua: 0.92, lech: 0.8 }
+        TuyLoai {
+            an_trong: 3,
+            an_lech: 5,
+            bo_qua: 0.92,
+            lech: 0.8,
+        }
     }
 }
 
@@ -113,7 +123,10 @@ pub struct CauHinh {
 impl Default for CauHinh {
     fn default() -> Self {
         Self {
-            cac_vung: vec![vung_moi("hoi_thoai", "Hội thoại", "phu_de"), vung_moi("nhiem_vu", "Nhiệm vụ", "co_dinh")],
+            cac_vung: vec![
+                vung_moi("hoi_thoai", "Hội thoại", "phu_de"),
+                vung_moi("nhiem_vu", "Nhiệm vụ", "co_dinh"),
+            ],
             nguong_chu_trang: 185,
             kieu_hien: "phu_de".into(),
             che_chu_goc: true,
@@ -166,9 +179,19 @@ impl CauHinh {
         if self.cac_vung.iter().all(|v| v.khung.is_some()) {
             return false;
         }
-        let Ok(appdata) = std::env::var("APPDATA") else { return false };
-        let Ok(b) = std::fs::read(std::path::Path::new(&appdata).join("DichGame").join("cau_hinh.json")) else { return false };
-        let Ok(cu) = serde_json::from_slice::<CauHinh>(&b) else { return false };
+        let Ok(appdata) = std::env::var("APPDATA") else {
+            return false;
+        };
+        let Ok(b) = std::fs::read(
+            std::path::Path::new(&appdata)
+                .join("DichGame")
+                .join("cau_hinh.json"),
+        ) else {
+            return false;
+        };
+        let Ok(cu) = serde_json::from_slice::<CauHinh>(&b) else {
+            return false;
+        };
         let mut co = false;
         for v in &mut self.cac_vung {
             if let Some(c) = cu.cac_vung.iter().find(|c| c.id == v.id) {
@@ -194,7 +217,9 @@ impl CauHinh {
                 v.vung = None;
             }
         }
-        if !["offline", "offline_claude", "claude", "google"].contains(&self.che_do_hoi_thoai.as_str()) {
+        if !["offline", "offline_claude", "claude", "google"]
+            .contains(&self.che_do_hoi_thoai.as_str())
+        {
             self.che_do_hoi_thoai = "offline_claude".into();
         }
         if self.kieu_hien != "khung" {

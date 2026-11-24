@@ -14,7 +14,9 @@ fn trung_vi(v: &mut [[u8; 3]]) -> [u8; 3] {
 }
 
 fn khoang_cach(a: [u8; 3], b: [u8; 3]) -> u32 {
-    (0..3).map(|k| (a[k] as i32 - b[k] as i32).unsigned_abs()).sum()
+    (0..3)
+        .map(|k| (a[k] as i32 - b[k] as i32).unsigned_abs())
+        .sum()
 }
 
 /// `hop` = [x, y, w, h] theo toạ độ trong ảnh `anh`.

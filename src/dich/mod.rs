@@ -43,16 +43,23 @@ fn sua(s: String) -> String {
             .unwrap_or_default();
         v.get("sua_ban_dich")
             .and_then(|m| m.as_object())
-            .map(|m| m.iter().filter_map(|(a, b)| Some((a.clone(), b.as_str()?.to_string()))).collect())
+            .map(|m| {
+                m.iter()
+                    .filter_map(|(a, b)| Some((a.clone(), b.as_str()?.to_string())))
+                    .collect()
+            })
             .unwrap_or_default()
     });
-    ds.iter().fold(s, |s, (sai, dung)| s.replace(sai.as_str(), dung))
+    ds.iter()
+        .fold(s, |s, (sai, dung)| s.replace(sai.as_str(), dung))
 }
 
 /// Bản Việt hóa game (Crimson Desert...): giống hệt chữ trong game, miễn phí.
 pub fn tim_viet_hoa(chu: &str) -> Option<String> {
     let mut k = VIET_HOA.lock().unwrap_or_else(|e| e.into_inner());
-    k.get_or_insert_with(BoNhoVietHoa::default).tim(chu).map(sua)
+    k.get_or_insert_with(BoNhoVietHoa::default)
+        .tim(chu)
+        .map(sua)
 }
 
 /// Bản đã lưu: Việt hóa game → Claude → (Claude không dùng được thì) Google.
@@ -152,7 +159,9 @@ pub fn claude_luu_ngam(chu: &str) -> Option<String> {
 fn ghi_loi(loi: &str) {
     static CUOI: Mutex<Option<(String, std::time::Instant)>> = Mutex::new(None);
     if let Ok(mut c) = CUOI.lock() {
-        let lap = c.as_ref().is_some_and(|(l, t)| l == loi && t.elapsed().as_secs() < 10);
+        let lap = c
+            .as_ref()
+            .is_some_and(|(l, t)| l == loi && t.elapsed().as_secs() < 10);
         if !lap {
             crate::duong_dan::nhat_ky(loi);
             *c = Some((loi.to_string(), std::time::Instant::now()));
@@ -188,7 +197,8 @@ fn tach_ten(dong: &str) -> (&str, &str) {
             && tu.len() <= 3
             && tu.iter().all(|w| {
                 w.chars().next().is_some_and(|c| c.is_ascii_uppercase())
-                    && w.chars().all(|c| c.is_ascii_alphabetic() || "'.-".contains(c))
+                    && w.chars()
+                        .all(|c| c.is_ascii_alphabetic() || "'.-".contains(c))
             });
         if la_ten && !loi.trim().is_empty() {
             return (ten, loi.trim());
@@ -211,7 +221,12 @@ fn offline_lo(cau: &[String]) -> Option<Vec<Option<String>>> {
         for d in c.lines().map(str::trim).filter(|d| !d.is_empty()) {
             let (ten, loi) = tach_ten(d);
             let (_, hoa) = ha_hoa(loi);
-            dong.push(Dong { cau: i, ten: ten.to_string(), hoa, goc: loi.to_string() });
+            dong.push(Dong {
+                cau: i,
+                ten: ten.to_string(),
+                hoa,
+                goc: loi.to_string(),
+            });
         }
     }
     let vao: Vec<String> = dong.iter().map(|d| ha_hoa(&d.goc).0).collect();
@@ -237,12 +252,25 @@ fn offline_lo(cau: &[String]) -> Option<Vec<Option<String>>> {
             tot[d.cau] += 1;
             vi
         } else {
-            crate::duong_dan::nhat_ky(&format!("Bỏ bản dịch offline hỏng: {} => {}", d.goc, vi.chars().take(80).collect::<String>()));
+            crate::duong_dan::nhat_ky(&format!(
+                "Bỏ bản dịch offline hỏng: {} => {}",
+                d.goc,
+                vi.chars().take(80).collect::<String>()
+            ));
             d.goc.clone()
         };
-        ket[d.cau].push(if d.ten.is_empty() { vi } else { format!("{}: {vi}", d.ten) });
+        ket[d.cau].push(if d.ten.is_empty() {
+            vi
+        } else {
+            format!("{}: {vi}", d.ten)
+        });
     }
-    Some(ket.into_iter().zip(tot).map(|(v, t)| (t > 0).then(|| v.join("\n"))).collect())
+    Some(
+        ket.into_iter()
+            .zip(tot)
+            .map(|(v, t)| (t > 0).then(|| v.join("\n")))
+            .collect(),
+    )
 }
 
 /// Google dịch cả lô (ít lần gọi), bỏ bản hỏng, lưu "google".
@@ -254,7 +282,9 @@ pub fn google_lo(cau: &[String]) -> Vec<Option<String>> {
     ra.into_iter()
         .zip(cau)
         .map(|(vi, en)| {
-            let vi = vi.map(|v| the::bo_lap_doi(en, &v)).filter(|v| hop_le(en, v))?;
+            let vi = vi
+                .map(|v| the::bo_lap_doi(en, &v))
+                .filter(|v| hop_le(en, v))?;
             luu("google", en, &vi);
             Some(vi)
         })
@@ -265,9 +295,15 @@ pub fn google_lo(cau: &[String]) -> Vec<Option<String>> {
 pub fn dich_nhieu(cac_cau: &[String], dung_claude: bool) -> Vec<Option<String>> {
     let mut ra: Vec<Option<String>> = cac_cau
         .iter()
-        .map(|c| tim_da_luu(c).or_else(|| the::tu_menu(c)).or_else(|| bo_nho(|b| b.tim("google", c)).map(sua)))
+        .map(|c| {
+            tim_da_luu(c)
+                .or_else(|| the::tu_menu(c))
+                .or_else(|| bo_nho(|b| b.tim("google", c)).map(sua))
+        })
         .collect();
-    let con_thieu = |ra: &Vec<Option<String>>| -> Vec<usize> { (0..cac_cau.len()).filter(|&i| ra[i].is_none()).collect() };
+    let con_thieu = |ra: &Vec<Option<String>>| -> Vec<usize> {
+        (0..cac_cau.len()).filter(|&i| ra[i].is_none()).collect()
+    };
 
     let can = con_thieu(&ra);
     if !can.is_empty() && dung_claude && claude::co_khoa() {
@@ -309,7 +345,10 @@ mod tests {
     #[test]
     fn chu_in_hoa_va_ten() {
         assert_eq!(ha_hoa("WINDOW SIZE"), ("Window size".to_string(), true));
-        assert_eq!(ha_hoa("Press E to open"), ("Press E to open".to_string(), false));
+        assert_eq!(
+            ha_hoa("Press E to open"),
+            ("Press E to open".to_string(), false)
+        );
         assert_eq!(tach_ten("Kliff: Let's go."), ("Kliff", "Let's go."));
         assert_eq!(tach_ten("press: e"), ("", "press: e"));
     }

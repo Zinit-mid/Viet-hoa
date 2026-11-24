@@ -38,14 +38,22 @@ impl Ocr {
     pub fn doc(&self, anh: &Anh) -> Result<Vec<Dong>> {
         let he_so = (CANH_TOI_DA / anh.w.max(anh.h) as f32).min(2.0);
         let (anh_doc, he_so) = if (he_so - 1.0).abs() > 0.05 {
-            (anh.doi_co((anh.w as f32 * he_so) as u32, (anh.h as f32 * he_so) as u32), he_so)
+            (
+                anh.doi_co((anh.w as f32 * he_so) as u32, (anh.h as f32 * he_so) as u32),
+                he_so,
+            )
         } else {
             (anh.clone(), 1.0)
         };
         let viet = DataWriter::new()?;
         viet.WriteBytes(&anh_doc.bgra)?;
         let buf = viet.DetachBuffer()?;
-        let bmp = SoftwareBitmap::CreateCopyFromBuffer(&buf, BitmapPixelFormat::Bgra8, anh_doc.w as i32, anh_doc.h as i32)?;
+        let bmp = SoftwareBitmap::CreateCopyFromBuffer(
+            &buf,
+            BitmapPixelFormat::Bgra8,
+            anh_doc.w as i32,
+            anh_doc.h as i32,
+        )?;
         let kq = self.may.RecognizeAsync(&bmp)?.get()?;
         let mut ra = Vec::new();
         for dong in kq.Lines()? {
@@ -64,7 +72,12 @@ impl Ocr {
             let cao = ((y1 - y0) / he_so) as i32;
             ra.push(Dong {
                 chu,
-                hop: [(x0 / he_so) as i32, (y0 / he_so) as i32, ((x1 - x0) / he_so) as i32, cao],
+                hop: [
+                    (x0 / he_so) as i32,
+                    (y0 / he_so) as i32,
+                    ((x1 - x0) / he_so) as i32,
+                    cao,
+                ],
                 cao_dong: cao,
             });
         }
@@ -84,7 +97,9 @@ impl Ocr {
         let mut ra = Vec::new();
         for &s in &bat_dau {
             let e = (s + o_rong).min(w);
-            let Some(manh) = anh.cat([s, 0, e - s, anh.h as i32]) else { continue };
+            let Some(manh) = anh.cat([s, 0, e - s, anh.h as i32]) else {
+                continue;
+            };
             let lo = s + if s > 0 { o / 2 } else { 0 };
             let hi = e - if e < w { o / 2 } else { 0 };
             for mut d in self.doc(&manh).unwrap_or_default() {
@@ -105,7 +120,10 @@ pub fn dong_hop_le(d: &str) -> bool {
     if crate::dich::the::tu_menu(d).is_some() {
         return true;
     }
-    let tu: Vec<&str> = d.split(|c: char| !(c.is_ascii_alphabetic() || c == '\'')).filter(|t| !t.is_empty()).collect();
+    let tu: Vec<&str> = d
+        .split(|c: char| !(c.is_ascii_alphabetic() || c == '\''))
+        .filter(|t| !t.is_empty())
+        .collect();
     let so_chu_cai: usize = tu.iter().map(|t| t.len()).sum();
     if so_chu_cai < 3 || !tu.iter().any(|t| t.len() >= 3) {
         return false;
@@ -116,14 +134,18 @@ pub fn dong_hop_le(d: &str) -> bool {
 
 /// Đoạn hợp lệ khi đọc cả màn hình (loại cảnh vật bị đọc nhầm thành chữ).
 pub fn hop_le_toan_man(chu: &str) -> bool {
-    let tu: Vec<&str> = chu.split(|c: char| !(c.is_ascii_alphabetic() || c == '\'')).filter(|t| !t.is_empty()).collect();
+    let tu: Vec<&str> = chu
+        .split(|c: char| !(c.is_ascii_alphabetic() || c == '\''))
+        .filter(|t| !t.is_empty())
+        .collect();
     let so_chu_cai: usize = tu.iter().map(|t| t.len()).sum();
     let tong = chu.chars().filter(|c| !c.is_whitespace()).count().max(1);
     so_chu_cai >= 4 && tu.iter().any(|t| t.len() >= 3) && so_chu_cai as f32 / tong as f32 >= 0.65
 }
 
 fn het_cau_dong(s: &str) -> bool {
-    s.trim_end().ends_with(['.', '!', '?', ':', ';', '"', '”', '’', ')', ']', '…'])
+    s.trim_end()
+        .ends_with(['.', '!', '?', ':', ';', '"', '”', '’', ')', ']', '…'])
 }
 
 /// Làm sạch các dòng OCR (giống lam_sach): bỏ rác, nối dòng bị ngắt (dòng sau viết
@@ -180,12 +202,23 @@ pub fn gom_doan(dong: Vec<Dong>) -> Vec<Dong> {
                 continue 'ngoai;
             }
         }
-        doan.push(D { dong: vec![d.chu], x0: x, y0: y, x1: x + w, y1: y + h, h });
+        doan.push(D {
+            dong: vec![d.chu],
+            x0: x,
+            y0: y,
+            x1: x + w,
+            y1: y + h,
+            h,
+        });
     }
     doan.into_iter()
         .filter_map(|p| {
             let chu = lam_sach(&p.dong);
-            (!chu.is_empty()).then_some(Dong { chu, hop: [p.x0, p.y0, p.x1 - p.x0, p.y1 - p.y0], cao_dong: p.h })
+            (!chu.is_empty()).then_some(Dong {
+                chu,
+                hop: [p.x0, p.y0, p.x1 - p.x0, p.y1 - p.y0],
+                cao_dong: p.h,
+            })
         })
         .take(80)
         .collect()
@@ -195,15 +228,29 @@ pub fn gom_doan(dong: Vec<Dong>) -> Vec<Dong> {
 mod tests {
     use super::*;
     fn d(chu: &str, y: i32, w: i32) -> Dong {
-        Dong { chu: chu.into(), hop: [100, y, w, 20], cao_dong: 20 }
+        Dong {
+            chu: chu.into(),
+            hop: [100, y, w, 20],
+            cao_dong: 20,
+        }
     }
     #[test]
     fn gom_dong_giu_xuong_dong() {
-        let ra = gom_doan(vec![d("Play", 100, 60), d("Options", 124, 90), d("Quit game", 148, 100)]);
+        let ra = gom_doan(vec![
+            d("Play", 100, 60),
+            d("Options", 124, 90),
+            d("Quit game", 148, 100),
+        ]);
         assert_eq!(ra.len(), 1);
         assert_eq!(ra[0].chu, "Play\nOptions\nQuit game");
-        let ra = gom_doan(vec![d("The village is under attack and we", 100, 400), d("need to leave now!", 124, 220)]);
-        assert_eq!(ra[0].chu, "The village is under attack and we need to leave now!");
+        let ra = gom_doan(vec![
+            d("The village is under attack and we", 100, 400),
+            d("need to leave now!", 124, 220),
+        ]);
+        assert_eq!(
+            ra[0].chu,
+            "The village is under attack and we need to leave now!"
+        );
     }
     #[test]
     fn loc_rac() {

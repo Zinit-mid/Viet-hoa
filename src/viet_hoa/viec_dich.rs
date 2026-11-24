@@ -42,12 +42,16 @@ pub fn la_cau(s: &str) -> bool {
     if s.contains("<br/>") || t.chars().count() >= 70 {
         return true;
     }
-    t.split_whitespace().count() >= 4 && (t.ends_with(['.', '!', '?', '…', '"']) || t.contains(". "))
+    t.split_whitespace().count() >= 4
+        && (t.ends_with(['.', '!', '?', '…', '"']) || t.contains(". "))
 }
 
 /// Các thẻ trong chuỗi (đã xếp) – bản dịch phải có đúng các thẻ này.
 pub fn the_cua(s: &str) -> Vec<String> {
-    let mut v: Vec<String> = re_the().find_iter(s).map(|m| m.as_str().to_string()).collect();
+    let mut v: Vec<String> = re_the()
+        .find_iter(s)
+        .map(|m| m.as_str().to_string())
+        .collect();
     v.sort();
     v
 }
@@ -61,9 +65,37 @@ pub struct BangTen {
 }
 
 const TU_THUONG: &[&str] = &[
-    "Talk", "Map", "Quest", "Quests", "Inventory", "Continue", "Settings", "Options", "Yes", "No", "Gold", "Silver",
-    "Food", "Water", "Wood", "Stone", "Iron", "Horse", "Sword", "Shield", "Bow", "Help", "Back", "Close", "Cancel",
-    "Confirm", "Accept", "Reward", "Rewards", "Level", "None",
+    "Talk",
+    "Map",
+    "Quest",
+    "Quests",
+    "Inventory",
+    "Continue",
+    "Settings",
+    "Options",
+    "Yes",
+    "No",
+    "Gold",
+    "Silver",
+    "Food",
+    "Water",
+    "Wood",
+    "Stone",
+    "Iron",
+    "Horse",
+    "Sword",
+    "Shield",
+    "Bow",
+    "Help",
+    "Back",
+    "Close",
+    "Cancel",
+    "Confirm",
+    "Accept",
+    "Reward",
+    "Rewards",
+    "Level",
+    "None",
 ];
 
 impl BangTen {
@@ -84,7 +116,11 @@ impl BangTen {
                 ten.insert(v.to_string());
             }
         }
-        let dai = ten.iter().map(|t| t.split_whitespace().count()).max().unwrap_or(1);
+        let dai = ten
+            .iter()
+            .map(|t| t.split_whitespace().count())
+            .max()
+            .unwrap_or(1);
         Self { ten, dai }
     }
 
@@ -118,7 +154,9 @@ impl BangTen {
 pub fn tach_json(chu: &str, so: usize) -> Result<Vec<String>> {
     let chu = chu.trim();
     let (i, j) = (chu.find('['), chu.rfind(']'));
-    let (Some(i), Some(j)) = (i, j) else { return Err(anyhow!("không thấy mảng JSON")) };
+    let (Some(i), Some(j)) = (i, j) else {
+        return Err(anyhow!("không thấy mảng JSON"));
+    };
     if j < i {
         return Err(anyhow!("không thấy mảng JSON"));
     }
@@ -156,7 +194,10 @@ pub fn doc_gia() -> [f64; 2] {
         .and_then(|b| serde_json::from_slice(&b).ok())
         .unwrap_or_default();
     match v["gia_usd_moi_trieu_token"].as_array() {
-        Some(a) if a.len() == 2 => [a[0].as_f64().unwrap_or(GIA_MAC_DINH[0]), a[1].as_f64().unwrap_or(GIA_MAC_DINH[1])],
+        Some(a) if a.len() == 2 => [
+            a[0].as_f64().unwrap_or(GIA_MAC_DINH[0]),
+            a[1].as_f64().unwrap_or(GIA_MAC_DINH[1]),
+        ],
         _ => GIA_MAC_DINH,
     }
 }
@@ -171,18 +212,29 @@ fn re_tach_cau() -> &'static Regex {
 
 fn tach_cau(s: &str) -> Vec<String> {
     let danh_dau = re_tach_cau().replace_all(s.trim(), "$1\u{1}$2");
-    danh_dau.split('\u{1}').map(str::trim).filter(|c| !c.is_empty()).map(String::from).collect()
+    danh_dau
+        .split('\u{1}')
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 /// Dịch các đoạn chữ (không có <..>, xuống dòng). Mã {..} thay bằng ZQn rồi trả lại; mô hình
 /// làm mất mã thì dịch từng mảnh giữa các mã. `dich_cau` dịch một danh sách câu.
-fn dich_doan(cac_doan: &[String], dich_cau: &dyn Fn(&[String]) -> Result<Vec<String>>) -> Result<Vec<String>> {
+fn dich_doan(
+    cac_doan: &[String],
+    dich_cau: &dyn Fn(&[String]) -> Result<Vec<String>>,
+) -> Result<Vec<String>> {
     static MA: OnceLock<Regex> = OnceLock::new();
     let re_ma = MA.get_or_init(|| Regex::new(r"\{[^{}]*\}").unwrap());
     let mut cau: Vec<String> = Vec::new();
     let mut khuon: Vec<(String, Vec<String>, usize, usize)> = Vec::new();
     for doan in cac_doan {
-        let ma: Vec<String> = re_ma.find_iter(doan).map(|m| m.as_str().to_string()).collect();
+        let ma: Vec<String> = re_ma
+            .find_iter(doan)
+            .map(|m| m.as_str().to_string())
+            .collect();
         let mut tam = doan.clone();
         for (n, m) in ma.iter().enumerate() {
             tam = tam.replacen(m.as_str(), &format!("ZQ{n}"), 1);
@@ -191,12 +243,17 @@ fn dich_doan(cac_doan: &[String], dich_cau: &dyn Fn(&[String]) -> Result<Vec<Str
         khuon.push((doan.clone(), ma, cau.len(), ds.len()));
         cau.extend(ds);
     }
-    let ban = if cau.is_empty() { Vec::new() } else { dich_cau(&cau)? };
+    let ban = if cau.is_empty() {
+        Vec::new()
+    } else {
+        dich_cau(&cau)?
+    };
     let mut kq = Vec::with_capacity(khuon.len());
     for (doan, ma, dau, so) in &khuon {
         let mut vi = ban[*dau..dau + so].join(" ");
         if !ma.is_empty() {
-            let du = (0..ma.len()).all(|n| vi.matches(&format!("ZQ{n}")).count() == 1) && !vi.contains(&format!("ZQ{}", ma.len()));
+            let du = (0..ma.len()).all(|n| vi.matches(&format!("ZQ{n}")).count() == 1)
+                && !vi.contains(&format!("ZQ{}", ma.len()));
             if du {
                 for (n, m) in ma.iter().enumerate() {
                     vi = vi.replace(&format!("ZQ{n}"), m);
@@ -213,10 +270,16 @@ fn dich_doan(cac_doan: &[String], dich_cau: &dyn Fn(&[String]) -> Result<Vec<Str
                 manh.push(doan[cuoi..].to_string());
                 let can: Vec<String> = manh
                     .iter()
-                    .filter(|m| !m.starts_with('{') && Regex::new(r"[A-Za-z]{2,}").unwrap().is_match(m))
+                    .filter(|m| {
+                        !m.starts_with('{') && Regex::new(r"[A-Za-z]{2,}").unwrap().is_match(m)
+                    })
                     .map(|m| m.trim().to_string())
                     .collect();
-                let dich = if can.is_empty() { Vec::new() } else { dich_cau(&can)? };
+                let dich = if can.is_empty() {
+                    Vec::new()
+                } else {
+                    dich_cau(&can)?
+                };
                 let mut it = dich.into_iter();
                 vi = manh
                     .iter()
@@ -238,7 +301,10 @@ fn dich_doan(cac_doan: &[String], dich_cau: &dyn Fn(&[String]) -> Result<Vec<Str
 }
 
 /// Dịch offline một lô chuỗi: giữ nguyên thẻ <..>, [EMPTY], xuống dòng; chỉ dịch phần chữ.
-pub fn offline_lo(lo: &[String], dich_cau: &dyn Fn(&[String]) -> Result<Vec<String>>) -> Result<Vec<Option<String>>> {
+pub fn offline_lo(
+    lo: &[String],
+    dich_cau: &dyn Fn(&[String]) -> Result<Vec<String>>,
+) -> Result<Vec<Option<String>>> {
     static R: OnceLock<Regex> = OnceLock::new();
     let re_tach = R.get_or_init(|| Regex::new(r"<[^<>]*>|\[EMPTY\]|\n").unwrap());
     enum Phan {
@@ -258,7 +324,8 @@ pub fn offline_lo(lo: &[String], dich_cau: &dyn Fn(&[String]) -> Result<Vec<Stri
         }
         manh.push(s[cuoi..].to_string());
         for doan in manh.into_iter().filter(|d| !d.is_empty()) {
-            let chi_the = re_tach.is_match(&doan) && re_tach.find(&doan).is_some_and(|m| m.as_str() == doan);
+            let chi_the =
+                re_tach.is_match(&doan) && re_tach.find(&doan).is_some_and(|m| m.as_str() == doan);
             if chi_the || khong_can_dich(&doan) {
                 phan.push(Phan::Giu(doan));
                 continue;
@@ -270,7 +337,11 @@ pub fn offline_lo(lo: &[String], dich_cau: &dyn Fn(&[String]) -> Result<Vec<Stri
         }
         khuon.push(phan);
     }
-    let ban = if can.is_empty() { Vec::new() } else { dich_doan(&can, dich_cau)? };
+    let ban = if can.is_empty() {
+        Vec::new()
+    } else {
+        dich_doan(&can, dich_cau)?
+    };
     Ok(khuon
         .into_iter()
         .map(|phan| {
@@ -335,7 +406,11 @@ impl ViecDich {
     }
 
     pub fn tim(&self, en: &str) -> Option<String> {
-        self.bo_nho.lock().unwrap_or_else(|e| e.into_inner()).get(en).cloned()
+        self.bo_nho
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(en)
+            .cloned()
     }
 
     /// Các chuỗi (không trùng, giữ thứ tự) chưa có trong bộ nhớ.
@@ -381,11 +456,19 @@ impl ViecDich {
 
     /// Dịch một lô bằng Claude; trả (bản dịch | None nếu hỏng, tiền).
     fn dich_lo_claude(&self, lo: &[String], gia: [f64; 2]) -> Result<(Vec<Option<String>>, f64)> {
-        let mut ten: Vec<String> = lo.iter().flat_map(|v| self.bang_ten.trong(v)).collect::<HashSet<_>>().into_iter().collect();
+        let mut ten: Vec<String> = lo
+            .iter()
+            .flat_map(|v| self.bang_ten.trong(v))
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
         ten.sort();
         let mut noi_dung = String::new();
         if !ten.is_empty() {
-            noi_dung.push_str(&format!("Giữ nguyên (không dịch): {}\n\n", ten.into_iter().take(150).collect::<Vec<_>>().join(", ")));
+            noi_dung.push_str(&format!(
+                "Giữ nguyên (không dịch): {}\n\n",
+                ten.into_iter().take(150).collect::<Vec<_>>().join(", ")
+            ));
         }
         noi_dung.push_str(&serde_json::to_string(lo)?);
         let ky: usize = lo.iter().map(|v| v.chars().count()).sum();
@@ -412,14 +495,24 @@ impl ViecDich {
             return Ok((vec![None], tien));
         };
         Ok((
-            lo.iter().zip(kq).map(|(en, vi)| (!vi.trim().is_empty() && the_cua(en) == the_cua(&vi)).then_some(vi)).collect(),
+            lo.iter()
+                .zip(kq)
+                .map(|(en, vi)| {
+                    (!vi.trim().is_empty() && the_cua(en) == the_cua(&vi)).then_some(vi)
+                })
+                .collect(),
             tien,
         ))
     }
 
     /// Dịch bằng Claude (4 luồng) tới khi hết câu / chạm giới hạn tiền / bị dừng.
     /// Trả true nếu đã dịch xong hết.
-    pub fn chay_claude(&mut self, ds: Vec<String>, gioi_han_usd: f64, bc: &dyn BaoCao) -> Result<bool> {
+    pub fn chay_claude(
+        &mut self,
+        ds: Vec<String>,
+        gioi_han_usd: f64,
+        bc: &dyn BaoCao,
+    ) -> Result<bool> {
         let tong = ds.len();
         if tong == 0 {
             bc.bao("Đã dịch xong hết.");
@@ -432,7 +525,14 @@ impl ViecDich {
         let cac_lo = chia_lo(&ds);
         bc.bao(&format!("Bắt đầu dịch {tong} câu ({} lô)...", cac_lo.len()));
         let hang = Mutex::new(cac_lo.into_iter());
-        let chung = Mutex::new((0usize, 0.0f64, 0usize, 0usize, Instant::now(), None::<String>)); // xong, tiền, đổi, lỗi, lần lưu, lỗi dừng
+        let chung = Mutex::new((
+            0usize,
+            0.0f64,
+            0usize,
+            0usize,
+            Instant::now(),
+            None::<String>,
+        )); // xong, tiền, đổi, lỗi, lần lưu, lỗi dừng
         let viec: &ViecDich = self;
         std::thread::scope(|s| {
             for _ in 0..SO_LUONG {
@@ -440,7 +540,9 @@ impl ViecDich {
                     if viec.dung.load(Ordering::SeqCst) || chung.lock().unwrap().1 >= gioi_han_usd {
                         return;
                     }
-                    let Some(lo) = hang.lock().unwrap().next() else { return };
+                    let Some(lo) = hang.lock().unwrap().next() else {
+                        return;
+                    };
                     match viec.dich_lo_claude(&lo, gia) {
                         Ok((kq, tien)) => {
                             let mut doi = 0;
@@ -476,7 +578,9 @@ impl ViecDich {
                         }
                         Err(e) => {
                             chung.lock().unwrap().3 += lo.len();
-                            bc.bao(&format!("Lỗi một lô ({e}) – bỏ qua, lần sau chạy tiếp sẽ dịch lại"));
+                            bc.bao(&format!(
+                                "Lỗi một lô ({e}) – bỏ qua, lần sau chạy tiếp sẽ dịch lại"
+                            ));
                         }
                     }
                 });
@@ -492,7 +596,9 @@ impl ViecDich {
             return Ok(false);
         }
         if tien >= gioi_han_usd {
-            bc.bao(&format!("Đã chạm giới hạn {gioi_han_usd:.2} USD – bấm Dịch lần nữa để chạy tiếp."));
+            bc.bao(&format!(
+                "Đã chạm giới hạn {gioi_han_usd:.2} USD – bấm Dịch lần nữa để chạy tiếp."
+            ));
             return Ok(false);
         }
         let con = self.cau_can_dich(ds.iter().map(String::as_str));
@@ -502,7 +608,10 @@ impl ViecDich {
     /// Dịch offline (CHỈ tiếng Anh) theo lô 24 câu. Trả true nếu xong hết.
     pub fn chay_offline(&mut self, ds: Vec<String>, bc: &dyn BaoCao) -> Result<bool> {
         if !offline::co_the_dung() {
-            return Err(claude::LoiDung("chưa có Python riêng / mô hình dịch offline (Cài đặt > Tải công cụ)".into()).into());
+            return Err(claude::LoiDung(
+                "chưa có Python riêng / mô hình dịch offline (Cài đặt > Tải công cụ)".into(),
+            )
+            .into());
         }
         let tong = ds.len();
         if tong == 0 {
@@ -526,7 +635,8 @@ impl ViecDich {
                 .zip(cau)
                 .map(|((vi, (_, hoa)), en)| {
                     let vi = if hoa { vi.to_uppercase() } else { vi };
-                    crate::dich::the::tu_menu(en).unwrap_or_else(|| crate::dich::the::bo_lap_doi(en, &vi))
+                    crate::dich::the::tu_menu(en)
+                        .unwrap_or_else(|| crate::dich::the::bo_lap_doi(en, &vi))
                 })
                 .collect())
         };
@@ -544,7 +654,10 @@ impl ViecDich {
                 let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
                 for (en, vi) in lo.iter().zip(kq) {
                     match vi {
-                        Some(vi) if the_cua(en) == the_cua(&vi) => {
+                        Some(vi)
+                            if the_cua(en) == the_cua(&vi)
+                                && !crate::dich::the::bi_lap(en, &vi) =>
+                        {
                             bn.insert(en.clone(), vi);
                             self.da_doi += 1;
                         }
@@ -575,12 +688,21 @@ mod tests {
         assert!(!khong_can_dich("Open the {Key:door}"));
         assert!(la_cau("You must find the second shrine before nightfall."));
         assert!(!la_cau("Iron Sword"));
-        assert_eq!(the_cua("a {Param1} <br/> [EMPTY]"), vec!["<br/>", "[EMPTY]", "{Param1}"]);
+        assert_eq!(
+            the_cua("a {Param1} <br/> [EMPTY]"),
+            vec!["<br/>", "[EMPTY]", "{Param1}"]
+        );
     }
 
     #[test]
     fn bang_ten_va_lo() {
-        let bt = BangTen::tao(["Kliff", "Greymanes", "Pywel", "Talk", "A very long sentence here."]);
+        let bt = BangTen::tao([
+            "Kliff",
+            "Greymanes",
+            "Pywel",
+            "Talk",
+            "A very long sentence here.",
+        ]);
         assert!(bt.la_ten("Kliff") && !bt.la_ten("Talk"));
         let t = bt.trong("Kliff leads the Greymanes across Pywel.");
         assert_eq!(t.len(), 3);
@@ -588,20 +710,32 @@ mod tests {
         let lo = chia_lo(&ds);
         assert_eq!(lo.len(), 3);
         assert_eq!(lo[0].len(), 40);
-        assert_eq!(tach_json("```json\n[\"a\",\"b\"]\n```", 2).unwrap(), vec!["a", "b"]);
+        assert_eq!(
+            tach_json("```json\n[\"a\",\"b\"]\n```", 2).unwrap(),
+            vec!["a", "b"]
+        );
         assert!(tach_json("[\"a\"]", 2).is_err());
     }
 
     #[test]
     fn offline_giu_the() {
         // "máy dịch" giả: thêm [vi] trước mỗi câu, giữ ZQn
-        let gia = |cau: &[String]| -> Result<Vec<String>> { Ok(cau.iter().map(|c| format!("[vi]{c}")).collect()) };
+        let gia = |cau: &[String]| -> Result<Vec<String>> {
+            Ok(cau.iter().map(|c| format!("[vi]{c}")).collect())
+        };
         let kq = offline_lo(
-            &["Hello there.<br/>Press {Key:Jump} now!".to_string(), "<b>Gold</b>\nSilver".to_string(), "123".to_string()],
+            &[
+                "Hello there.<br/>Press {Key:Jump} now!".to_string(),
+                "<b>Gold</b>\nSilver".to_string(),
+                "123".to_string(),
+            ],
             &gia,
         )
         .unwrap();
-        assert_eq!(kq[0].as_deref(), Some("[vi]Hello there.<br/>[vi]Press {Key:Jump} now!"));
+        assert_eq!(
+            kq[0].as_deref(),
+            Some("[vi]Hello there.<br/>[vi]Press {Key:Jump} now!")
+        );
         assert_eq!(kq[1].as_deref(), Some("<b>[vi]Gold</b>\n[vi]Silver"));
         assert_eq!(kq[2].as_deref(), Some("123"));
         assert_eq!(tach_cau("One. Two! three"), vec!["One.", "Two! three"]);

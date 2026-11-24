@@ -8,7 +8,8 @@ use crate::cau_hinh;
 
 pub const MO_HINH: &str = "claude-haiku-5-5";
 
-pub const HUONG_DAN: &str = "Bạn là người dịch game chuyên nghiệp từ tiếng Anh (hoặc ngôn ngữ khác) sang tiếng Việt.\n\
+pub const HUONG_DAN: &str =
+    "Bạn là người dịch game chuyên nghiệp từ tiếng Anh (hoặc ngôn ngữ khác) sang tiếng Việt.\n\
 - Dịch tự nhiên, ngắn gọn, đúng giọng nhân vật trong game.\n\
 - GIỮ NGUYÊN tên người, địa danh, tổ chức, vật phẩm riêng.\n\
 - GIỮ NGUYÊN mọi thẻ như %s, {..}, [..], <..>, \\n, \\c[1] và vị trí của chúng.\n\
@@ -21,11 +22,14 @@ pub static KHOA_HONG: AtomicBool = AtomicBool::new(false);
 pub static BAT: AtomicBool = AtomicBool::new(true);
 
 pub fn co_khoa() -> bool {
-    BAT.load(Ordering::Relaxed) && !KHOA_HONG.load(Ordering::Relaxed) && cau_hinh::doc_khoa("khoa_api.txt").is_some()
+    BAT.load(Ordering::Relaxed)
+        && !KHOA_HONG.load(Ordering::Relaxed)
+        && cau_hinh::doc_khoa("khoa_api.txt").is_some()
 }
 
 fn goi(he_thong: &str, noi_dung: &str, toi_da: u32) -> Result<String> {
-    let khoa = cau_hinh::doc_khoa("khoa_api.txt").ok_or_else(|| anyhow!("Chưa có mã API Claude"))?;
+    let khoa =
+        cau_hinh::doc_khoa("khoa_api.txt").ok_or_else(|| anyhow!("Chưa có mã API Claude"))?;
     if KHOA_HONG.load(Ordering::Relaxed) {
         bail!("Mã API Claude bị từ chối");
     }
@@ -46,7 +50,9 @@ fn goi(he_thong: &str, noi_dung: &str, toi_da: u32) -> Result<String> {
             KHOA_HONG.store(true, Ordering::Relaxed);
             bail!("Mã API Claude bị từ chối ({ma}) – chuyển sang Google");
         }
-        Err(ureq::Error::Status(ma, r)) => bail!("Claude lỗi {ma}: {}", r.into_string().unwrap_or_default()),
+        Err(ureq::Error::Status(ma, r)) => {
+            bail!("Claude lỗi {ma}: {}", r.into_string().unwrap_or_default())
+        }
         Err(e) => return Err(e.into()),
     };
     let mut ra = String::new();
@@ -94,7 +100,10 @@ pub fn goi_day_du(he_thong: &str, noi_dung: &str, toi_da: u32) -> Result<(String
             Ok(r) => r.into_json()?,
             Err(ureq::Error::Status(401 | 403, _)) => {
                 KHOA_HONG.store(true, Ordering::Relaxed);
-                return Err(LoiDung("mã Claude không hợp lệ (HTTP 401/403) – kiểm tra lại mã trong Cài đặt".into()).into());
+                return Err(LoiDung(
+                    "mã Claude không hợp lệ (HTTP 401/403) – kiểm tra lại mã trong Cài đặt".into(),
+                )
+                .into());
             }
             Err(ureq::Error::Status(429 | 500 | 502 | 503 | 529, _)) => {
                 std::thread::sleep(Duration::from_secs(5 + lan * 10));
@@ -138,8 +147,12 @@ pub fn dich_lo(cac_cau: &[String], he_thong: &str) -> Result<Vec<String>> {
         serde_json::to_string(cac_cau)?
     );
     let tra = goi(he_thong, &yeu_cau, 8000)?;
-    let dau = tra.find('[').ok_or_else(|| anyhow!("Claude không trả mảng JSON"))?;
-    let cuoi = tra.rfind(']').ok_or_else(|| anyhow!("Claude không trả mảng JSON"))?;
+    let dau = tra
+        .find('[')
+        .ok_or_else(|| anyhow!("Claude không trả mảng JSON"))?;
+    let cuoi = tra
+        .rfind(']')
+        .ok_or_else(|| anyhow!("Claude không trả mảng JSON"))?;
     let ra: Vec<String> = serde_json::from_str(&tra[dau..=cuoi])?;
     if ra.len() != cac_cau.len() {
         bail!("Claude trả {} câu, cần {}", ra.len(), cac_cau.len());

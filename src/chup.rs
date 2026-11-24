@@ -43,7 +43,13 @@ impl Anh {
             let d = ((y * self.w + x0) * 4) as usize;
             bgra.extend_from_slice(&self.bgra[d..d + (w * 4) as usize]);
         }
-        Some(Anh { w, h, x0: self.x0 + x0 as i32, y0: self.y0 + y0 as i32, bgra })
+        Some(Anh {
+            w,
+            h,
+            x0: self.x0 + x0 as i32,
+            y0: self.y0 + y0 as i32,
+            bgra,
+        })
     }
 
     /// Lọc chữ trắng (giống app cũ): độ sáng ≥ ngưỡng → chữ ĐEN, còn lại nền TRẮNG.
@@ -75,14 +81,21 @@ impl Anh {
                 let tx = fx - x0 as f32;
                 let d = ((y * w + x) * 4) as usize;
                 for k in 0..4 {
-                    let p = |xx: u32, yy: u32| self.bgra[((yy * self.w + xx) * 4) as usize + k] as f32;
+                    let p =
+                        |xx: u32, yy: u32| self.bgra[((yy * self.w + xx) * 4) as usize + k] as f32;
                     let tren = p(x0, y0) * (1.0 - tx) + p(x1, y0) * tx;
                     let duoi = p(x0, y1) * (1.0 - tx) + p(x1, y1) * tx;
                     bgra[d + k] = (tren * (1.0 - ty) + duoi * ty).round() as u8;
                 }
             }
         }
-        Anh { w, h, x0: self.x0, y0: self.y0, bgra }
+        Anh {
+            w,
+            h,
+            x0: self.x0,
+            y0: self.y0,
+            bgra,
+        }
     }
 
     /// Dấu vân tay ảnh (96×24 xám) – ảnh không đổi thì khỏi đọc chữ lại.
@@ -94,7 +107,12 @@ impl Anh {
                 let sx = (x * self.w / w).min(self.w - 1);
                 let sy = (y * self.h / h).min(self.h - 1);
                 let i = ((sy * self.w + sx) * 4) as usize;
-                ra.push(((self.bgra[i + 2] as u32 * 299 + self.bgra[i + 1] as u32 * 587 + self.bgra[i] as u32 * 114) / 1000) as u8);
+                ra.push(
+                    ((self.bgra[i + 2] as u32 * 299
+                        + self.bgra[i + 1] as u32 * 587
+                        + self.bgra[i] as u32 * 114)
+                        / 1000) as u8,
+                );
             }
         }
         ra
@@ -152,7 +170,14 @@ impl ChupDxgi {
             let dev = dev.ok_or_else(|| anyhow!("không tạo được D3D11"))?;
             let ctx = ctx.ok_or_else(|| anyhow!("không tạo được D3D11"))?;
             let dup = Self::nhan_ban(&dev)?;
-            Ok(Self { dev, ctx, dup, tam: None, w: 0, h: 0 })
+            Ok(Self {
+                dev,
+                ctx,
+                dup,
+                tam: None,
+                w: 0,
+                h: 0,
+            })
         }
     }
 
@@ -185,7 +210,9 @@ impl MayChup for ChupDxgi {
                 Err(e) if e.code() == DXGI_ERROR_WAIT_TIMEOUT => return Ok(false),
                 Err(e) if e.code() == DXGI_ERROR_ACCESS_LOST => {
                     // Không tự tạo lại ở đây: bộ quản lý sẽ bỏ hẳn bộ chụp này và chờ rồi mới tạo mới
-                    return Err(anyhow!("DXGI mất quyền chụp (game đổi chế độ hiển thị / tắt)"));
+                    return Err(anyhow!(
+                        "DXGI mất quyền chụp (game đổi chế độ hiển thị / tắt)"
+                    ));
                 }
                 Err(e) => return Err(e.into()),
             }
@@ -195,7 +222,8 @@ impl MayChup for ChupDxgi {
                 return Ok(false);
             }
             let kq = (|| -> Result<()> {
-                let tex: ID3D11Texture2D = tai_nguyen.ok_or_else(|| anyhow!("khung rỗng"))?.cast()?;
+                let tex: ID3D11Texture2D =
+                    tai_nguyen.ok_or_else(|| anyhow!("khung rỗng"))?.cast()?;
                 let mut mo_ta = D3D11_TEXTURE2D_DESC::default();
                 tex.GetDesc(&mut mo_ta);
                 if self.tam.is_none() || self.w != mo_ta.Width || self.h != mo_ta.Height {
@@ -224,11 +252,15 @@ impl MayChup for ChupDxgi {
 
     fn lay(&mut self, v: [i32; 4]) -> Option<Anh> {
         // Chưa nhận được khung hình nào (màn hình đứng yên từ lúc tạo) → chụp tạm bằng GDI
-        let Some(tam) = self.tam.as_ref() else { return ChupGdi.lay(v) };
+        let Some(tam) = self.tam.as_ref() else {
+            return ChupGdi.lay(v);
+        };
         let (x0, y0, w, h) = kep(v, self.w, self.h)?;
         unsafe {
             let mut map = D3D11_MAPPED_SUBRESOURCE::default();
-            self.ctx.Map(tam, 0, D3D11_MAP_READ, 0, Some(&mut map)).ok()?;
+            self.ctx
+                .Map(tam, 0, D3D11_MAP_READ, 0, Some(&mut map))
+                .ok()?;
             let goc = map.pData as *const u8;
             let mut bgra = Vec::with_capacity((w * h * 4) as usize);
             for y in y0..y0 + h {
@@ -236,7 +268,13 @@ impl MayChup for ChupDxgi {
                 bgra.extend_from_slice(std::slice::from_raw_parts(dau, (w * 4) as usize));
             }
             self.ctx.Unmap(tam, 0);
-            Some(Anh { w, h, x0: x0 as i32, y0: y0 as i32, bgra })
+            Some(Anh {
+                w,
+                h,
+                x0: x0 as i32,
+                y0: y0 as i32,
+                bgra,
+            })
         }
     }
 }
@@ -252,7 +290,12 @@ impl MayChup for ChupGdi {
     }
 
     fn kich_thuoc(&self) -> (u32, u32) {
-        unsafe { (GetSystemMetrics(SM_CXSCREEN) as u32, GetSystemMetrics(SM_CYSCREEN) as u32) }
+        unsafe {
+            (
+                GetSystemMetrics(SM_CXSCREEN) as u32,
+                GetSystemMetrics(SM_CYSCREEN) as u32,
+            )
+        }
     }
 
     fn cap_nhat(&mut self) -> Result<bool> {
@@ -268,7 +311,17 @@ impl MayChup for ChupGdi {
             let dc = CreateCompatibleDC(Some(man));
             let bmp = CreateCompatibleBitmap(man, wi, hi);
             let cu = SelectObject(dc, bmp.into());
-            let ok = BitBlt(dc, 0, 0, wi, hi, Some(man), x0 as i32, y0 as i32, SRCCOPY | CAPTUREBLT);
+            let ok = BitBlt(
+                dc,
+                0,
+                0,
+                wi,
+                hi,
+                Some(man),
+                x0 as i32,
+                y0 as i32,
+                SRCCOPY | CAPTUREBLT,
+            );
             let mut info = BITMAPINFO::default();
             info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
             info.bmiHeader.biWidth = wi;
@@ -277,12 +330,26 @@ impl MayChup for ChupGdi {
             info.bmiHeader.biBitCount = 32;
             let mut bgra = vec![0u8; (w * h * 4) as usize];
             SelectObject(dc, cu);
-            GetDIBits(dc, bmp, 0, h, Some(bgra.as_mut_ptr().cast()), &mut info, DIB_RGB_COLORS);
+            GetDIBits(
+                dc,
+                bmp,
+                0,
+                h,
+                Some(bgra.as_mut_ptr().cast()),
+                &mut info,
+                DIB_RGB_COLORS,
+            );
             let _ = DeleteObject(bmp.into());
             let _ = DeleteDC(dc);
             ReleaseDC(None, man);
             ok.ok()?;
-            Some(Anh { w, h, x0: x0 as i32, y0: y0 as i32, bgra })
+            Some(Anh {
+                w,
+                h,
+                x0: x0 as i32,
+                y0: y0 as i32,
+                bgra,
+            })
         }
     }
 }

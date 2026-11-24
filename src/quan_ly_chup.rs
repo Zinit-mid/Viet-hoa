@@ -52,7 +52,9 @@ impl QuanLyChup {
             if self.gdi_tu.is_some() {
                 self.may = Some(Box::new(chup::ChupGdi));
             } else {
-                let tao = self.tao_nhanh.unwrap_or(|| Ok(Box::new(chup::ChupDxgi::moi()?)));
+                let tao = self
+                    .tao_nhanh
+                    .unwrap_or(|| Ok(Box::new(chup::ChupDxgi::moi()?)));
                 match tao() {
                     Ok(m) => self.may = Some(m),
                     Err(e) => {
@@ -90,7 +92,9 @@ impl QuanLyChup {
             }
             self.gdi_tu = Some(Instant::now());
             self.cho_den = None;
-            chung.tt().loi = "Chụp nhanh (DXGI) đang lỗi → tạm dùng GDI. Game nên để Borderless / Windowed.".into();
+            chung.tt().loi =
+                "Chụp nhanh (DXGI) đang lỗi → tạm dùng GDI. Game nên để Borderless / Windowed."
+                    .into();
             return;
         }
         let cho = match self.loi_lien {
@@ -128,7 +132,10 @@ mod tests {
     #[test]
     fn mat_quyen_chup_cho_dan_roi_sang_gdi() {
         let chung = Chung::moi(CauHinh::default());
-        let mut ql = QuanLyChup { tao_nhanh: Some(|| Ok(Box::new(Hong))), ..Default::default() };
+        let mut ql = QuanLyChup {
+            tao_nhanh: Some(|| Ok(Box::new(Hong))),
+            ..Default::default()
+        };
         let mut so_lan_tao = 0;
         let mut cho = Vec::new();
         for _ in 0..5 {
@@ -146,7 +153,10 @@ mod tests {
         assert_eq!(so_lan_tao, 5);
         assert_eq!(cho, vec![1, 2, 5, 5]);
         // Trong lúc chờ không được tạo bộ chụp mới
-        let mut ql2 = QuanLyChup { tao_nhanh: Some(|| Ok(Box::new(Hong))), ..Default::default() };
+        let mut ql2 = QuanLyChup {
+            tao_nhanh: Some(|| Ok(Box::new(Hong))),
+            ..Default::default()
+        };
         ql2.lay_may(&chung);
         ql2.loi(&chung, "x");
         assert!(ql2.lay_may(&chung).is_none());

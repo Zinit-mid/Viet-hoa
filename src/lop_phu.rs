@@ -102,7 +102,12 @@ pub fn bat_che_do_dich(bat: bool) {
     let h = HWND_DIEU_KHIEN.load(Ordering::Relaxed);
     if h != 0 {
         unsafe {
-            let _ = PostMessageW(Some(HWND(h as *mut _)), WM_CHE_DO, WPARAM(bat as usize), LPARAM(0));
+            let _ = PostMessageW(
+                Some(HWND(h as *mut _)),
+                WM_CHE_DO,
+                WPARAM(bat as usize),
+                LPARAM(0),
+            );
         }
     }
 }
@@ -286,7 +291,12 @@ unsafe fn rong_mot_dong(chu: &mut [u16], co: i32) -> i32 {
 unsafe fn do_chu(chu: &mut [u16], co: i32, rong: i32) -> (i32, i32) {
     let dc = CreateCompatibleDC(None);
     let cu = SelectObject(dc, font(co).into());
-    let mut r = RECT { left: 0, top: 0, right: rong.max(40), bottom: 0 };
+    let mut r = RECT {
+        left: 0,
+        top: 0,
+        right: rong.max(40),
+        bottom: 0,
+    };
     DrawTextW(dc, chu, &mut r, DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
     SelectObject(dc, cu);
     let _ = DeleteDC(dc);
@@ -376,14 +386,34 @@ unsafe fn ve_o(hwnd: HWND, m: &MucPhu) {
     let goc_w = m.hop[2].max(40);
     let toi_da = (goc_w * 5 / 2).max(320).min(man_w - m.hop[0]).max(goc_w);
     let can = rong_mot_dong(&mut chu, co) + 2 * LE + 2;
-    let rong = if can <= toi_da { can.max(goc_w) } else { toi_da };
+    let rong = if can <= toi_da {
+        can.max(goc_w)
+    } else {
+        toi_da
+    };
     let (_, cao_chu) = do_chu(&mut chu, co, rong - 2 * LE);
     let cao = m.hop[3].max(cao_chu + 2 * LE);
     VE.with(|v| {
-        v.borrow_mut().insert(hwnd.0 as isize, VeO { chu, co, nen, mau_chu });
+        v.borrow_mut().insert(
+            hwnd.0 as isize,
+            VeO {
+                chu,
+                co,
+                nen,
+                mau_chu,
+            },
+        );
     });
     let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha, LWA_ALPHA);
-    let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), m.hop[0], m.hop[1], rong, cao, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    let _ = SetWindowPos(
+        hwnd,
+        Some(HWND_TOPMOST),
+        m.hop[0],
+        m.hop[1],
+        rong,
+        cao,
+        SWP_NOACTIVATE | SWP_SHOWWINDOW,
+    );
     let _ = InvalidateRect(Some(hwnd), None, false);
 }
 
@@ -394,7 +424,11 @@ unsafe fn lop_nen(bat: bool) {
         if bat && l.is_none() {
             let (w, h) = (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
             if let Ok(hwnd) = CreateWindowExW(
-                WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+                WS_EX_LAYERED
+                    | WS_EX_TRANSPARENT
+                    | WS_EX_TOPMOST
+                    | WS_EX_TOOLWINDOW
+                    | WS_EX_NOACTIVATE,
                 w!("VietHoaLopNen"),
                 w!("Việt Hóa – lớp nền"),
                 WS_POPUP,
@@ -432,13 +466,16 @@ unsafe fn an_app_khoi_chup(an: bool) {
         GetWindowThreadProcessId(h, Some(&mut pid));
         // Chỉ bảng chính đang hiện của app. Không đụng cửa sổ ẩn (driver OpenGL
         // tạo "NVOGLDC invisible", "__wglDummyWindowFodder" – đụng vào là hiện bảng trắng)
-        if pid == windows::Win32::System::Threading::GetCurrentProcessId() && IsWindowVisible(h).as_bool() {
+        if pid == windows::Win32::System::Threading::GetCurrentProcessId()
+            && IsWindowVisible(h).as_bool()
+        {
             let mut ten = [0u16; 64];
             let n = GetClassNameW(h, &mut ten) as usize;
             let lop = String::from_utf16_lossy(&ten[..n]);
             let mut tieu_de = [0u16; 64];
             let m = GetWindowTextW(h, &mut tieu_de) as usize;
-            if !lop.starts_with("VietHoa") && String::from_utf16_lossy(&tieu_de[..m]) == "Việt Hóa" {
+            if !lop.starts_with("VietHoa") && String::from_utf16_lossy(&tieu_de[..m]) == "Việt Hóa"
+            {
                 let ds = &mut *(lp.0 as *mut Vec<HWND>);
                 ds.push(h);
             }
@@ -449,7 +486,9 @@ unsafe fn an_app_khoi_chup(an: bool) {
     let _ = EnumWindows(Some(moi_cua_so), LPARAM(&mut ds as *mut _ as isize));
     let mut da_an = false;
     for h in ds {
-        da_an |= SetWindowDisplayAffinity(h, if an { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE }).is_ok() && an;
+        da_an |= SetWindowDisplayAffinity(h, if an { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE })
+            .is_ok()
+            && an;
     }
     APP_DA_AN.store(da_an, Ordering::Relaxed);
 }
@@ -463,16 +502,28 @@ unsafe extern "system" fn thu_o(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) ->
             let _ = GetClientRect(hwnd, &mut rc);
             VE.with(|v| {
                 let mut v = v.borrow_mut();
-                let Some(ve) = v.get_mut(&(hwnd.0 as isize)) else { return };
+                let Some(ve) = v.get_mut(&(hwnd.0 as isize)) else {
+                    return;
+                };
                 let co_nen = CreateSolidBrush(rgb(ve.nen));
                 FillRect(hdc, &rc, co_nen);
                 let _ = DeleteObject(co_nen.into());
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, rgb(ve.mau_chu));
                 let cu = SelectObject(hdc, font(ve.co).into());
-                let mut trong = RECT { left: LE, top: LE, right: rc.right - LE, bottom: rc.bottom - LE };
+                let mut trong = RECT {
+                    left: LE,
+                    top: LE,
+                    right: rc.right - LE,
+                    bottom: rc.bottom - LE,
+                };
                 let mut do_rc = trong;
-                DrawTextW(hdc, &mut ve.chu, &mut do_rc, DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                DrawTextW(
+                    hdc,
+                    &mut ve.chu,
+                    &mut do_rc,
+                    DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX,
+                );
                 let du = (trong.bottom - trong.top) - (do_rc.bottom - do_rc.top);
                 if du > 0 {
                     trong.top += du / 2;
@@ -548,7 +599,10 @@ pub fn chon_vung(ten: &str) -> Option<[i32; 4]> {
 }
 
 unsafe extern "system" fn thu_chon(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    let diem = || POINT { x: (lp.0 & 0xFFFF) as i16 as i32, y: ((lp.0 >> 16) & 0xFFFF) as i16 as i32 };
+    let diem = || POINT {
+        x: (lp.0 & 0xFFFF) as i16 as i32,
+        y: ((lp.0 >> 16) & 0xFFFF) as i16 as i32,
+    };
     match msg {
         WM_LBUTTONDOWN => {
             let p = diem();
@@ -599,15 +653,30 @@ unsafe extern "system" fn thu_chon(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             )
             .encode_utf16()
             .collect();
-            let mut o = RECT { left: 0, top: 40, right: rc.right, bottom: 100 };
+            let mut o = RECT {
+                left: 0,
+                top: 40,
+                right: rc.right,
+                bottom: 100,
+            };
             DrawTextW(hdc, &mut huong_dan, &mut o, DT_CENTER | DT_NOPREFIX);
             SelectObject(hdc, cu);
             let c = *CHON.lock().unwrap();
             if let (Some(a), Some(b)) = (c.0, c.1) {
-                let r = RECT { left: a.x.min(b.x), top: a.y.min(b.y), right: a.x.max(b.x), bottom: a.y.max(b.y) };
+                let r = RECT {
+                    left: a.x.min(b.x),
+                    top: a.y.min(b.y),
+                    right: a.x.max(b.x),
+                    bottom: a.y.max(b.y),
+                };
                 let trang = CreateSolidBrush(COLORREF(0x00FF_FFFF));
                 FrameRect(hdc, &r, trang);
-                let r2 = RECT { left: r.left + 1, top: r.top + 1, right: r.right - 1, bottom: r.bottom - 1 };
+                let r2 = RECT {
+                    left: r.left + 1,
+                    top: r.top + 1,
+                    right: r.right - 1,
+                    bottom: r.bottom - 1,
+                };
                 FrameRect(hdc, &r2, trang);
                 let _ = DeleteObject(trang.into());
             }

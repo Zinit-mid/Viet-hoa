@@ -13,6 +13,7 @@ mod khung_dich;
 mod lop_phu;
 mod ocr;
 mod quan_ly_chup;
+mod trang_viet_hoa;
 #[allow(dead_code)] // các giai đoạn sau (Việt hóa từng game) sẽ dùng
 mod viet_hoa;
 
@@ -27,7 +28,10 @@ fn main() -> eframe::Result<()> {
     }
     // Lỗi nặng ở bất kỳ luồng nào → ghi vào nhật ký (để biết luồng nào chết, vì sao)
     std::panic::set_hook(Box::new(|info| {
-        duong_dan::nhat_ky(&format!("LỖI NẶNG ({}): {info}", std::thread::current().name().unwrap_or("luồng phụ")));
+        duong_dan::nhat_ky(&format!(
+            "LỖI NẶNG ({}): {info}",
+            std::thread::current().name().unwrap_or("luồng phụ")
+        ));
     }));
     let bao_chuyen = duong_dan::chuyen_du_lieu_cu();
     let ch = cau_hinh::CauHinh::nap();
@@ -35,8 +39,12 @@ fn main() -> eframe::Result<()> {
     // Tùy chọn khởi động: --dich (bật dịch vùng), --f12 (bật dịch cả màn hình)
     for a in std::env::args().skip(1) {
         match a.as_str() {
-            "--dich" => chung.dang_dich.store(true, std::sync::atomic::Ordering::SeqCst),
-            "--f12" => chung.toan_man.store(true, std::sync::atomic::Ordering::SeqCst),
+            "--dich" => chung
+                .dang_dich
+                .store(true, std::sync::atomic::Ordering::SeqCst),
+            "--f12" => chung
+                .toan_man
+                .store(true, std::sync::atomic::Ordering::SeqCst),
             // Tạo lối tắt trên Desktop rồi thoát
             "--tao-loi-tat" => {
                 match duong_dan::tao_loi_tat_desktop() {

@@ -24,8 +24,10 @@ pub fn co_the_dung() -> bool {
 }
 
 fn khoi_dong() -> Result<TienTrinh> {
-    let py = duong_dan::python().ok_or_else(|| anyhow!("Chưa có Python riêng (cong_cu\\python)"))?;
-    let mh = duong_dan::mo_hinh_offline().ok_or_else(|| anyhow!("Chưa có mô hình quickmt-en-vi"))?;
+    let py =
+        duong_dan::python().ok_or_else(|| anyhow!("Chưa có Python riêng (cong_cu\\python)"))?;
+    let mh =
+        duong_dan::mo_hinh_offline().ok_or_else(|| anyhow!("Chưa có mô hình quickmt-en-vi"))?;
     let script = duong_dan::goc().join("scripts").join("dich_offline.py");
     let mut con = Command::new(py)
         .arg("-I")
@@ -37,8 +39,15 @@ fn khoi_dong() -> Result<TienTrinh> {
         .stderr(Stdio::null())
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()?;
-    let vao = con.stdin.take().ok_or_else(|| anyhow!("không mở được stdin"))?;
-    let mut ra = BufReader::new(con.stdout.take().ok_or_else(|| anyhow!("không mở được stdout"))?);
+    let vao = con
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow!("không mở được stdin"))?;
+    let mut ra = BufReader::new(
+        con.stdout
+            .take()
+            .ok_or_else(|| anyhow!("không mở được stdout"))?,
+    );
     let mut dong = String::new();
     ra.read_line(&mut dong)?;
     if !dong.starts_with("SAN_SANG") {
@@ -85,7 +94,6 @@ pub fn nap_san() {
         }
     });
 }
-
 
 pub fn tat() {
     if let Ok(mut k) = TT.lock() {

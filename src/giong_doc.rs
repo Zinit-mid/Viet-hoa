@@ -30,8 +30,14 @@ fn mci(lenh: &str) {
 
 pub fn doc(chu: String) {
     let giong = GIONG.lock().map(|g| g.clone()).unwrap_or_default();
-    let giong = if giong.is_empty() { "vi-VN-NamMinhNeural".to_string() } else { giong };
-    let Some(py) = duong_dan::python() else { return };
+    let giong = if giong.is_empty() {
+        "vi-VN-NamMinhNeural".to_string()
+    } else {
+        giong
+    };
+    let Some(py) = duong_dan::python() else {
+        return;
+    };
     let so = SO.fetch_add(1, Ordering::SeqCst) + 1;
     std::thread::spawn(move || {
         let thu_muc = duong_dan::du_lieu().join("tam");
@@ -43,7 +49,16 @@ pub fn doc(chu: String) {
             _ => chu,
         };
         let ok = Command::new(py)
-            .args(["-I", "-m", "edge_tts", "--voice", &giong, "--text", &chu, "--write-media"])
+            .args([
+                "-I",
+                "-m",
+                "edge_tts",
+                "--voice",
+                &giong,
+                "--text",
+                &chu,
+                "--write-media",
+            ])
             .arg(&mp3)
             .creation_flags(0x0800_0000)
             .status()
@@ -53,7 +68,10 @@ pub fn doc(chu: String) {
             return; // đã có câu mới hơn
         }
         mci("close vh_giong");
-        mci(&format!("open \"{}\" type mpegvideo alias vh_giong", mp3.display()));
+        mci(&format!(
+            "open \"{}\" type mpegvideo alias vh_giong",
+            mp3.display()
+        ));
         mci("play vh_giong");
     });
 }

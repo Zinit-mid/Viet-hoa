@@ -24,7 +24,12 @@ pub enum Kieu {
     /// Hộp nền tối
     Hop,
     /// Che chữ gốc: (x, y, w, h, màu nền, màu chữ, cao 1 dòng)
-    Che { hop: [i32; 4], nen: [u8; 3], chu: [u8; 3], cao: i32 },
+    Che {
+        hop: [i32; 4],
+        nen: [u8; 3],
+        chu: [u8; 3],
+        cao: i32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -175,7 +180,11 @@ unsafe fn font(co: i32, dam: bool) -> HFONT {
                 0,
                 0,
                 0,
-                if dam { FW_BOLD.0 as i32 } else { FW_SEMIBOLD.0 as i32 },
+                if dam {
+                    FW_BOLD.0 as i32
+                } else {
+                    FW_SEMIBOLD.0 as i32
+                },
                 0,
                 0,
                 0,
@@ -198,7 +207,12 @@ unsafe fn do_chu(chu: &str, co: i32, rong: i32) -> (i32, i32) {
     }
     let dc = CreateCompatibleDC(None);
     let cu = SelectObject(dc, font(co, true).into());
-    let mut r = RECT { left: 0, top: 0, right: rong.max(40), bottom: 0 };
+    let mut r = RECT {
+        left: 0,
+        top: 0,
+        right: rong.max(40),
+        bottom: 0,
+    };
     DrawTextW(dc, &mut s, &mut r, DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
     SelectObject(dc, cu);
     let _ = DeleteDC(dc);
@@ -226,7 +240,14 @@ unsafe fn tao_cua_so() -> Option<HWND> {
 }
 
 /// Kích thước khung theo nội dung (giống _ve của app cũ).
-unsafe fn tinh_co(k: &KhungHien, chinh: bool, x: i32, y: i32, w: i32, co: i32) -> (i32, i32, i32, i32, i32) {
+unsafe fn tinh_co(
+    k: &KhungHien,
+    chinh: bool,
+    x: i32,
+    y: i32,
+    w: i32,
+    co: i32,
+) -> (i32, i32, i32, i32, i32) {
     if let (Kieu::Che { hop, cao, .. }, false) = (&k.kieu, chinh) {
         // giống ve_chu_vua_o: cỡ từ 0,9 × cao dòng, thu nhỏ ×0,9 tới khi vừa; vẫn dài thì kéo ô xuống
         let [cx, cy, cw, ch] = *hop;
@@ -241,7 +262,11 @@ unsafe fn tinh_co(k: &KhungHien, chinh: bool, x: i32, y: i32, w: i32, co: i32) -
         }
     }
     let tren = if chinh { 26 } else { LE };
-    let chu = if chinh && k.chu.trim().is_empty() { GOI_Y } else { k.chu.as_str() };
+    let chu = if chinh && k.chu.trim().is_empty() {
+        GOI_Y
+    } else {
+        k.chu.as_str()
+    };
     let (_, hh) = do_chu(chu, co, (w - 2 * LE).max(60));
     (x, y, w, (hh + tren + LE).max(30), co)
 }
@@ -264,7 +289,19 @@ unsafe fn cap_nhat() {
             let hien = chinh || !k.chu.trim().is_empty();
             if !o.contains_key(&k.id) {
                 let Some(h) = tao_cua_so() else { continue };
-                o.insert(k.id.clone(), O { hwnd: h, hien: None, keo: None, x: 0, y: 0, w: 0, h: 0, co: 0 });
+                o.insert(
+                    k.id.clone(),
+                    O {
+                        hwnd: h,
+                        hien: None,
+                        keo: None,
+                        x: 0,
+                        y: 0,
+                        w: 0,
+                        h: 0,
+                        co: 0,
+                    },
+                );
             }
             let x = o.get_mut(&k.id).unwrap();
             if !hien {
@@ -276,7 +313,11 @@ unsafe fn cap_nhat() {
             }
             if x.keo.is_some() {
                 // đang kéo: giữ vị trí người dùng, chỉ đổi chữ
-                x.hien = Some(KhungHien { khung: [x.x, x.y, x.w], co_chu: x.co, ..k });
+                x.hien = Some(KhungHien {
+                    khung: [x.x, x.y, x.w],
+                    co_chu: x.co,
+                    ..k
+                });
             } else {
                 x.x = k.khung[0];
                 x.y = k.khung[1];
@@ -302,13 +343,29 @@ unsafe fn ve_lai(o: &mut O, chinh: bool) {
     SetWindowLongW(o.hwnd, GWL_EXSTYLE, kieu as i32);
     let (mau, alpha, co) = match (&k.kieu, chinh) {
         (_, true) => (LWA_ALPHA, 242u8, LWA_ALPHA),
-        (Kieu::PhuDe, _) => (LWA_COLORKEY | LWA_ALPHA, (k.do_dam.clamp(0.2, 1.0) * 255.0) as u8, LWA_ALPHA),
-        (Kieu::Hop, _) => (LWA_ALPHA, (k.do_dam.clamp(0.2, 1.0) * 255.0) as u8, LWA_ALPHA),
+        (Kieu::PhuDe, _) => (
+            LWA_COLORKEY | LWA_ALPHA,
+            (k.do_dam.clamp(0.2, 1.0) * 255.0) as u8,
+            LWA_ALPHA,
+        ),
+        (Kieu::Hop, _) => (
+            LWA_ALPHA,
+            (k.do_dam.clamp(0.2, 1.0) * 255.0) as u8,
+            LWA_ALPHA,
+        ),
         (Kieu::Che { .. }, _) => (LWA_ALPHA, 255, LWA_ALPHA),
     };
     let _ = co;
     let _ = SetLayeredWindowAttributes(o.hwnd, MAU_KHOA, alpha, mau);
-    let _ = SetWindowPos(o.hwnd, Some(HWND_TOPMOST), x, y, w, h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    let _ = SetWindowPos(
+        o.hwnd,
+        Some(HWND_TOPMOST),
+        x,
+        y,
+        w,
+        h,
+        SWP_NOACTIVATE | SWP_SHOWWINDOW,
+    );
     let _ = InvalidateRect(Some(o.hwnd), None, false);
 }
 
@@ -318,7 +375,12 @@ unsafe fn ve(hwnd: HWND) {
     let mut rc = RECT::default();
     let _ = GetClientRect(hwnd, &mut rc);
     let chinh = dang_chinh();
-    let k = CAC_O.with(|o| o.borrow().values().find(|x| x.hwnd == hwnd).and_then(|x| x.hien.clone().map(|k| (k, x.co))));
+    let k = CAC_O.with(|o| {
+        o.borrow()
+            .values()
+            .find(|x| x.hwnd == hwnd)
+            .and_then(|x| x.hien.clone().map(|k| (k, x.co)))
+    });
     if let Some((k, co)) = k {
         // vẽ vào bộ đệm rồi chép một lần (không nháy)
         let mem = CreateCompatibleDC(Some(hdc));
@@ -329,7 +391,13 @@ unsafe fn ve(hwnd: HWND) {
             (_, true) => [0x2b, 0x2b, 0x33],
             (Kieu::PhuDe, _) => [1, 1, 1],
             (Kieu::Hop, _) => [0x10, 0x10, 0x14],
-            (Kieu::Che { nen, .. }, _) => if *nen == [1, 1, 1] { [0, 0, 0] } else { *nen },
+            (Kieu::Che { nen, .. }, _) => {
+                if *nen == [1, 1, 1] {
+                    [0, 0, 0]
+                } else {
+                    *nen
+                }
+            }
         };
         let co_nen = CreateSolidBrush(rgb(nen));
         FillRect(mem, &rc, co_nen);
@@ -340,12 +408,21 @@ unsafe fn ve(hwnd: HWND) {
             let cu = SelectObject(mem, font(12, true).into());
             SetTextColor(mem, rgb([0xff, 0xcc, 0x33]));
             let mut t: Vec<u16> = format!("■ {}", k.ten).encode_utf16().collect();
-            let mut r = RECT { left: LE, top: 6, right: rc.right - LE, bottom: 24 };
+            let mut r = RECT {
+                left: LE,
+                top: 6,
+                right: rc.right - LE,
+                bottom: 24,
+            };
             DrawTextW(mem, &mut t, &mut r, DT_SINGLELINE | DT_NOPREFIX);
             SelectObject(mem, cu);
             tren = 26;
         }
-        let chu = if chinh && k.chu.trim().is_empty() { GOI_Y.to_string() } else { k.chu.clone() };
+        let chu = if chinh && k.chu.trim().is_empty() {
+            GOI_Y.to_string()
+        } else {
+            k.chu.clone()
+        };
         let mut s: Vec<u16> = chu.encode_utf16().collect();
         let can = if k.can_giua { DT_CENTER } else { DT_LEFT };
         match (&k.kieu, chinh) {
@@ -353,21 +430,40 @@ unsafe fn ve(hwnd: HWND) {
                 let (_, _, _, _, c) = tinh_co(&k, false, 0, 0, 0, 0);
                 let cu = SelectObject(mem, font(c, true).into());
                 SetTextColor(mem, rgb(*mau));
-                let mut r = RECT { left: 4, top: 3, right: rc.right - 4, bottom: rc.bottom - 3 };
+                let mut r = RECT {
+                    left: 4,
+                    top: 3,
+                    right: rc.right - 4,
+                    bottom: rc.bottom - 3,
+                };
                 DrawTextW(mem, &mut s, &mut r, DT_WORDBREAK | DT_NOPREFIX | can);
                 SelectObject(mem, cu);
             }
             _ => {
                 let cu = SelectObject(mem, font(co, true).into());
-                let r0 = RECT { left: LE, top: tren, right: rc.right - LE, bottom: rc.bottom };
+                let r0 = RECT {
+                    left: LE,
+                    top: tren,
+                    right: rc.right - LE,
+                    bottom: rc.bottom,
+                };
                 // viền chữ (kiểu phụ đề)
-                let vien = if matches!(k.kieu, Kieu::PhuDe) && !chinh { k.vien + (co >= 26 && k.vien > 0) as i32 } else { 0 };
+                let vien = if matches!(k.kieu, Kieu::PhuDe) && !chinh {
+                    k.vien + (co >= 26 && k.vien > 0) as i32
+                } else {
+                    0
+                };
                 if vien > 0 {
                     SetTextColor(mem, COLORREF(0));
                     for dx in -vien..=vien {
                         for dy in -vien..=vien {
                             if (dx != 0 || dy != 0) && dx * dx + dy * dy <= vien * vien + 1 {
-                                let mut r = RECT { left: r0.left + dx, top: r0.top + dy, right: r0.right + dx, bottom: r0.bottom + dy };
+                                let mut r = RECT {
+                                    left: r0.left + dx,
+                                    top: r0.top + dy,
+                                    right: r0.right + dx,
+                                    bottom: r0.bottom + dy,
+                                };
                                 DrawTextW(mem, &mut s, &mut r, DT_WORDBREAK | DT_NOPREFIX | can);
                             }
                         }
@@ -392,9 +488,18 @@ unsafe fn ve(hwnd: HWND) {
             let vang = CreateSolidBrush(rgb([0xff, 0xcc, 0x33]));
             let cu_choi = SelectObject(mem, vang.into());
             let pt = [
-                POINT { x: rc.right - 2, y: rc.bottom - 22 },
-                POINT { x: rc.right - 2, y: rc.bottom - 2 },
-                POINT { x: rc.right - 22, y: rc.bottom - 2 },
+                POINT {
+                    x: rc.right - 2,
+                    y: rc.bottom - 22,
+                },
+                POINT {
+                    x: rc.right - 2,
+                    y: rc.bottom - 2,
+                },
+                POINT {
+                    x: rc.right - 22,
+                    y: rc.bottom - 2,
+                },
             ];
             let _ = Polygon(mem, &pt);
             SelectObject(mem, cu_choi);
@@ -411,7 +516,11 @@ unsafe fn ve(hwnd: HWND) {
 fn bao_doi(o: &O) {
     if let (Some(k), Some(g)) = (&o.hien, GUI.get()) {
         if let Ok(g) = g.lock() {
-            let _ = g.send(KhungDoi { id: k.id.clone(), khung: [o.x, o.y, o.w], co_chu: o.co });
+            let _ = g.send(KhungDoi {
+                id: k.id.clone(),
+                khung: [o.x, o.y, o.w],
+                co_chu: o.co,
+            });
         }
     }
 }
@@ -430,7 +539,10 @@ unsafe extern "system" fn thu_khung(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM
         WM_ERASEBKGND => LRESULT(1),
         WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
         WM_LBUTTONDOWN if dang_chinh() => {
-            let (cx, cy) = ((lp.0 & 0xFFFF) as i16 as i32, ((lp.0 >> 16) & 0xFFFF) as i16 as i32);
+            let (cx, cy) = (
+                (lp.0 & 0xFFFF) as i16 as i32,
+                ((lp.0 >> 16) & 0xFFFF) as i16 as i32,
+            );
             let p = diem();
             CAC_O.with(|o| {
                 if let Some(x) = o.borrow_mut().values_mut().find(|x| x.hwnd == hwnd) {

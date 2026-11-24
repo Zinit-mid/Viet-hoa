@@ -88,13 +88,19 @@ impl BoNhoDich {
         let mut m = doc(&duong);
         // Bản Rust cũ lưu {câu thường: bản dịch} và đã ghi đè bản của app cũ →
         // đổi sang định dạng mới, rồi gộp lại bộ nhớ gốc của app cũ trong %APPDATA%.
-        let la_kieu_rust = !m.is_empty() && m.iter().all(|(k, v)| v.is_string() && !k.contains('|'));
+        let la_kieu_rust =
+            !m.is_empty() && m.iter().all(|(k, v)| v.is_string() && !k.contains('|'));
         if la_kieu_rust {
-            m = m.into_iter().map(|(k, v)| (format!("claude#|{k}"), json!({"src": k, "vi": v}))).collect();
+            m = m
+                .into_iter()
+                .map(|(k, v)| (format!("claude#|{k}"), json!({"src": k, "vi": v})))
+                .collect();
         }
         let mut thay_doi = 0;
         if let Ok(appdata) = std::env::var("APPDATA") {
-            let cu = doc(&PathBuf::from(appdata).join("DichGame").join("ban_dich_da_luu.json"));
+            let cu = doc(&PathBuf::from(appdata)
+                .join("DichGame")
+                .join("ban_dich_da_luu.json"));
             for (k, v) in cu {
                 if !m.contains_key(&k) {
                     m.insert(k, v);
@@ -107,9 +113,17 @@ impl BoNhoDich {
         }
         let gan_day: Vec<String> = m.keys().filter(|k| k.contains("#|")).cloned().collect();
         let gan_day = gan_day[gan_day.len().saturating_sub(400)..].to_vec();
-        let mut bn = Self { duong, m, gan_day, thay_doi };
+        let mut bn = Self {
+            duong,
+            m,
+            gan_day,
+            thay_doi,
+        };
         if thay_doi > 0 {
-            duong_dan::nhat_ky(&format!("Bộ nhớ dịch: gộp thêm {thay_doi} mục từ app cũ, tổng {}", bn.m.len()));
+            duong_dan::nhat_ky(&format!(
+                "Bộ nhớ dịch: gộp thêm {thay_doi} mục từ app cũ, tổng {}",
+                bn.m.len()
+            ));
             bn.luu();
         }
         bn
@@ -128,13 +142,23 @@ impl BoNhoDich {
         let so_moi = cac_so(van_ban);
         let khoa_dung = format!("{may}#|{mau}");
         let tien_to = format!("{may}#|");
-        let ung_vien = std::iter::once(&khoa_dung).chain(self.gan_day.iter().rev().filter(|k| k.starts_with(&tien_to)));
+        let ung_vien = std::iter::once(&khoa_dung).chain(
+            self.gan_day
+                .iter()
+                .rev()
+                .filter(|k| k.starts_with(&tien_to)),
+        );
         for (i, k) in ung_vien.enumerate() {
-            let Some(Value::Object(e)) = self.m.get(k) else { continue };
+            let Some(Value::Object(e)) = self.m.get(k) else {
+                continue;
+            };
             if i > 0 && !chu_giong(&k[tien_to.len()..], &mau, NGUONG_GAN) {
                 continue;
             }
-            let (Some(src), Some(vi)) = (e.get("src").and_then(Value::as_str), e.get("vi").and_then(Value::as_str)) else {
+            let (Some(src), Some(vi)) = (
+                e.get("src").and_then(Value::as_str),
+                e.get("vi").and_then(Value::as_str),
+            ) else {
                 continue;
             };
             if let Some(kq) = thay_so(vi, &cac_so(src), &so_moi) {
@@ -180,7 +204,9 @@ impl Drop for BoNhoDich {
 }
 
 fn doc(p: &std::path::Path) -> Map<String, Value> {
-    let Ok(b) = std::fs::read(p) else { return Map::new() };
+    let Ok(b) = std::fs::read(p) else {
+        return Map::new();
+    };
     match serde_json::from_slice::<Value>(b.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&b)) {
         Ok(Value::Object(m)) => m,
         _ => {
@@ -218,8 +244,20 @@ pub fn chuan_hoa_vh(s: &str) -> String {
     }
     let _ = sau;
     let t = t.replace("[EMPTY]", " ").replace(['’', '‘'], "'");
-    let t: String = t.chars().map(|ch| if ch.is_ascii_alphanumeric() || ch == '\'' || ch == ' ' { ch } else { ' ' }).collect();
-    t.to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ")
+    let t: String = t
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '\'' || ch == ' ' {
+                ch
+            } else {
+                ' '
+            }
+        })
+        .collect();
+    t.to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[derive(Default)]
@@ -231,7 +269,9 @@ pub struct BoNhoVietHoa {
 
 impl BoNhoVietHoa {
     fn duong() -> PathBuf {
-        duong_dan::viet_hoa_game().join("crimson_desert").join("bo_nho_dich.json")
+        duong_dan::viet_hoa_game()
+            .join("crimson_desert")
+            .join("bo_nho_dich.json")
     }
 
     fn nap(&mut self) {
@@ -271,10 +311,19 @@ impl BoNhoVietHoa {
             return Some(kq.clone());
         }
         if van_ban.contains('\n') {
-            let ds: Vec<Option<&String>> =
-                van_ban.lines().filter(|x| !x.trim().is_empty()).map(|x| self.m.get(&chuan_hoa_vh(x))).collect();
+            let ds: Vec<Option<&String>> = van_ban
+                .lines()
+                .filter(|x| !x.trim().is_empty())
+                .map(|x| self.m.get(&chuan_hoa_vh(x)))
+                .collect();
             if !ds.is_empty() && ds.iter().all(Option::is_some) {
-                return Some(ds.into_iter().flatten().cloned().collect::<Vec<_>>().join("\n"));
+                return Some(
+                    ds.into_iter()
+                        .flatten()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                );
             }
         }
         None
@@ -301,7 +350,13 @@ fn chuan_hoa_vh_giu_dau(s: &str) -> String {
         t.push(c[i]);
         i += 1;
     }
-    t.replace("[EMPTY]", "").lines().map(|d| d.split_whitespace().collect::<Vec<_>>().join(" ")).collect::<Vec<_>>().join("\n").trim().to_string()
+    t.replace("[EMPTY]", "")
+        .lines()
+        .map(|d| d.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
 }
 
 #[cfg(test)]
@@ -309,10 +364,21 @@ mod tests {
     use super::*;
     #[test]
     fn dinh_dang_app_cu() {
-        let mut bn = BoNhoDich { duong: PathBuf::from("x"), m: Map::new(), gan_day: vec![], thay_doi: 0 };
-        bn.m.insert("claude#|You got # gold".into(), json!({"src": "You got 15 gold", "vi": "Bạn nhận 15 vàng"}));
+        let mut bn = BoNhoDich {
+            duong: PathBuf::from("x"),
+            m: Map::new(),
+            gan_day: vec![],
+            thay_doi: 0,
+        };
+        bn.m.insert(
+            "claude#|You got # gold".into(),
+            json!({"src": "You got 15 gold", "vi": "Bạn nhận 15 vàng"}),
+        );
         bn.gan_day.push("claude#|You got # gold".into());
-        assert_eq!(bn.tim("claude", "You got 230 gold").as_deref(), Some("Bạn nhận 230 vàng"));
+        assert_eq!(
+            bn.tim("claude", "You got 230 gold").as_deref(),
+            Some("Bạn nhận 230 vàng")
+        );
         assert_eq!(bn.tim("google", "You got 230 gold"), None);
         bn.them("google", "Off", "Tắt");
         assert_eq!(bn.tim("google", "Off").as_deref(), Some("Tắt"));

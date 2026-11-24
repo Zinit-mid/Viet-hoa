@@ -82,7 +82,12 @@ pub fn chon_vung(chung: &Arc<Chung>, gui: &Sender<Lenh>, chi_so: usize) {
     }
     let (chung, gui) = (chung.clone(), gui.clone());
     std::thread::spawn(move || {
-        let ten = chung.ch().cac_vung.get(chi_so).map(|v| v.ten.clone()).unwrap_or_else(|| "vùng mới".into());
+        let ten = chung
+            .ch()
+            .cac_vung
+            .get(chi_so)
+            .map(|v| v.ten.clone())
+            .unwrap_or_else(|| "vùng mới".into());
         if let Some(v) = lop_phu::chon_vung(&ten) {
             let _ = gui.send(Lenh::VungMoi(chi_so, v));
         }
@@ -177,18 +182,42 @@ struct ViecDich {
 
 /// Dịch một câu của vùng (giống _thuc_hien_dich + _dich_nhanh của app cũ).
 fn thuc_hien_dich(job: ViecDich, st: &TT, gui: &Sender<Hien>) {
-    let ViecDich { v, chu, che_do, giong, thay_claude, hien_google_truoc } = job;
+    let ViecDich {
+        v,
+        chu,
+        che_do,
+        giong,
+        thay_claude,
+        hien_google_truoc,
+    } = job;
     let luc = Instant::now();
     let con_dung = || khoa(st).chu_da_hien == chu;
     let phu_de = v.loai == "phu_de";
     let gui_hien = |vi: String, may: Option<May>, tam: bool| {
-        let _ = gui.send(Hien { id: v.id.clone(), en: chu.clone(), vi, may, tam, luc });
+        let _ = gui.send(Hien {
+            id: v.id.clone(),
+            en: chu.clone(),
+            vi,
+            may,
+            tam,
+            luc,
+        });
     };
-    let che_do = if che_do == "claude" && !dich::claude::co_khoa() { "offline_claude".to_string() } else { che_do };
+    let che_do = if che_do == "claude" && !dich::claude::co_khoa() {
+        "offline_claude".to_string()
+    } else {
+        che_do
+    };
 
     if che_do != "claude" {
         // Hiện bản dịch NGAY: Việt hóa game > Claude đã lưu > offline > Google
-        let che_do_vung = if phu_de { che_do.as_str() } else if che_do == "google" { "google" } else { "offline_claude" };
+        let che_do_vung = if phu_de {
+            che_do.as_str()
+        } else if che_do == "google" {
+            "google"
+        } else {
+            "offline_claude"
+        };
         let Some((vi, may)) = dich::dich_nhanh(&chu, che_do_vung) else {
             if con_dung() {
                 khoa(st).chu_da_hien.clear(); // lần sau thử lại
@@ -228,7 +257,14 @@ fn thuc_hien_dich(job: ViecDich, st: &TT, gui: &Sender<Hien>) {
         std::thread::spawn(move || {
             if let Some(vi) = dich::google_lo(&[chu2.clone()]).pop().flatten() {
                 if khoa(&st2).chu_da_hien == chu2 {
-                    let _ = gui2.send(Hien { id: id2, en: chu2, vi, may: Some(May::Google), tam: true, luc });
+                    let _ = gui2.send(Hien {
+                        id: id2,
+                        en: chu2,
+                        vi,
+                        may: Some(May::Google),
+                        tam: true,
+                        luc,
+                    });
                 }
             }
         });
@@ -267,7 +303,11 @@ fn xu_ly_vung(ocr: &Ocr, v: &Vung, anh: &Anh, ep: bool, st: &TT, nc: &NguCanh) -
     let mut s = khoa(st);
     let hinh_dung_yen = s.van_tay.as_ref().is_some_and(|cu| {
         cu.len() == van_tay.len()
-            && cu.iter().zip(&van_tay).map(|(a, b)| (*a as i32 - *b as i32).unsigned_abs()).sum::<u32>() as f32
+            && cu
+                .iter()
+                .zip(&van_tay)
+                .map(|(a, b)| (*a as i32 - *b as i32).unsigned_abs())
+                .sum::<u32>() as f32
                 / (van_tay.len() as f32)
                 < 3.0
     });
@@ -300,23 +340,35 @@ fn xu_ly_vung(ocr: &Ocr, v: &Vung, anh: &Anh, ep: bool, st: &TT, nc: &NguCanh) -
     };
     s.van_tay = Some(van_tay);
     // Chữ tiếng Việt (kể cả bị OCR đọc mất dấu) → không dịch, coi như trống
-    let chu = if dich::the::la_tieng_viet(&chu) || dich::the::la_viet_mat_dau(&chu) { String::new() } else { chu };
+    let chu = if dich::the::la_tieng_viet(&chu) || dich::the::la_viet_mat_dau(&chu) {
+        String::new()
+    } else {
+        chu
+    };
 
     // ẩn khi trống / lệch lâu
     s.lan_trong = if chu.is_empty() { s.lan_trong + 1 } else { 0 };
-    if !s.chu_da_hien.is_empty() && !chu.is_empty() && !chu_giong(&so_hoa(&chu), &so_hoa(&s.chu_da_hien), tuy.lech) {
+    if !s.chu_da_hien.is_empty()
+        && !chu.is_empty()
+        && !chu_giong(&so_hoa(&chu), &so_hoa(&s.chu_da_hien), tuy.lech)
+    {
         s.lan_lech += 1;
     } else {
         s.lan_lech = 0;
     }
     let dang_hien = !s.chu_da_hien.is_empty() || !s.van_ban.is_empty();
-    if dang_hien && (s.lan_trong >= tuy.an_trong || (!s.chu_da_hien.is_empty() && s.lan_lech >= tuy.an_lech)) {
+    if dang_hien
+        && (s.lan_trong >= tuy.an_trong || (!s.chu_da_hien.is_empty() && s.lan_lech >= tuy.an_lech))
+    {
         s.chu_da_hien.clear();
         s.van_ban.clear();
         s.lan_lech = 0;
     }
 
-    if s.chu_cho.as_ref().is_some_and(|c| chu_giong(&so_hoa(&chu), &so_hoa(c), 0.9)) {
+    if s.chu_cho
+        .as_ref()
+        .is_some_and(|c| chu_giong(&so_hoa(&chu), &so_hoa(c), 0.9))
+    {
         s.so_lan_giong += 1;
     } else {
         s.so_lan_giong = 0;
@@ -326,10 +378,15 @@ fn xu_ly_vung(ocr: &Ocr, v: &Vung, anh: &Anh, ep: bool, st: &TT, nc: &NguCanh) -
     }
     s.chu_cho = Some(chu.clone());
     let phu_de = v.loai == "phu_de";
-    let on_dinh = ep || s.so_lan_giong >= 1 || (phu_de && het_cau(&chu)) || (!phu_de && hinh_dung_yen);
+    let on_dinh =
+        ep || s.so_lan_giong >= 1 || (phu_de && het_cau(&chu)) || (!phu_de && hinh_dung_yen);
 
     // chữ đang chạy từng chữ: hiện bản tạm (offline / Google) trước
-    if !on_dinh && phu_de && chu.chars().count() >= 30 && s.t_xem_som.is_none_or(|t| t.elapsed().as_millis() > 600) {
+    if !on_dinh
+        && phu_de
+        && chu.chars().count() >= 30
+        && s.t_xem_som.is_none_or(|t| t.elapsed().as_millis() > 600)
+    {
         s.t_xem_som = Some(Instant::now());
         let (chu2, st2, gui2, id) = (chu.clone(), st.clone(), nc.gui_hien.clone(), v.id.clone());
         std::thread::spawn(move || {
@@ -344,11 +401,20 @@ fn xu_ly_vung(ocr: &Ocr, v: &Vung, anh: &Anh, ep: bool, st: &TT, nc: &NguCanh) -
                 let dau: String = c.chars().take(chu2.chars().count()).collect();
                 chu_giong(&chu2, &dau, 0.85)
             });
-            let da_co_ban_chinh = s.chu_da_hien.starts_with(&chu2.chars().take(20).collect::<String>())
+            let da_co_ban_chinh = s
+                .chu_da_hien
+                .starts_with(&chu2.chars().take(20).collect::<String>())
                 && s.chu_da_hien.len() >= chu2.len();
             if con_moi && !da_co_ban_chinh {
                 drop(s);
-                let _ = gui2.send(Hien { id, en: String::new(), vi, may: None, tam: true, luc: Instant::now() });
+                let _ = gui2.send(Hien {
+                    id,
+                    en: String::new(),
+                    vi,
+                    may: None,
+                    tam: true,
+                    luc: Instant::now(),
+                });
             }
         });
     }
@@ -395,7 +461,13 @@ fn trong_vung(h: [i32; 4], v: [i32; 4]) -> bool {
     cx >= v[0] && cx <= v[0] + v[2] && cy >= v[1] && cy <= v[1] + v[3]
 }
 
-fn cap_nhat_doan(doan: &mut Vec<Doan>, moi: Vec<Dong>, anh: &Anh, gui: &Sender<(Vec<String>, Vec<Option<String>>)>, che_do: &str) {
+fn cap_nhat_doan(
+    doan: &mut Vec<Doan>,
+    moi: Vec<Dong>,
+    anh: &Anh,
+    gui: &Sender<(Vec<String>, Vec<Option<String>>)>,
+    che_do: &str,
+) {
     let mut da_khop = vec![false; doan.len()];
     let mut them = Vec::new();
     let mut can_nhanh: Vec<String> = Vec::new();
@@ -459,7 +531,11 @@ fn cap_nhat_doan(doan: &mut Vec<Doan>, moi: Vec<Dong>, anh: &Anh, gui: &Sender<(
         let gui = gui.clone();
         let chi_offline = che_do.starts_with("offline");
         std::thread::spawn(move || {
-            let vi = if chi_offline { dich::dich_nhieu(&can_nhanh, false) } else { dich::google_lo(&can_nhanh) };
+            let vi = if chi_offline {
+                dich::dich_nhieu(&can_nhanh, false)
+            } else {
+                dich::google_lo(&can_nhanh)
+            };
             let _ = gui.send((can_nhanh, vi));
         });
     }
@@ -486,9 +562,16 @@ fn cap_nhat_doan(doan: &mut Vec<Doan>, moi: Vec<Dong>, anh: &Anh, gui: &Sender<(
 // ---------------- vòng chính ----------------
 
 pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
-    let _ = unsafe { windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED) };
+    let _ = unsafe {
+        windows::Win32::System::WinRT::RoInitialize(
+            windows::Win32::System::WinRT::RO_INIT_MULTITHREADED,
+        )
+    };
     let mut ql = QuanLyChup::default();
-    nk(&format!("Khởi động luồng dịch; bộ nhớ dịch {} mục", dich::nap_san()));
+    nk(&format!(
+        "Khởi động luồng dịch; bộ nhớ dịch {} mục",
+        dich::nap_san()
+    ));
     let ocr = match Ocr::moi() {
         Ok(o) => {
             chung.tt().ocr = "Sẵn sàng".into();
@@ -500,7 +583,8 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
             None
         }
     };
-    if chung.dang_dich.load(Ordering::SeqCst) && chung.ch().che_do_hoi_thoai.starts_with("offline") {
+    if chung.dang_dich.load(Ordering::SeqCst) && chung.ch().che_do_hoi_thoai.starts_with("offline")
+    {
         dich::offline::nap_san();
     }
     let (gui_hien, nhan_hien) = channel::<Hien>();
@@ -585,9 +669,15 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
                 Lenh::VungMoi(i, r) => {
                     let mut ch = chung.ch();
                     if i >= ch.cac_vung.len() && ch.cac_vung.len() < SO_VUNG_TOI_DA {
-                        let so = (1..).find(|n| !ch.cac_vung.iter().any(|v| v.id == format!("vung_{n}"))).unwrap_or(1);
+                        let so = (1..)
+                            .find(|n| !ch.cac_vung.iter().any(|v| v.id == format!("vung_{n}")))
+                            .unwrap_or(1);
                         let ten = format!("Vùng {}", ch.cac_vung.len() + 1);
-                        ch.cac_vung.push(cau_hinh::vung_moi(&format!("vung_{so}"), &ten, "co_dinh"));
+                        ch.cac_vung.push(cau_hinh::vung_moi(
+                            &format!("vung_{so}"),
+                            &ten,
+                            "co_dinh",
+                        ));
                     }
                     let n = ch.cac_vung.len();
                     if let Some(v) = ch.cac_vung.get_mut(i.min(n.saturating_sub(1))) {
@@ -603,7 +693,21 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
             }
         }
 
-        let (cfg_vung, che_goc, kieu_hien, che_do, giong, (thay_claude, thay_co_dinh), google_truoc, vien, do_dam_chu, do_mo, nguong, co_tm, chu_ky) = {
+        let (
+            cfg_vung,
+            che_goc,
+            kieu_hien,
+            che_do,
+            giong,
+            (thay_claude, thay_co_dinh),
+            google_truoc,
+            vien,
+            do_dam_chu,
+            do_mo,
+            nguong,
+            co_tm,
+            chu_ky,
+        ) = {
             let ch = chung.ch();
             (
                 {
@@ -627,7 +731,9 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
 
         // 2. Bản dịch mới
         while let Ok(h) = nhan_hien.try_recv() {
-            let Some(st) = trang_thai.get(&h.id) else { continue };
+            let Some(st) = trang_thai.get(&h.id) else {
+                continue;
+            };
             let mut s = khoa(st);
             if h.en.is_empty() || s.chu_da_hien == h.en {
                 s.van_ban = h.vi.clone();
@@ -635,7 +741,14 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
             drop(s);
             if !h.tam {
                 if let Some(may) = h.may {
-                    nk(&format!("Dịch xong [{}] ({}, {} ms): {} => {}", h.id, may.ten(), h.luc.elapsed().as_millis(), h.en, h.vi));
+                    nk(&format!(
+                        "Dịch xong [{}] ({}, {} ms): {} => {}",
+                        h.id,
+                        may.ten(),
+                        h.luc.elapsed().as_millis(),
+                        h.en,
+                        h.vi
+                    ));
                     let mut tt = chung.tt();
                     tt.cuoi_ms = h.luc.elapsed().as_millis();
                     tt.cuoi_en = h.en;
@@ -645,7 +758,11 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
             }
         }
         while let Ok((en, vi)) = nhan_tm.try_recv() {
-            nk(&format!("F12: dịch xong {}/{} đoạn", vi.iter().filter(|v| v.is_some()).count(), en.len()));
+            nk(&format!(
+                "F12: dịch xong {}/{} đoạn",
+                vi.iter().filter(|v| v.is_some()).count(),
+                en.len()
+            ));
             for (e, v) in en.iter().zip(vi) {
                 if let (Some(d), Some(v)) = (doan.iter_mut().find(|d| &d.en == e), v) {
                     d.vi = Some(v);
@@ -660,8 +777,19 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
             hoat_dong = dang_dich || toan_man;
             bat_tu = Instant::now();
             lop_phu::bat_che_do_dich(hoat_dong);
-            nk(if hoat_dong { "Bắt đầu dịch" } else { "Dừng dịch" });
-        } else if hoat_dong && ap_lai.elapsed() >= Duration::from_millis(if lop_phu::APP_DA_AN.load(Ordering::Relaxed) { 2000 } else { 200 }) {
+            nk(if hoat_dong {
+                "Bắt đầu dịch"
+            } else {
+                "Dừng dịch"
+            });
+        } else if hoat_dong
+            && ap_lai.elapsed()
+                >= Duration::from_millis(if lop_phu::APP_DA_AN.load(Ordering::Relaxed) {
+                    2000
+                } else {
+                    200
+                })
+        {
             // áp lại "ẩn bảng app khỏi ảnh chụp" (cửa sổ app có thể tạo sau)
             ap_lai = Instant::now();
             lop_phu::bat_che_do_dich(true);
@@ -669,7 +797,8 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
 
         // 3. Đọc màn hình (khi đang chọn vùng / chỉnh khung thì tạm dừng đọc)
         // vừa bật: chờ bảng app kịp ẩn khỏi ảnh chụp rồi mới đọc (tránh đọc chữ của app)
-        let cho_an = !lop_phu::APP_DA_AN.load(Ordering::Relaxed) && bat_tu.elapsed() < Duration::from_secs(3);
+        let cho_an = !lop_phu::APP_DA_AN.load(Ordering::Relaxed)
+            && bat_tu.elapsed() < Duration::from_secs(3);
         let tam_dung = chung.dang_chon_vung.load(Ordering::SeqCst) || chinh || cho_an;
         let mut co_moi = false;
         if let (Some(ocr), true, false) = (ocr.as_ref(), dang_dich || toan_man, tam_dung) {
@@ -694,23 +823,31 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
                         if !(ep_lan_nay || v.loai == "phu_de" || dem % VONG_CO_DINH == 0) {
                             continue;
                         }
-                        let Some(anh) = may.lay(v.vung.unwrap()) else { continue };
-                        let st = trang_thai.entry(v.id.clone()).or_default().clone();
-                        let lam_dich = |chu: String, viec_dich: &mut HashMap<String, ViecNen<ViecDich>>| {
-                            let st2 = st.clone();
-                            let gh = gui_hien.clone();
-                            let vd = viec_dich.entry(v.id.clone()).or_insert_with(|| ViecNen::moi(move |j| thuc_hien_dich(j, &st2, &gh)));
-                            vd.gui(ViecDich {
-                                v: v.clone(),
-                                chu,
-                                che_do: che_do.clone(),
-                                giong,
-                                thay_claude,
-                                hien_google_truoc: google_truoc,
-                            });
+                        let Some(anh) = may.lay(v.vung.unwrap()) else {
+                            continue;
                         };
+                        let st = trang_thai.entry(v.id.clone()).or_default().clone();
+                        let lam_dich =
+                            |chu: String, viec_dich: &mut HashMap<String, ViecNen<ViecDich>>| {
+                                let st2 = st.clone();
+                                let gh = gui_hien.clone();
+                                let vd = viec_dich.entry(v.id.clone()).or_insert_with(|| {
+                                    ViecNen::moi(move |j| thuc_hien_dich(j, &st2, &gh))
+                                });
+                                vd.gui(ViecDich {
+                                    v: v.clone(),
+                                    chu,
+                                    che_do: che_do.clone(),
+                                    giong,
+                                    thay_claude,
+                                    hien_google_truoc: google_truoc,
+                                });
+                            };
                         if v.loai == "phu_de" {
-                            let nc = NguCanh { nguong, gui_hien: &gui_hien };
+                            let nc = NguCanh {
+                                nguong,
+                                gui_hien: &gui_hien,
+                            };
                             if let Some(chu) = xu_ly_vung(ocr, v, &anh, ep_lan_nay, &st, &nc) {
                                 lam_dich(chu, &mut viec_dich);
                             }
@@ -724,10 +861,15 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
                                 let mut viec: Option<ViecNen<ViecDich>> = None;
                                 ViecNen::moi(move |(v, anh, ep): (Vung, Anh, bool)| {
                                     let Some(o) = ocr2.as_ref() else { return };
-                                    let nc = NguCanh { nguong, gui_hien: &gh };
+                                    let nc = NguCanh {
+                                        nguong,
+                                        gui_hien: &gh,
+                                    };
                                     if let Some(chu) = xu_ly_vung(o, &v, &anh, ep, &st2, &nc) {
                                         let (st3, gh3) = (st2.clone(), gh.clone());
-                                        let vd = viec.get_or_insert_with(|| ViecNen::moi(move |j| thuc_hien_dich(j, &st3, &gh3)));
+                                        let vd = viec.get_or_insert_with(|| {
+                                            ViecNen::moi(move |j| thuc_hien_dich(j, &st3, &gh3))
+                                        });
                                         vd.gui(ViecDich {
                                             v,
                                             chu,
@@ -745,23 +887,34 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
                 }
                 // 3b. Cả màn hình (F12)
                 // màn hình đứng yên quá 5 giây vẫn quét lại (phòng DXGI ngừng gửi hình)
-                let den_luot = quet_tm_cuoi.elapsed() >= Duration::from_millis(if co_moi || ep_lan_nay { 700 } else { 5000 });
+                let den_luot = quet_tm_cuoi.elapsed()
+                    >= Duration::from_millis(if co_moi || ep_lan_nay { 700 } else { 5000 });
                 if toan_man && den_luot {
                     quet_tm_cuoi = Instant::now();
                     let (w, h) = may.kich_thuoc();
                     if let Some(anh) = may.lay([0, 0, w as i32, h as i32]) {
-                        let bo: Vec<[i32; 4]> = if dang_dich { cfg_vung.iter().filter_map(|v| v.vung).collect() } else { vec![] };
+                        let bo: Vec<[i32; 4]> = if dang_dich {
+                            cfg_vung.iter().filter_map(|v| v.vung).collect()
+                        } else {
+                            vec![]
+                        };
                         let moi: Vec<Dong> = ocr::gom_doan(ocr.doc_toan_man(&anh))
                             .into_iter()
                             .filter(|d| ocr::hop_le_toan_man(&d.chu))
-                            .filter(|d| !dich::the::la_tieng_viet(&d.chu) && !dich::the::la_viet_mat_dau(&d.chu))
+                            .filter(|d| {
+                                !dich::the::la_tieng_viet(&d.chu)
+                                    && !dich::the::la_viet_mat_dau(&d.chu)
+                            })
                             .filter(|d| !bo.iter().any(|b| trong_vung(d.hop, *b)))
                             .collect();
                         let so_moi = moi.len();
                         cap_nhat_doan(&mut doan, moi, &anh, &gui_tm, &che_do);
                         let mut tt = chung.tt();
                         if tt.so_doan_toan_man != doan.len() {
-                            nk(&format!("F12: đọc được {so_moi} đoạn, đang theo dõi {} đoạn", doan.len()));
+                            nk(&format!(
+                                "F12: đọc được {so_moi} đoạn, đang theo dõi {} đoạn",
+                                doan.len()
+                            ));
                         }
                         tt.so_doan_toan_man = doan.len();
                     }
@@ -785,7 +938,12 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
             };
             let kieu = match (che_goc, che, v.vung) {
                 (true, Some((hop, Some((nen, mau)), cao)), Some(r)) if !chu.is_empty() => {
-                    Kieu::Che { hop: [r[0] + hop[0] - 4, r[1] + hop[1] - 3, hop[2] + 8, hop[3] + 6], nen, chu: mau, cao }
+                    Kieu::Che {
+                        hop: [r[0] + hop[0] - 4, r[1] + hop[1] - 3, hop[2] + 8, hop[3] + 6],
+                        nen,
+                        chu: mau,
+                        cao,
+                    }
                 }
                 _ if kieu_hien == "khung" => Kieu::Hop,
                 _ => Kieu::PhuDe,
@@ -796,7 +954,11 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
                 chu,
                 khung: k,
                 co_chu: v.co_chu,
-                do_dam: if matches!(kieu, Kieu::Hop) { do_mo } else { do_dam_chu },
+                do_dam: if matches!(kieu, Kieu::Hop) {
+                    do_mo
+                } else {
+                    do_dam_chu
+                },
                 kieu,
                 can_giua: v.loai == "phu_de",
                 vien,
@@ -808,10 +970,18 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
         let mut muc: Vec<MucPhu> = Vec::new();
         if toan_man && !an {
             for d in &doan {
-                if let Some(vi) = d.vi.as_ref().filter(|vi| vi.trim().to_lowercase() != d.en.trim().to_lowercase()) {
+                if let Some(vi) =
+                    d.vi.as_ref()
+                        .filter(|vi| vi.trim().to_lowercase() != d.en.trim().to_lowercase())
+                {
                     let co = ((d.cao as f32) * 0.85) as i32;
                     let co = if co_tm > 0 { co.max(co_tm) } else { co.max(12) };
-                    muc.push(MucPhu { hop: d.hop, chu: vi.clone(), co_chu: co, mau: if che_goc { d.mau } else { None } });
+                    muc.push(MucPhu {
+                        hop: d.hop,
+                        chu: vi.clone(),
+                        co_chu: co,
+                        mau: if che_goc { d.mau } else { None },
+                    });
                 }
             }
         }
@@ -819,7 +989,11 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
 
         let chu_ky = Duration::from_millis((chu_ky.clamp(0.05, 1.0) * 1000.0) as u64);
         if !co_moi || !ql.may.as_ref().is_some_and(|m| m.ten() == "DXGI") {
-            std::thread::sleep(chu_ky.saturating_sub(bat_dau.elapsed()).max(Duration::from_millis(15)));
+            std::thread::sleep(
+                chu_ky
+                    .saturating_sub(bat_dau.elapsed())
+                    .max(Duration::from_millis(15)),
+            );
         }
     }
 }

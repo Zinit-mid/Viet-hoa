@@ -45,7 +45,11 @@ fn thu_muc_cai_dat() -> Option<PathBuf> {
 pub fn tao_loi_tat_desktop() -> Result<PathBuf, String> {
     use std::os::windows::process::CommandExt;
     let exe = goc().join("VietHoa.exe");
-    let exe = if exe.exists() { exe } else { std::env::current_exe().map_err(|e| e.to_string())? };
+    let exe = if exe.exists() {
+        exe
+    } else {
+        std::env::current_exe().map_err(|e| e.to_string())?
+    };
     let lenh = format!(
         "$d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'Việt Hóa.lnk')); $s.TargetPath='{}'; $s.WorkingDirectory='{}'; $s.Save(); Join-Path $d 'Việt Hóa.lnk'",
         exe.display().to_string().replace('\'', "''"),
@@ -79,7 +83,10 @@ pub fn file_du_lieu(ten: &str) -> PathBuf {
 pub fn mo_hinh_offline() -> Option<PathBuf> {
     [
         du_lieu().join("mo_hinh").join("quickmt-en-vi"),
-        goc().join("DichGame_AI").join("mo_hinh_dich_offline").join("quickmt-en-vi"),
+        goc()
+            .join("DichGame_AI")
+            .join("mo_hinh_dich_offline")
+            .join("quickmt-en-vi"),
     ]
     .into_iter()
     .find(|p| p.join("model.bin").exists())
@@ -94,11 +101,16 @@ pub fn python() -> Option<PathBuf> {
 pub fn nhat_ky(dong: &str) {
     use std::io::Write;
     let p = du_lieu().join("nhat_ky.txt");
-    if fs::metadata(&p).map(|m| m.len() > 1_000_000).unwrap_or(false) {
+    if fs::metadata(&p)
+        .map(|m| m.len() > 1_000_000)
+        .unwrap_or(false)
+    {
         let _ = fs::rename(&p, du_lieu().join("nhat_ky_cu.txt"));
     }
     if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&p) {
-        let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+        let t = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
         let giay = t.as_secs() % 86_400;
         let _ = writeln!(
             f,
@@ -116,7 +128,9 @@ pub struct GiuMayThuc;
 
 impl GiuMayThuc {
     pub fn moi() -> Self {
-        use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED};
+        use windows::Win32::System::Power::{
+            SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED,
+        };
         unsafe {
             SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
         }
@@ -131,6 +145,35 @@ impl Drop for GiuMayThuc {
             SetThreadExecutionState(ES_CONTINUOUS);
         }
     }
+}
+
+/// Giờ máy "dd/mm/yyyy HH:MM" (giống time.strftime của app cũ).
+pub fn gio_dia_phuong() -> String {
+    let t = unsafe { windows::Win32::System::SystemInformation::GetLocalTime() };
+    format!(
+        "{:02}/{:02}/{} {:02}:{:02}",
+        t.wDay, t.wMonth, t.wYear, t.wHour, t.wMinute
+    )
+}
+
+/// Desktop thật người dùng đang thấy (kể cả khi OneDrive chuyển Desktop).
+pub fn desktop() -> PathBuf {
+    for p in [
+        std::env::var("OneDrive")
+            .ok()
+            .map(|o| PathBuf::from(o).join("Desktop")),
+        std::env::var("USERPROFILE")
+            .ok()
+            .map(|u| PathBuf::from(u).join("Desktop")),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if p.is_dir() {
+            return p;
+        }
+    }
+    du_lieu()
 }
 
 /// Ghi file an toàn: ghi .tam rồi đổi tên.
@@ -180,7 +223,10 @@ fn chep_thu_muc(nguon: &Path, dich: &Path, bo: &[&str]) -> std::io::Result<usize
     for muc in fs::read_dir(nguon)? {
         let muc = muc?;
         let ten = muc.file_name();
-        if bo.iter().any(|b| ten.to_string_lossy().eq_ignore_ascii_case(b)) {
+        if bo
+            .iter()
+            .any(|b| ten.to_string_lossy().eq_ignore_ascii_case(b))
+        {
             continue;
         }
         let den = dich.join(&ten);
