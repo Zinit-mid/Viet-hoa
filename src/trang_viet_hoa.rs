@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use eframe::egui::{self, Color32, RichText};
 
+use crate::viet_hoa::crimson_desert::{self as vcd, CrimsonDesert};
 use crate::viet_hoa::do_file::{self, ViecFile};
 use crate::viet_hoa::tim_game::{self, Game, LoaiGame};
 use crate::viet_hoa::viec_dich::BaoCao;
@@ -45,6 +46,46 @@ pub struct TrangVietHoa {
     gioi_han: f64,
     khong_dau: bool,
     hoi_tra_lai: bool,
+    /// Crimson Desert (công cụ riêng): đọc nền, None khi chưa đọc xong
+    cd: Option<Arc<Mutex<Option<CrimsonDesert>>>>,
+    cd_dot: usize,
+    /// thống kê đã tính: ((đợt, số câu bộ nhớ), (tổng, đã, còn, ký tự còn), USD)
+    cd_tk: Option<((usize, usize), (usize, usize, usize, usize), f64)>,
+}
+
+/// Chạy việc nền trên đối tượng dùng chung; tự cập nhật tiến trình.
+fn chay_nen<T: Send + 'static>(
+    tt: &Arc<Mutex<TienTrinh>>,
+    doi_tuong: Arc<Mutex<T>>,
+    ten: &str,
+    viec: impl FnOnce(&mut T, &BaoTt) -> Result<String, String> + Send + 'static,
+) {
+    {
+        let mut t = tt.lock().unwrap();
+        if t.viec.is_some() {
+            return;
+        }
+        *t = TienTrinh {
+            viec: Some(ten.to_string()),
+            thong_bao: format!("{ten}..."),
+            ..Default::default()
+        };
+    }
+    let tt = tt.clone();
+    std::thread::spawn(move || {
+        let bc = BaoTt(tt.clone());
+        let kq = {
+            let mut g = doi_tuong.lock().unwrap_or_else(|e| e.into_inner());
+            viec(&mut g, &bc)
+        };
+        let mut t = tt.lock().unwrap();
+        t.viec = None;
+        t.thong_bao = match kq {
+            Ok(s) => s,
+            Err(e) => format!("Lỗi: {e}"),
+        };
+        duong_dan::nhat_ky(&format!("Việt hóa game: {}", t.thong_bao));
+    });
 }
 
 impl Default for TrangVietHoa {
@@ -59,6 +100,9 @@ impl Default for TrangVietHoa {
             gioi_han: 1.0,
             khong_dau: false,
             hoi_tra_lai: false,
+            cd: None,
+            cd_dot: 0,
+            cd_tk: None,
         }
     }
 }
@@ -99,32 +143,190 @@ impl TrangVietHoa {
         viec: impl FnOnce(&mut ViecFile, &BaoTt) -> Result<String, String> + Send + 'static,
     ) {
         let Some(v) = self.viec.clone() else { return };
-        {
-            let mut t = self.tt.lock().unwrap();
-            if t.viec.is_some() {
-                return;
-            }
-            *t = TienTrinh {
-                viec: Some(ten.to_string()),
-                thong_bao: format!("{ten}..."),
-                ..Default::default()
-            };
-        }
-        let tt = self.tt.clone();
-        std::thread::spawn(move || {
-            let bc = BaoTt(tt.clone());
-            let kq = {
-                let mut g = v.lock().unwrap();
-                viec(&mut g, &bc)
-            };
-            let mut t = tt.lock().unwrap();
-            t.viec = None;
-            t.thong_bao = match kq {
-                Ok(s) => s,
-                Err(e) => format!("Lỗi: {e}"),
-            };
-            duong_dan::nhat_ky(&format!("Việt hóa game: {}", t.thong_bao));
+        chay_nen(&self.tt, v, ten, viec);
+    }
+
+    /// Chạy việc nền với Crimson Desert đã đọc xong.
+    fn chay_cd(
+        &self,
+        ten: &str,
+        viec: impl FnOnce(&mut CrimsonDesert, &BaoTt) -> Result<String, String> + Send + 'static,
+    ) {
+        let Some(o) = self.cd.clone() else { return };
+        chay_nen(&self.tt, o, ten, move |cd, bc| match cd.as_mut() {
+            Some(cd) => viec(cd, bc),
+            None => Err("chưa đọc xong chữ của game".into()),
         });
+    }
+
+    fn mo_cd(&mut self, i: usize) {
+        let thu_muc = self.games.as_ref().unwrap()[i].thu_muc.clone();
+        self.chon = Some(i);
+        self.viec = None;
+        self.cd_tk = None;
+        *self.tt.lock().unwrap() = TienTrinh::default();
+        let o = Arc::new(Mutex::new(None));
+        self.cd = Some(o.clone());
+        chay_nen(
+            &self.tt,
+            o,
+            "Đang đọc chữ tiếng Anh của game",
+            move |cd, _| {
+                let v = CrimsonDesert::nap(&thu_muc).map_err(|e| e.to_string())?;
+                *cd = Some(v);
+                Ok(String::new())
+            },
+        );
+    }
+
+    fn ve_cd(&mut self, ui: &mut egui::Ui) {
+        let Some(o) = self.cd.clone() else { return };
+        let ban = self.dang_ban();
+        let Ok(g) = o.try_lock() else {
+            ui.label(RichText::new("Crimson Desert: đang làm việc nền...").weak());
+            return;
+        };
+        let Some(cd) = g.as_ref() else {
+            if !ban {
+                ui.label(
+                    RichText::new("Chưa đọc được chữ của game (xem lỗi ở trên).")
+                        .color(Color32::LIGHT_RED),
+                );
+            }
+            return;
+        };
+        self.dung = cd.viec.dung.clone();
+        let so_bo_nho = cd.viec.bo_nho.lock().map(|b| b.len()).unwrap_or(0);
+        let khoa = (self.cd_dot, so_bo_nho);
+        if self.cd_tk.as_ref().map(|t| t.0) != Some(khoa) && !ban {
+            let tk = cd.thong_ke(self.cd_dot);
+            self.cd_tk = Some((khoa, tk, cd.viec.uoc_tinh_usd(tk.3)));
+        }
+        let Some((_, (tong, da, con, ky_con), usd)) = self.cd_tk else {
+            return;
+        };
+        let mut lam: Option<&str> = None;
+        the(ui, "VIỆT HÓA CHỮ", |ui| {
+            ui.horizontal(|ui| {
+                for (i, d) in vcd::DOT.iter().enumerate() {
+                    if ui
+                        .add_enabled(
+                            !ban,
+                            egui::Button::new(format!("Đợt {}", i + 1)).selected(self.cd_dot == i),
+                        )
+                        .on_hover_text(d.ten)
+                        .clicked()
+                    {
+                        self.cd_dot = i;
+                    }
+                }
+            });
+            ui.label(RichText::new(vcd::DOT[self.cd_dot].ten).strong());
+            ui.label(format!(
+                "{tong} câu khác nhau • đã dịch {da} • còn {con} câu ({ky_con} ký tự)"
+            ));
+            ui.horizontal_wrapped(|ui| {
+                if ui
+                    .add_enabled(
+                        !ban && con > 0 && dich::offline::co_the_dung(),
+                        egui::Button::new("Dịch offline (miễn phí)"),
+                    )
+                    .clicked()
+                {
+                    lam = Some("offline");
+                }
+                if ui
+                    .add_enabled(
+                        !ban && con > 0 && dich::claude::co_khoa(),
+                        egui::Button::new(format!("Dịch bằng Claude (~{usd:.2} USD)")),
+                    )
+                    .clicked()
+                {
+                    lam = Some("claude");
+                }
+                ui.label("Giới hạn mỗi lần:");
+                for g in [1.0, 2.0, 5.0] {
+                    ui.selectable_value(&mut self.gioi_han, g, format!("{g:.0} USD"));
+                }
+            });
+            ui.label(RichText::new("Giữ nguyên tiếng Anh: tên nhân vật, tên riêng, tên vật phẩm. Câu đã dịch được lưu lại, lần sau chỉ dịch câu mới.").small().weak());
+        });
+        the(ui, "GÓI CHO DMM", |ui| {
+            if ui
+                .add_enabled(
+                    !ban && so_bo_nho > 0,
+                    egui::Button::new(RichText::new("Xuất gói Việt hóa ra Desktop").strong()),
+                )
+                .clicked()
+            {
+                lam = Some("goi");
+            }
+            ui.label(RichText::new("Game 2.04+ không cho sửa file trực tiếp: trong DMM tắt gói cũ > Import file VietHoa_CrimsonDesert.zip > bật > Mount Mods. Vào game để ngôn ngữ English.").small().weak());
+        });
+        the(ui, "MOD TĂNG Ô CHỨA ĐỒ", |ui| {
+            if ui
+                .add_enabled(!ban, egui::Button::new("Tạo mod tăng ô chứa đồ"))
+                .clicked()
+            {
+                lam = Some("tui");
+            }
+            ui.label(RichText::new("Tạo 2 file ở Desktop\\Mod_TangO_CrimsonDesert: AnToan (balo 732, kho/tủ 1440 – nên dùng) và TatCa (cả balo 1440 – sao lưu save trước). Tắt game > DMM: Import 1 file, bật, Mount Mods.").small().weak());
+        });
+        ui.label(
+            RichText::new("Lồng tiếng Crimson Desert sẽ có ở mục Lồng tiếng (giai đoạn 6).")
+                .small()
+                .weak(),
+        );
+        drop(g);
+
+        let dot = self.cd_dot;
+        let gioi_han = self.gioi_han;
+        match lam {
+            Some("offline") => self.chay_cd("Đang dịch offline", move |cd, bc| {
+                let ds = cd.cau_can_dich(dot);
+                let xong = cd.viec.chay_offline(ds, bc).map_err(|e| e.to_string())?;
+                Ok(if xong {
+                    format!("Dịch offline xong đợt {}. Bấm Xuất gói Việt hóa.", dot + 1)
+                } else {
+                    format!("Đã dừng / còn câu lỗi ({} câu lỗi).", cd.viec.loi)
+                })
+            }),
+            Some("claude") => self.chay_cd("Đang dịch bằng Claude", move |cd, bc| {
+                let ds = cd.cau_can_dich(dot);
+                let xong = cd
+                    .viec
+                    .chay_claude(ds, gioi_han, bc)
+                    .map_err(|e| e.to_string())?;
+                Ok(format!(
+                    "{} • tốn {:.3} USD",
+                    if xong {
+                        "Dịch bằng Claude xong đợt này"
+                    } else {
+                        "Đã dừng – bấm lại để dịch tiếp"
+                    },
+                    cd.viec.tien
+                ))
+            }),
+            Some("goi") => self.chay_cd("Đang xuất gói cho DMM", |cd, _| {
+                let p = duong_dan::desktop().join(vcd::TEN_GOI);
+                let n = cd.xuat_goi(&p).map_err(|e| e.to_string())?;
+                duong_dan::mo_explorer(&p);
+                Ok(format!(
+                    "Đã xuất gói ({n} câu tiếng Việt) ra Desktop: {}",
+                    vcd::TEN_GOI
+                ))
+            }),
+            Some("tui") => self.chay_cd("Đang tạo mod tăng ô chứa đồ", |cd, _| {
+                let ra = duong_dan::desktop().join("Mod_TangO_CrimsonDesert");
+                let bc = cd.tao_mod_tui_do(&ra).map_err(|e| e.to_string())?;
+                duong_dan::mo_explorer(&ra);
+                Ok(format!(
+                    "Đã tạo mod ở Desktop\\Mod_TangO_CrimsonDesert:\n{}",
+                    bc.join("\n")
+                ))
+            }),
+            _ => {}
+        }
     }
 
     pub fn ve(&mut self, ui: &mut egui::Ui) {
@@ -149,9 +351,10 @@ impl TrangVietHoa {
 
         // ---- thư viện game ----
         let mut mo: Option<usize> = None;
+        let mut mo_cd: Option<usize> = None;
         let mut tim_lai = false;
         let mut bo_tay: Option<PathBuf> = None;
-        // Đã chọn game → thu gọn thư viện thành 1 dòng cho gọn
+        // Đã chọn game > thu gọn thư viện thành 1 dòng cho gọn
         if let Some(i) = self.chon {
             let mut doi = false;
             the(ui, "GAME ĐANG CHỌN", |ui| {
@@ -174,6 +377,7 @@ impl TrangVietHoa {
             if doi {
                 self.chon = None;
                 self.viec = None;
+                self.cd = None;
                 *self.tt.lock().unwrap() = TienTrinh::default();
                 return;
             }
@@ -194,10 +398,9 @@ impl TrangVietHoa {
                             };
                             ui.label(RichText::new(&g.ten).strong());
                             ui.label(RichText::new(nguon).weak());
+                            let la_cd = g.loai() == LoaiGame::CrimsonDesert;
                             let rieng = match g.loai() {
-                                LoaiGame::CrimsonDesert => {
-                                    Some("Crimson Desert: công cụ riêng ở giai đoạn 4")
-                                }
+                                LoaiGame::CrimsonDesert => None,
                                 LoaiGame::Rise | LoaiGame::Tr2013 | LoaiGame::Shadow => {
                                     Some("Tomb Raider: công cụ riêng ở giai đoạn 5")
                                 }
@@ -205,7 +408,19 @@ impl TrangVietHoa {
                             };
                             ui.horizontal(|ui| {
                                 let chon = self.chon == Some(i);
-                                if ui
+                                if la_cd {
+                                    if ui
+                                        .add(
+                                            egui::Button::new(
+                                                RichText::new("Việt hóa Crimson Desert").strong(),
+                                            )
+                                            .selected(chon),
+                                        )
+                                        .clicked()
+                                    {
+                                        mo_cd = Some(i);
+                                    }
+                                } else if ui
                                     .add(egui::Button::new("Dò file chữ").selected(chon))
                                     .clicked()
                                 {
@@ -252,10 +467,17 @@ impl TrangVietHoa {
             self.tim_lai();
             self.chon = None;
             self.viec = None;
+            self.cd = None;
             return;
+        }
+        if let Some(i) = mo_cd {
+            if !self.dang_ban() {
+                self.mo_cd(i);
+            }
         }
         if let Some(i) = mo {
             if !self.dang_ban() {
+                self.cd = None;
                 let g = &self.games.as_ref().unwrap()[i];
                 self.chon = Some(i);
                 let mut v = ViecFile::moi(&g.thu_muc, &g.ten);
@@ -266,17 +488,32 @@ impl TrangVietHoa {
             }
         }
 
+        if self.chon.is_none() {
+            return;
+        }
+        if self.dang_ban() {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(300));
+        }
+        self.ve_tien_trinh(ui);
+        if self.cd.is_some() {
+            self.ve_cd(ui);
+            return;
+        }
         let (Some(i), Some(viec)) = (self.chon, self.viec.clone()) else {
             return;
         };
         let ten_game = self.games.as_ref().unwrap()[i].ten.clone();
         let ban = self.dang_ban();
-        if ban {
-            ui.ctx()
-                .request_repaint_after(std::time::Duration::from_millis(300));
-        }
 
-        // ---- tiến trình ----
+        let Ok(mut v) = viec.try_lock() else {
+            ui.label(RichText::new(format!("{ten_game}: đang làm việc nền...")).weak());
+            return;
+        };
+        self.ve_file(ui, &mut v, &ten_game, ban);
+    }
+
+    fn ve_tien_trinh(&mut self, ui: &mut egui::Ui) {
         {
             let t = self.tt.lock().unwrap();
             if t.viec.is_some() || !t.thong_bao.is_empty() {
@@ -301,12 +538,9 @@ impl TrangVietHoa {
                 });
             }
         }
+    }
 
-        let Ok(mut v) = viec.try_lock() else {
-            ui.label(RichText::new(format!("{ten_game}: đang làm việc nền...")).weak());
-            return;
-        };
-
+    fn ve_file(&mut self, ui: &mut egui::Ui, v: &mut ViecFile, ten_game: &str, ban: bool) {
         // ---- dò file ----
         let mut can_doc_lai = false;
         let mut quet = false;
@@ -397,7 +631,6 @@ impl TrangVietHoa {
                 });
         });
         if quet {
-            drop(v);
             self.chay("Đang dò file chữ", |v, bc| {
                 let dung = v.viec.dung.clone();
                 dung.store(false, Ordering::SeqCst);
@@ -528,7 +761,6 @@ impl TrangVietHoa {
                 );
             }
         });
-        drop(v);
 
         let khong_dau = self.khong_dau;
         let gioi_han = self.gioi_han;

@@ -1985,7 +1985,7 @@ mod tests {
             fn tien_do(&self, _: usize, _: usize, _: f64) {}
         }
         let thu = PathBuf::from(std::env::var("QUY_TRINH").unwrap());
-        let mut v = ViecFile::moi(&thu, "Game thử");
+        let v = ViecFile::moi(&thu, "Game thử");
         let _ = std::fs::remove_dir_all(&v.tm);
         let mut v = ViecFile::moi(&thu, "Game thử");
         let kq = v.quet(&|_| {}, &|| false);

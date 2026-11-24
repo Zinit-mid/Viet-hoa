@@ -156,6 +156,18 @@ pub fn gio_dia_phuong() -> String {
     )
 }
 
+/// Mở Explorer: thư mục, hoặc thư mục chứa file và chọn sẵn file đó.
+pub fn mo_explorer(p: &Path) {
+    use std::os::windows::process::CommandExt;
+    let mut c = std::process::Command::new("explorer");
+    if p.is_file() {
+        c.raw_arg(format!("/select,\"{}\"", p.display()));
+    } else {
+        c.arg(p);
+    }
+    let _ = c.spawn();
+}
+
 /// Desktop thật người dùng đang thấy (kể cả khi OneDrive chuyển Desktop).
 pub fn desktop() -> PathBuf {
     for p in [
