@@ -7,11 +7,12 @@ use std::sync::OnceLock;
 
 static GOC: OnceLock<PathBuf> = OnceLock::new();
 
-const SCRIPTS: [(&str, &str); 5] = [
+const SCRIPTS: [(&str, &str); 6] = [
     ("dich_offline.py", include_str!("../scripts/dich_offline.py")),
     ("tao_giong.py", include_str!("../scripts/tao_giong.py")),
     ("long_tieng_tr.py", include_str!("../scripts/long_tieng_tr.py")),
     ("nghe_phim.py", include_str!("../scripts/nghe_phim.py")),
+    ("thuyet_minh.py", include_str!("../scripts/thuyet_minh.py")),
     ("tai_cong_cu.ps1", include_str!("../scripts/tai_cong_cu.ps1")),
 ];
 

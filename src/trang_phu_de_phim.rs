@@ -21,6 +21,8 @@ struct Tt {
     phim: Option<PathBuf>,
     srt: Option<PathBuf>,
     thu_muc: Option<PathBuf>,
+    /// phim đã trộn giọng thuyết minh
+    phim_tm: Option<PathBuf>,
 }
 
 struct Bao(Arc<Mutex<Tt>>);
@@ -40,6 +42,12 @@ pub struct TrangPhuDePhim {
     gioi_han: f64,
     tt: Arc<Mutex<Tt>>,
     dung: Arc<AtomicBool>,
+    /// thuyết minh
+    giong: usize,
+    theo_cam_xuc: bool,
+    nhan_nha: bool,
+    cuong_do: f64,
+    chi_thu: bool,
 }
 
 impl Default for TrangPhuDePhim {
@@ -50,6 +58,11 @@ impl Default for TrangPhuDePhim {
             gioi_han: 1.0,
             tt: Arc::new(Mutex::new(Tt::default())),
             dung: Arc::new(AtomicBool::new(false)),
+            giong: 0,
+            theo_cam_xuc: true,
+            nhan_nha: true,
+            cuong_do: 0.7,
+            chi_thu: true,
         }
     }
 }
@@ -66,6 +79,65 @@ impl TrangPhuDePhim {
                 tien: (g.tien > 0.0).then_some(g.tien),
                 loi: g.loi,
             }
+        });
+    }
+
+    /// Thuyết minh bằng giọng đã chọn (dùng phụ đề đã tạo; chưa có thì báo tạo phụ đề trước).
+    fn thuyet_minh(&mut self) {
+        let nguon = self.nguon.trim().trim_matches('"').to_string();
+        {
+            let mut t = self.tt.lock().unwrap();
+            if t.dang_ban {
+                return;
+            }
+            if nguon.is_empty() {
+                (t.thong_bao, t.loi) = ("Dán link phim hoặc chọn file phim trước.".into(), true);
+                return;
+            }
+            *t = Tt { dang_ban: true, thong_bao: "Đang chuẩn bị thuyết minh...".into(), ..Default::default() };
+        }
+        let tuy = crate::thuyet_minh::Tuy {
+            giong: crate::thuyet_minh::GIONG[self.giong].0.to_string(),
+            theo_cam_xuc: self.theo_cam_xuc,
+            nhan_nha: self.nhan_nha,
+            cuong_do: self.cuong_do,
+            thu_dau: self.chi_thu.then_some(10),
+        };
+        let (tt, dung) = (self.tt.clone(), self.dung.clone());
+        dung.store(false, Ordering::SeqCst);
+        std::thread::spawn(move || {
+            let _thuc = duong_dan::GiuMayThuc::moi();
+            let (a, b) = (tt.clone(), tt.clone());
+            let kq = (|| -> anyhow::Result<Option<crate::thuyet_minh::KetQua>> {
+                let v = ViecPhim::moi(&nguon)?;
+                let phim = v.phim.as_ref().ok_or_else(|| anyhow::anyhow!("chưa có phim – bấm Tạo phụ đề tiếng Việt trước"))?.duong_dan.clone();
+                if v.dong.is_empty() {
+                    anyhow::bail!("chưa có phụ đề – bấm Tạo phụ đề tiếng Việt trước");
+                }
+                tt.lock().unwrap().phim = Some(phim.clone());
+                let dong: Vec<(f64, f64, String)> = v.dong.iter().map(|(x, y, c)| (*x, *y, v.viec.tim(c).unwrap_or_default())).collect();
+                crate::thuyet_minh::thuyet_minh(
+                    &phim,
+                    &dong,
+                    &v.thu_muc_phim(),
+                    &tuy,
+                    &dung,
+                    &move |s| a.lock().unwrap().thong_bao = s.to_string(),
+                    &move |x, y| b.lock().unwrap().tien = if y > 0 { x as f32 / y as f32 } else { 0.0 },
+                )
+            })();
+            let mut t = tt.lock().unwrap();
+            t.dang_ban = false;
+            match kq {
+                Ok(Some(k)) => {
+                    t.xong = true;
+                    t.thong_bao = format!("Xong ✓ Thuyết minh {} dòng: {}\nGiọng riêng: {}", k.so_dong, k.phim_moi.display(), k.giong.display());
+                    t.phim_tm = Some(k.phim_moi);
+                }
+                Ok(None) => (t.thong_bao, t.loi) = ("Đã dừng – bấm lại để làm tiếp.".into(), true),
+                Err(e) => (t.thong_bao, t.loi) = (format!("Không làm được: {e}"), true),
+            }
+            duong_dan::nhat_ky(&format!("Thuyết minh phim: {}", t.thong_bao));
         });
     }
 
@@ -105,9 +177,9 @@ impl TrangPhuDePhim {
         ui.heading("Phụ đề phim");
         ui.label("• Dán link phim (YouTube và đa số trang video) hoặc chọn file phim trên máy.\n• App tải phim về, AI nghe lời thoại, dịch sang tiếng Việt và tạo phụ đề KHỚP TỪNG CÂU.\n• Phim 2 tiếng mất khoảng 5–15 phút. Xong app tự mở phim kèm phụ đề tiếng Việt.\n• Không dùng được cho Netflix / Disney+ (có khóa bản quyền).");
         ui.add_space(8.0);
-        let (ban, tb, loi, xong, tien, phim, srt, thu_muc) = {
+        let (ban, tb, loi, xong, tien, phim, srt, thu_muc, phim_tm) = {
             let t = self.tt.lock().unwrap();
-            (t.dang_ban, t.thong_bao.clone(), t.loi, t.xong, t.tien, t.phim.clone(), t.srt.clone(), t.thu_muc.clone())
+            (t.dang_ban, t.thong_bao.clone(), t.loi, t.xong, t.tien, t.phim.clone(), t.srt.clone(), t.thu_muc.clone(), t.phim_tm.clone())
         };
         if ban {
             ui.ctx().request_repaint_after(std::time::Duration::from_millis(300));
@@ -174,6 +246,43 @@ impl TrangPhuDePhim {
         if ban {
             ui.add(egui::ProgressBar::new(tien).show_percentage().animate(tien == 0.0));
         }
+        ui.add_space(8.0);
+        egui::Frame::group(ui.style()).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.label(RichText::new("THUYẾT MINH TIẾNG VIỆT (giọng đọc có cảm xúc)").color(Color32::from_rgb(64, 160, 255)).strong());
+            ui.label(RichText::new("Dùng phụ đề tiếng Việt đã tạo ở trên: đọc từng dòng bằng một giọng chuẩn, đặt đúng thời điểm, hạ tiếng gốc khi thuyết minh nói, xuất phim mới.").small().weak());
+            ui.add_enabled_ui(!ban, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("Giọng:");
+                    egui::ComboBox::from_id_salt("tm_giong")
+                        .selected_text(format!("{} ({})", crate::thuyet_minh::GIONG[self.giong].0, crate::thuyet_minh::GIONG[self.giong].1))
+                        .show_ui(ui, |ui| {
+                            for (i, (g, m)) in crate::thuyet_minh::GIONG.iter().enumerate() {
+                                ui.selectable_value(&mut self.giong, i, format!("{g} ({m})"));
+                            }
+                        });
+                });
+                ui.checkbox(&mut self.theo_cam_xuc, "Giọng theo cảm xúc: dùng mẫu bình thường / gấp rút / buồn của giọng này theo từng câu");
+                ui.checkbox(&mut self.nhan_nha, "Nhấn nhá theo câu: chỉnh to nhỏ, nhanh chậm, cao thấp theo dấu câu và từ khóa");
+                if self.nhan_nha {
+                    ui.horizontal(|ui| {
+                        ui.label("Độ mạnh nhấn nhá:");
+                        ui.add(egui::Slider::new(&mut self.cuong_do, 0.3..=1.0).fixed_decimals(1));
+                    });
+                }
+                ui.checkbox(&mut self.chi_thu, "Chỉ làm thử 10 dòng đầu (nghe trước khi làm cả phim)");
+            });
+            ui.horizontal(|ui| {
+                if ui.add_enabled(!ban, egui::Button::new(RichText::new("Tạo thuyết minh").strong())).clicked() {
+                    self.thuyet_minh();
+                }
+                if ui.add_enabled(phim_tm.is_some(), egui::Button::new("Mở phim thuyết minh")).clicked() {
+                    if let Some(p) = &phim_tm {
+                        pdp::mo_phim(p, None);
+                    }
+                }
+            });
+        });
         if !tb.is_empty() {
             ui.add_space(6.0);
             let m = if loi {
