@@ -42,7 +42,8 @@ impl Muc {
             Muc::LongTieng => crate::kieu::CAM,
             Muc::PhuDe => crate::kieu::VANG,
             Muc::DoFile => crate::kieu::XANH_BIEN,
-            _ => crate::kieu::XANH_SANG,
+            Muc::DichManHinh => crate::kieu::CYAN,
+            Muc::CaiDat => crate::kieu::TIM,
         }
     }
     /// Mục con: (tên, trang, khối cần cuộn tới)
@@ -367,6 +368,7 @@ impl eframe::App for App {
         }
         ctx.request_repaint_after(Duration::from_millis(300));
         crate::tien_trinh::cap_nhat();
+        crate::kieu::dat_mau_vien(self.muc.mau());
         crate::kieu::nen_anh_sang(ctx);
 
         egui::TopBottomPanel::bottom("trang_thai")

@@ -8,7 +8,7 @@ use std::time::Instant;
 use eframe::egui::{self, epaint, Color32, FontFamily, FontId, Pos2, Rect, Response, RichText, Sense, Stroke, TextStyle, Ui, Vec2};
 
 // ---------------- màu ----------------
-pub const NEN: Color32 = Color32::from_rgb(13, 8, 32);
+pub const NEN: Color32 = Color32::from_rgb(7, 9, 26);
 pub const CHU: Color32 = Color32::from_rgb(244, 244, 244);
 pub const CHU_PHU: Color32 = Color32::from_rgb(198, 198, 198);
 pub const CHU_MO: Color32 = Color32::from_rgb(168, 168, 168);
@@ -28,7 +28,7 @@ pub fn a(c: Color32, alpha: u8) -> Color32 {
 }
 
 fn kinh_nen() -> Color32 {
-    rgba(160, 120, 255, 26)
+    rgba(150, 120, 255, 15)
 }
 fn kinh_vien() -> Color32 {
     rgba(190, 150, 255, 70)
@@ -154,10 +154,11 @@ pub fn ap_dung(ctx: &egui::Context) {
 
 /// Màu nền cửa sổ (đằng sau mọi thứ).
 pub fn mau_nen() -> [f32; 4] {
-    [13.0 / 255.0, 8.0 / 255.0, 32.0 / 255.0, 1.0]
+    [7.0 / 255.0, 9.0 / 255.0, 26.0 / 255.0, 1.0]
 }
 
-/// 3 vệt sáng mờ phía sau (xanh dương góc trên trái, tím bên phải, cam phía dưới). Gọi đầu mỗi khung hình.
+/// Nền như ảnh mẫu HARIRI: đêm xanh đen, các mảng sáng màu (xanh ngọc, tím, xanh dương, vàng cam), bụi sao li ti,
+/// vài tia sáng chéo. Vẽ ở lớp nền; tắt được ở Cài đặt > Giao diện. Gọi đầu mỗi khung hình.
 pub fn nen_anh_sang(ctx: &egui::Context) {
     if !anh_sang_bat() {
         return;
@@ -178,20 +179,71 @@ pub fn nen_anh_sang(ctx: &egui::Context) {
         }
         p.add(epaint::Shape::mesh(m));
     };
-    vet(Pos2::new(r.left() + w * 0.18, r.top()), (w * 0.42).max(480.0), rgba(70, 100, 255, 84));
-    vet(Pos2::new(r.left() + w * 0.88, r.top() + h * 0.30), (w * 0.46).max(480.0), rgba(170, 80, 255, 120));
-    vet(Pos2::new(r.left() + w * 0.12, r.top() + h * 0.80), (w * 0.34).max(420.0), rgba(150, 70, 255, 90));
-    vet(Pos2::new(r.left() + w * 0.55, r.bottom()), (w * 0.38).max(420.0), rgba(255, 140, 90, 30));
+    let at = |fx: f32, fy: f32| Pos2::new(r.left() + w * fx, r.top() + h * fy);
+    let b = w.max(h);
+    // xanh dương phía trên giữa, tím trái trên, tím hồng bên phải, xanh ngọc dưới trái, vàng cam dưới phải
+    vet(at(0.45, 0.0), b * 0.42, rgba(60, 110, 255, 56));
+    vet(at(0.06, 0.08), b * 0.36, rgba(150, 80, 255, 72));
+    vet(at(0.96, 0.32), b * 0.38, rgba(190, 90, 255, 64));
+    vet(at(0.04, 0.96), b * 0.30, rgba(30, 205, 225, 56));
+    vet(at(1.0, 0.88), b * 0.30, rgba(255, 170, 70, 46));
+    vet(at(0.55, 1.0), b * 0.28, rgba(255, 120, 90, 22));
+    vet(at(0.30, 0.55), b * 0.26, rgba(120, 70, 255, 22));
+
+    // tia sáng chéo mảnh (góc trên phải, góc dưới trái)
+    let tia = |a1: Pos2, a2: Pos2, al: u8| {
+        p.line_segment([a1, a2], Stroke::new(1.0, rgba(190, 220, 255, al)));
+    };
+    for (i, (x2, y2)) in [(1.0, 0.18), (1.0, 0.26), (0.97, 0.34), (1.0, 0.10)].iter().enumerate() {
+        tia(at(0.74 + i as f32 * 0.02, 0.0), at(*x2, *y2), 26 - i as u8 * 4);
+    }
+    for (i, x2) in [0.20f32, 0.24, 0.28].iter().enumerate() {
+        tia(at(0.17 + i as f32 * 0.015, 1.0), at(*x2, 0.80 - i as f32 * 0.02), 22);
+    }
+
+    // bụi sao: vị trí cố định theo chỉ số (không chớp, không tốn CPU)
+    let mut x: u32 = 0x9E37_79B9;
+    let mut ngau = || {
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        (x % 10_000) as f32 / 10_000.0
+    };
+    for _ in 0..150 {
+        let (fx, fy, k, d) = (ngau(), ngau(), ngau(), ngau());
+        let mau = if k < 0.12 {
+            rgba(120, 230, 255, 60 + (d * 110.0) as u8)
+        } else if k < 0.2 {
+            rgba(255, 200, 120, 60 + (d * 90.0) as u8)
+        } else {
+            rgba(235, 225, 255, 30 + (d * 120.0) as u8)
+        };
+        p.circle_filled(at(fx, fy), 0.7 + d * 1.0, mau);
+    }
 }
 
 // ---------------- khối kính ----------------
+static MAU_VIEN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0xFFB98AFF);
+
+/// Màu viền sáng của khối kính (theo chức năng của trang đang mở).
+pub fn dat_mau_vien(c: Color32) {
+    MAU_VIEN.store(u32::from_be_bytes([c.a(), c.r(), c.g(), c.b()]), Ordering::Relaxed);
+}
+
+fn mau_vien() -> Color32 {
+    let [_, r, g, b] = MAU_VIEN.load(Ordering::Relaxed).to_be_bytes();
+    Color32::from_rgb(r, g, b)
+}
+
 pub fn kinh_khung() -> egui::Frame {
+    let m = mau_vien();
     egui::Frame::NONE
         .fill(kinh_nen())
-        .stroke(Stroke::new(1.0, kinh_vien()))
+        .stroke(Stroke::new(1.5, a(m, 175)))
         .corner_radius(egui::CornerRadius::same(24))
         .inner_margin(egui::Margin::same(20))
-        .shadow(epaint::Shadow { offset: [0, 10], blur: 32, spread: 0, color: Color32::from_black_alpha(80) })
+        // quầng sáng màu quanh khối (như viền neon của ảnh mẫu)
+        .shadow(epaint::Shadow { offset: [0, 0], blur: 24, spread: 1, color: a(m, 42) })
 }
 
 /// Khối kính có tiêu đề (thẻ). Nếu thanh bên yêu cầu cuộn tới khối này thì cuộn tới.
