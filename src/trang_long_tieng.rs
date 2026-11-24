@@ -46,6 +46,8 @@ pub struct TrangLongTieng {
     dung: Arc<AtomicBool>,
     gan: HashMap<String, String>,
     kho: Vec<String>,
+    kho_so: usize,
+    them: crate::them_giong::ThemGiong,
 }
 
 impl Default for TrangLongTieng {
@@ -60,6 +62,8 @@ impl Default for TrangLongTieng {
             dung: Arc::new(AtomicBool::new(false)),
             gan: HashMap::new(),
             kho: clone_giong::liet_ke(),
+            kho_so: 0,
+            them: Default::default(),
         }
     }
 }
@@ -261,7 +265,13 @@ impl TrangLongTieng {
             });
         });
 
+        let so = crate::them_giong::SO_LAN_LUU.load(Ordering::SeqCst);
+        if so != self.kho_so {
+            self.kho_so = so;
+            self.kho = clone_giong::liet_ke();
+        }
         the(ui, "3. GIỌNG TỪNG NGƯỜI", |ui| {
+            self.them.nut(ui);
             let mut dem: HashMap<String, usize> = HashMap::new();
             for c in self.tt.lock().unwrap().clips.iter().filter(|c| c.vi.is_some()) {
                 *dem.entry(c.nguoi.clone()).or_default() += 1;

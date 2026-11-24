@@ -20,6 +20,7 @@ mod trang_long_tieng;
 mod trang_phu_de_phim;
 mod trang_sua_dich;
 mod trang_tu_dong;
+mod them_giong;
 mod thuyet_minh;
 mod tien_trinh;
 mod tu_dong;

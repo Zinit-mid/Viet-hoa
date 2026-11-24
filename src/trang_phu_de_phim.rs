@@ -43,7 +43,11 @@ pub struct TrangPhuDePhim {
     tt: Arc<Mutex<Tt>>,
     dung: Arc<AtomicBool>,
     /// thuyết minh
-    giong: usize,
+    /// "Thiện Minh" (dựng sẵn) hoặc "kho:<tên file>" (giọng của bạn)
+    giong: String,
+    kho: Vec<String>,
+    kho_so: usize,
+    them: crate::them_giong::ThemGiong,
     theo_cam_xuc: bool,
     nhan_nha: bool,
     cuong_do: f64,
@@ -60,7 +64,10 @@ impl Default for TrangPhuDePhim {
             gioi_han: 1.0,
             tt: Arc::new(Mutex::new(Tt::default())),
             dung: Arc::new(AtomicBool::new(false)),
-            giong: 0,
+            giong: "Thiện Minh".into(),
+            kho: crate::viet_hoa::clone_giong::liet_ke(),
+            kho_so: 0,
+            them: Default::default(),
             theo_cam_xuc: true,
             nhan_nha: true,
             cuong_do: 0.7,
@@ -100,11 +107,12 @@ impl TrangPhuDePhim {
             *t = Tt { dang_ban: true, thong_bao: "Đang chuẩn bị thuyết minh...".into(), ..Default::default() };
         }
         let tuy = crate::thuyet_minh::Tuy {
-            giong: crate::thuyet_minh::GIONG[self.giong].0.to_string(),
+            giong: self.giong.trim_start_matches("kho:").to_string(),
             theo_cam_xuc: self.theo_cam_xuc,
             nhan_nha: self.nhan_nha,
             cuong_do: self.cuong_do,
             thu_dau: self.chi_thu.then_some(10),
+            tu_kho: self.giong.strip_prefix("kho:").map(String::from),
         };
         let (tt, dung) = (self.tt.clone(), self.dung.clone());
         dung.store(false, Ordering::SeqCst);
@@ -265,13 +273,32 @@ impl TrangPhuDePhim {
             ui.add_enabled_ui(!ban, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.label("Giọng:");
-                    egui::ComboBox::from_id_salt("tm_giong")
-                        .selected_text(format!("{} ({})", crate::thuyet_minh::GIONG[self.giong].0, crate::thuyet_minh::GIONG[self.giong].1))
-                        .show_ui(ui, |ui| {
-                            for (i, (g, m)) in crate::thuyet_minh::GIONG.iter().enumerate() {
-                                ui.selectable_value(&mut self.giong, i, format!("{g} ({m})"));
+                    let hien = match self.giong.strip_prefix("kho:") {
+                        Some(f) => format!("{f} (giọng của bạn)"),
+                        None => crate::thuyet_minh::GIONG
+                            .iter()
+                            .find(|g| g.0 == self.giong)
+                            .map(|g| format!("{} ({})", g.0, g.1))
+                            .unwrap_or_else(|| self.giong.clone()),
+                    };
+                    egui::ComboBox::from_id_salt("tm_giong").selected_text(hien).width(300.0).show_ui(ui, |ui| {
+                        for (g, m) in crate::thuyet_minh::GIONG.iter() {
+                            ui.selectable_value(&mut self.giong, g.to_string(), format!("{g} ({m})"));
+                        }
+                        if !self.kho.is_empty() {
+                            ui.separator();
+                            ui.label(RichText::new("Giọng của bạn (kho giọng)").small().weak());
+                            for f in self.kho.clone() {
+                                ui.selectable_value(&mut self.giong, format!("kho:{f}"), &f);
                             }
-                        });
+                        }
+                    });
+                    let so = crate::them_giong::SO_LAN_LUU.load(Ordering::SeqCst);
+                    if so != self.kho_so {
+                        self.kho_so = so;
+                        self.kho = crate::viet_hoa::clone_giong::liet_ke();
+                    }
+                    self.them.nut(ui);
                 });
                 ui.checkbox(&mut self.theo_cam_xuc, "Giọng theo cảm xúc: dùng mẫu bình thường / gấp rút / buồn của giọng này theo từng câu");
                 ui.checkbox(&mut self.nhan_nha, "Nhấn nhá theo câu: chỉnh to nhỏ, nhanh chậm, cao thấp theo dấu câu và từ khóa");

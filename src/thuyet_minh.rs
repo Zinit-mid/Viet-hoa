@@ -37,6 +37,8 @@ pub struct Tuy {
     pub cuong_do: f64,
     /// chỉ làm N dòng đầu để nghe thử
     pub thu_dau: Option<usize>,
+    /// giọng của bạn trong kho giọng (tên file .wav); None = giọng dựng sẵn `giong`
+    pub tu_kho: Option<String>,
 }
 
 /// Bảng "cách đọc tên riêng" của người dùng: mỗi dòng `Tên => cách viết để đọc` (vd `Jess => Giét`).
@@ -86,6 +88,29 @@ pub fn phan_loai(vi: &str) -> &'static str {
     } else {
         "binh_thuong"
     }
+}
+
+/// Bộ giọng cho một giọng trong kho: mẫu chính làm "bình thường"; có thêm file `<tên>_gap_rut.wav` /
+/// `<tên>_buon.wav` cạnh nó thì dùng cho câu gấp rút / buồn, không thì dùng lại mẫu chính.
+/// → (thư mục bộ giọng, chữ ký nội dung để đổi giọng thì đọc lại)
+fn bo_tu_kho(file: &str) -> Result<(PathBuf, String)> {
+    let kho = crate::viet_hoa::clone_giong::kho_giong();
+    let goc = kho.join(file);
+    if !goc.is_file() {
+        bail!("không thấy giọng {file} trong kho giọng");
+    }
+    let stem = file.trim_end_matches(".wav");
+    let thu = thu_muc_giong(&format!("kho_{stem}"));
+    std::fs::create_dir_all(&thu)?;
+    std::fs::copy(&goc, thu.join("binh_thuong.wav"))?;
+    let mut sig = std::fs::metadata(&goc).map(|m| m.len()).unwrap_or(0).to_string();
+    for k in ["gap_rut", "buon"] {
+        let ung = [kho.join(format!("{stem}_{k}.wav")), kho.join(format!("{stem}__{k}.wav"))];
+        let nguon = ung.iter().find(|p| p.is_file()).unwrap_or(&goc);
+        std::fs::copy(nguon, thu.join(format!("{k}.wav")))?;
+        sig += &format!("-{}", std::fs::metadata(nguon).map(|m| m.len()).unwrap_or(0));
+    }
+    Ok((thu, sig))
 }
 
 pub fn thu_muc_bo() -> PathBuf {
@@ -221,12 +246,18 @@ pub fn thuyet_minh(
         dl.truncate(n);
     }
     // 2. bộ giọng cảm xúc
-    if t.theo_cam_xuc && !co_bo(&t.giong) {
-        bao(&format!("Tạo bộ giọng cảm xúc cho {} (lần đầu, ~1 phút)...", t.giong));
-        if !tao_bo(&[&t.giong], dung, bao)? {
-            return Ok(None);
+    let (bo_dir, giong_id) = if let Some(f) = &t.tu_kho {
+        let (d, sig) = bo_tu_kho(f)?;
+        (Some(d), format!("kho:{f}#{sig}"))
+    } else {
+        if t.theo_cam_xuc && !co_bo(&t.giong) {
+            bao(&format!("Tạo bộ giọng cảm xúc cho {} (lần đầu, ~1 phút)...", t.giong));
+            if !tao_bo(&[&t.giong], dung, bao)? {
+                return Ok(None);
+            }
         }
-    }
+        (t.theo_cam_xuc.then(|| thu_muc_giong(&t.giong)), t.giong.clone())
+    };
     let ten_doc = doc_ten_doc();
     // 3. VieNeu đọc từng dòng
     let wav_dir = tm.join("thuyet_minh").join("wav");
@@ -237,13 +268,13 @@ pub fn thuyet_minh(
         let cx = phan_loai(vi);
         let chu = ap_ten(&lam_sach_loi(vi), &ten_doc);
         let khung = dl.get(i + 1).map(|n| n.0 - a - 0.05).unwrap_or(8.0).clamp(0.6, 12.0);
-        let id = id_dong(&t.giong, cx, &chu, t);
+        let id = id_dong(&giong_id, cx, &chu, t);
         ds.push(json!({"id": id, "text": chu, "giay": khung, "cam_xuc": cx}));
         ids.push(id);
     }
     let viec = json!({
         "che_do": "doc", "giong": t.giong, "ra": wav_dir.to_string_lossy(), "ds": ds,
-        "bo": if t.theo_cam_xuc { Some(thu_muc_giong(&t.giong).to_string_lossy().into_owned()) } else { None },
+        "bo": bo_dir.map(|d| d.to_string_lossy().into_owned()),
         "nhan_nha": t.nhan_nha, "cuong_do": t.cuong_do, "toi_da": 1.45,
     });
     let n = dl.len();
@@ -381,7 +412,7 @@ mod test {
 
     #[test]
     fn id_theo_noi_dung() {
-        let t = Tuy { giong: "Thiện Minh".into(), theo_cam_xuc: true, nhan_nha: true, cuong_do: 0.7, thu_dau: None };
+        let t = Tuy { giong: "Thiện Minh".into(), theo_cam_xuc: true, nhan_nha: true, cuong_do: 0.7, thu_dau: None, tu_kho: None };
         assert_ne!(id_dong("a", "buon", "x", &t), id_dong("a", "gap_rut", "x", &t));
         assert_eq!(id_dong("a", "buon", "x", &t).len(), 12);
     }
@@ -409,7 +440,7 @@ mod test {
         for d in &dong {
             println!("{:.1} [{}] {}", d.0, phan_loai(&d.2), d.2);
         }
-        let t = Tuy { giong: "Thiện Minh".into(), theo_cam_xuc: true, nhan_nha: true, cuong_do: 0.7, thu_dau: None };
+        let t = Tuy { giong: "Thiện Minh".into(), theo_cam_xuc: true, nhan_nha: true, cuong_do: 0.7, thu_dau: None, tu_kho: std::env::var("KHO").ok() };
         let kq = thuyet_minh(v.phim.as_ref().map(|p| p.duong_dan.as_path()).unwrap(), &dong, &v.thu_muc_phim(), &t, &dung, &|s| println!("{s}"), &|a, b| println!("{a}/{b}"))
             .unwrap()
             .unwrap();
