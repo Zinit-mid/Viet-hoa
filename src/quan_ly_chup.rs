@@ -88,12 +88,12 @@ impl QuanLyChup {
         }
         if self.loi_lien >= 5 {
             if self.gdi_tu.is_none() {
-                nk("Lỗi chụp 5 lần liền → chuyển sang chụp GDI, 30 giây sau thử lại DXGI");
+                nk("Lỗi chụp 5 lần liền > chuyển sang chụp GDI, 30 giây sau thử lại DXGI");
             }
             self.gdi_tu = Some(Instant::now());
             self.cho_den = None;
             chung.tt().loi =
-                "Chụp nhanh (DXGI) đang lỗi → tạm dùng GDI. Game nên để Borderless / Windowed."
+                "Chụp nhanh (DXGI) đang lỗi > tạm dùng GDI. Game nên để Borderless / Windowed."
                     .into();
             return;
         }

@@ -31,6 +31,7 @@ pub struct App {
     thong_bao: String,
     bao_chuyen: Vec<String>,
     viet_hoa: crate::trang_viet_hoa::TrangVietHoa,
+    clone_giong: crate::trang_clone_giong::TrangCloneGiong,
 }
 
 const XANH: Color32 = Color32::from_rgb(64, 160, 255);
@@ -53,6 +54,7 @@ impl App {
             thong_bao: String::new(),
             bao_chuyen,
             viet_hoa: Default::default(),
+            clone_giong: Default::default(),
         }
     }
 }
@@ -145,8 +147,8 @@ impl eframe::App for App {
                 Trang::CaiDat => self.trang_cai_dat(ui),
                 Trang::PhuDePhim => sap_co(ui, "Phụ đề phim", "Link YouTube / file phim > nghe lời thoại (Whisper large-v3-turbo, GPU) > dịch > file .srt tiếng Việt cạnh phim > mở VLC kèm phụ đề."),
                 Trang::VietHoaGame => self.viet_hoa.ve(ui),
-                Trang::LongTieng => sap_co(ui, "Lồng tiếng", "Ghép file giọng - câu phụ đề > nhóm người nói > giọng mẫu > tự sửa giới tính (F0) > phiên âm tên riêng > VieNeu > hậu kỳ > mã hóa lại (Wwise .wem / FSB4 trong .mul)."),
-                Trang::CloneGiong => sap_co(ui, "Clone giọng", "Chọn file ghi âm + giây bắt đầu–kết thúc > cắt, bỏ lặng, mono 24 kHz, lọc 70 Hz, chuẩn hóa độ to > nghe thử bằng VieNeu > lưu vào kho giọng > gán cho nhân vật từng game."),
+                Trang::LongTieng => sap_co(ui, "Lồng tiếng", "Tomb Raider (Rise / 2013): dùng ngay trong mục Việt hóa game, thẻ LỒNG TIẾNG VIỆT. Crimson Desert: sắp có. Quy trình: ghép file giọng - câu phụ đề > nhóm người nói > giọng mẫu > tự sửa giới tính (F0) > phiên âm tên riêng > VieNeu > hậu kỳ > mã hóa lại (Wwise .wem / FSB4 trong .mul)."),
+                Trang::CloneGiong => self.clone_giong.ve(ui),
             });
         });
     }

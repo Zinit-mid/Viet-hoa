@@ -67,7 +67,10 @@ pub fn tao_loi_tat_desktop() -> Result<PathBuf, String> {
 }
 
 pub fn du_lieu() -> PathBuf {
-    goc().join("du_lieu")
+    // VIET_HOA_DU_LIEU: thư mục dữ liệu khác (dùng khi kiểm thử)
+    std::env::var_os("VIET_HOA_DU_LIEU")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| goc().join("du_lieu"))
 }
 pub fn cong_cu() -> PathBuf {
     goc().join("cong_cu")

@@ -2859,6 +2859,7 @@ dependencies = [
  "eframe",
  "encoding_rs",
  "fancy-regex",
+ "flate2",
  "lz4_flex",
  "md5",
  "regex",

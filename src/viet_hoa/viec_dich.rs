@@ -372,6 +372,8 @@ pub struct ViecDich {
     pub duong_do_luong: PathBuf,
     pub huong_dan: String,
     pub bang_ten: BangTen,
+    /// cách lấy thẻ để kiểm bản dịch (mặc định the_cua)
+    pub the: fn(&str) -> Vec<String>,
     pub bo_nho: Arc<Mutex<BTreeMap<String, String>>>,
     pub dung: Arc<AtomicBool>,
     pub da_doi: usize,
@@ -392,6 +394,7 @@ impl ViecDich {
             duong_bo_nho,
             huong_dan: huong_dan.to_string(),
             bang_ten,
+            the: the_cua,
             bo_nho: Arc::new(Mutex::new(bo_nho)),
             dung: Arc::new(AtomicBool::new(false)),
             da_doi: 0,
@@ -498,7 +501,7 @@ impl ViecDich {
             lo.iter()
                 .zip(kq)
                 .map(|(en, vi)| {
-                    (!vi.trim().is_empty() && the_cua(en) == the_cua(&vi)).then_some(vi)
+                    (!vi.trim().is_empty() && (self.the)(en) == (self.the)(&vi)).then_some(vi)
                 })
                 .collect(),
             tien,
@@ -655,7 +658,7 @@ impl ViecDich {
                 for (en, vi) in lo.iter().zip(kq) {
                     match vi {
                         Some(vi)
-                            if the_cua(en) == the_cua(&vi)
+                            if (self.the)(en) == (self.the)(&vi)
                                 && !crate::dich::the::bi_lap(en, &vi) =>
                         {
                             bn.insert(en.clone(), vi);

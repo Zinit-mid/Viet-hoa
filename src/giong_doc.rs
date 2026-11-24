@@ -80,3 +80,11 @@ pub fn dung() {
     SO.fetch_add(1, Ordering::SeqCst);
     mci("close vh_giong");
 }
+
+/// Phát một file WAV (nghe thử giọng mẫu / giọng clone). Phát lại câu mới thì ngắt câu cũ.
+pub fn phat_wav(p: &std::path::Path) {
+    SO.fetch_add(1, Ordering::SeqCst);
+    mci("close vh_wav");
+    mci(&format!("open \"{}\" type waveaudio alias vh_wav", p.display()));
+    mci("play vh_wav");
+}

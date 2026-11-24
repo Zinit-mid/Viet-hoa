@@ -119,7 +119,7 @@ pub const TEN_GOI: &str = "VietHoa_CrimsonDesert.zip";
 
 pub struct CrimsonDesert {
     pub thu_muc_game: PathBuf,
-    nhom: BTreeMap<String, Paloc>,
+    pub(super) nhom: BTreeMap<String, Paloc>,
     pub viec: ViecDich,
 }
 
@@ -316,23 +316,23 @@ pub fn tim_o_chua(b: &[u8]) -> (Vec<OChua>, Vec<String>) {
             .then_some(i)
         });
         let Some(vt) = vt else {
-            bao_cao.push(format!("✗ {ten_viet}: không thấy bản ghi {ten}"));
+            bao_cao.push(format!("- {ten_viet}: không thấy bản ghi {ten}"));
             continue;
         };
         let e = vt + ma.len();
         let (vd, vm) = (e + 7, e + 13);
         if vm + 2 > b.len() {
-            bao_cao.push(format!("✗ {ten_viet}: bản ghi lạ"));
+            bao_cao.push(format!("- {ten_viet}: bản ghi lạ"));
             continue;
         }
         let (md, td) = (u16_at(vd), u16_at(vm));
         if !(1 <= md && md <= td && td <= 5000) {
             bao_cao.push(format!(
-                "✗ {ten_viet}: số ô lạ ({md}/{td}) – game đổi cấu trúc"
+                "- {ten_viet}: số ô lạ ({md}/{td}) – game đổi cấu trúc"
             ));
             continue;
         }
-        bao_cao.push(format!("✓ {ten_viet}: {md} ô (tối đa {td})"));
+        bao_cao.push(format!("+ {ten_viet}: {md} ô (tối đa {td})"));
         kq.push(OChua {
             ten_viet,
             vt_mac_dinh: vd,

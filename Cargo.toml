@@ -25,6 +25,7 @@ rfd = "0.15"
 eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow"] }
 lz4_flex = "0.11"
 zip = { version = "9.8.2", default-features = false, features = ["deflate"] }
+flate2 = "1.1.11"
 
 [dependencies.windows]
 version = "0.61"
@@ -43,6 +44,7 @@ features = [
     "Win32_Graphics_Gdi",
     "Win32_Media_Multimedia",
     "Win32_System_LibraryLoader",
+    "Win32_Storage_FileSystem",
     "Win32_System_Power",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",

@@ -13,6 +13,7 @@ mod khung_dich;
 mod lop_phu;
 mod ocr;
 mod quan_ly_chup;
+mod trang_clone_giong;
 mod trang_viet_hoa;
 #[allow(dead_code)] // các giai đoạn sau (Việt hóa từng game) sẽ dùng
 mod viet_hoa;
