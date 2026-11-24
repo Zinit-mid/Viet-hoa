@@ -87,3 +87,11 @@ Chuyển hết chức năng app cũ nhưng gọn hơn và bỏ các nút thử. 
 
 **Giao diện**
 - Phím giả lập từ shell không tới được bộ bắt phím của app. Dùng tùy chọn khởi động `--dich` / `--f12`, và bấm chuột bằng `SendInput`.
+
+## Dùng độc lập (GĐ8, chưa commit)
+
+Mục tiêu: thao tác hoàn toàn trên app, không cần Claude Code; Claude API chỉ là tùy chọn (mặc định dịch offline).
+- **Sửa bản dịch** (`trang_sua_dich.rs`): sửa từng câu, tìm & thay hàng loạt, từ điển `tu_dien.json` (tên riêng + sửa bản dịch) áp cho mọi lần dịch sau (`dich::ap_dung_sua` trong `viec_dich`).
+- **Làm tự động** (`tu_dong.rs` + `trang_tu_dong.rs`): một nút dịch → lồng tiếng → cài cho CD / Rise / TR2013 / Shadow / game khác (dò file chữ). Đã chạy thật trên game giả (10 câu dịch offline rồi ghi).
+- **Lồng tiếng chung** (`long_tieng_chung.rs` + `trang_long_tieng.rs`): game có file thoại rời wav/ogg/mp3/flac/opus; ghép chữ theo tên file hoặc CSV, giọng nhái gốc hoặc từ kho, mã hóa lại bằng ffmpeg, cài/gỡ có sao lưu. Đã thử thật 3 file ogg, gỡ trả đúng từng byte. Chưa thử trên game thật.
+- **Đóng gói**: `scripts\dong_goi.ps1` → `dist\VietHoa_<ver>.zip` (exe + scripts + hướng dẫn, 5,6 MB). Script nhúng trong exe, tự chép ra `scripts\` khi chạy ở máy khác (thư mục không có Cargo.toml). VieNeu fallback sang `cong_cu\python` nếu máy không có app VieNeu. Chưa có tự cập nhật.

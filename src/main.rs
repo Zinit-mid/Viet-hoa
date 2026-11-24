@@ -15,7 +15,11 @@ mod ocr;
 mod phu_de_phim;
 mod quan_ly_chup;
 mod trang_clone_giong;
+mod trang_long_tieng;
 mod trang_phu_de_phim;
+mod trang_sua_dich;
+mod trang_tu_dong;
+mod tu_dong;
 mod trang_viet_hoa;
 #[allow(dead_code)] // các giai đoạn sau (Việt hóa từng game) sẽ dùng
 mod viet_hoa;
@@ -36,6 +40,7 @@ fn main() -> eframe::Result<()> {
             std::thread::current().name().unwrap_or("luồng phụ")
         ));
     }));
+    duong_dan::chep_script_nhung();
     let bao_chuyen = duong_dan::chuyen_du_lieu_cu();
     let ch = cau_hinh::CauHinh::nap();
     let chung = dich_man_hinh::Chung::moi(ch);

@@ -54,6 +54,16 @@ fn sua(s: String) -> String {
         .fold(s, |s, (sai, dung)| s.replace(sai.as_str(), dung))
 }
 
+/// Áp từ điển sửa bản dịch (tu_dien.json) cho một câu vừa dịch.
+pub fn ap_dung_sua(s: &str) -> String {
+    sua(s.to_string())
+}
+
+/// Đọc lại tu_dien.json sau khi người dùng sửa.
+pub fn nap_lai_tu_dien() {
+    *SUA.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
 /// Bản Việt hóa game (Crimson Desert...): giống hệt chữ trong game, miễn phí.
 pub fn tim_viet_hoa(chu: &str) -> Option<String> {
     let mut k = VIET_HOA.lock().unwrap_or_else(|e| e.into_inner());

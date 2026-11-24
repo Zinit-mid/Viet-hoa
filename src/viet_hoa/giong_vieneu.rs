@@ -42,6 +42,12 @@ pub fn tim_vieneu() -> Option<Vieneu> {
             return Some(Vieneu { python: py, hf_home: goc.join(loai).join("hf"), gpu });
         }
     }
+    // máy không có app VieNeu: dùng bản cài trong cong_cu\python (scripts\tai_cong_cu.ps1)
+    let py = duong_dan::python()?;
+    if py.parent()?.join("Lib").join("site-packages").join("vieneu").is_dir() {
+        let gpu = py.parent()?.join("Lib").join("site-packages").join("torch").join("lib").join("cudart64_12.dll").is_file();
+        return Some(Vieneu { python: py, hf_home: duong_dan::du_lieu().join("hf"), gpu });
+    }
     None
 }
 

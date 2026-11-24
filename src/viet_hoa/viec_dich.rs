@@ -555,7 +555,7 @@ impl ViecDich {
                                 for (en, vi) in lo.iter().zip(kq) {
                                     match vi {
                                         Some(vi) => {
-                                            bn.insert(en.clone(), vi);
+                                            bn.insert(en.clone(), crate::dich::ap_dung_sua(&vi));
                                             doi += 1;
                                         }
                                         None => hong += 1,
@@ -661,7 +661,7 @@ impl ViecDich {
                             if (self.the)(en) == (self.the)(&vi)
                                 && !crate::dich::the::bi_lap(en, &vi) =>
                         {
-                            bn.insert(en.clone(), vi);
+                            bn.insert(en.clone(), crate::dich::ap_dung_sua(&vi));
                             self.da_doi += 1;
                         }
                         _ => self.loi += 1,

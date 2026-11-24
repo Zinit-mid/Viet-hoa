@@ -17,6 +17,8 @@ enum Trang {
     DichManHinh,
     PhuDePhim,
     VietHoaGame,
+    TuDong,
+    SuaDich,
     LongTieng,
     CloneGiong,
     CaiDat,
@@ -33,6 +35,9 @@ pub struct App {
     viet_hoa: crate::trang_viet_hoa::TrangVietHoa,
     clone_giong: crate::trang_clone_giong::TrangCloneGiong,
     phu_de_phim: crate::trang_phu_de_phim::TrangPhuDePhim,
+    sua_dich: crate::trang_sua_dich::TrangSuaDich,
+    tu_dong: crate::trang_tu_dong::TrangTuDong,
+    long_tieng: crate::trang_long_tieng::TrangLongTieng,
 }
 
 const XANH: Color32 = Color32::from_rgb(64, 160, 255);
@@ -57,6 +62,9 @@ impl App {
             viet_hoa: Default::default(),
             clone_giong: Default::default(),
             phu_de_phim: Default::default(),
+            sua_dich: Default::default(),
+            tu_dong: Default::default(),
+            long_tieng: Default::default(),
         }
     }
 }
@@ -135,7 +143,9 @@ impl eframe::App for App {
                 muc(ui, &mut self.trang, Trang::PhuDePhim, "🎬  Phụ đề phim");
                 ui.add_space(6.0);
                 ui.label(RichText::new("CÔNG CỤ GAME").small().weak());
+                muc(ui, &mut self.trang, Trang::TuDong, "⚡  Làm tự động");
                 muc(ui, &mut self.trang, Trang::VietHoaGame, "📝  Việt hóa game");
+                muc(ui, &mut self.trang, Trang::SuaDich, "✏  Sửa bản dịch");
                 muc(ui, &mut self.trang, Trang::LongTieng, "🔊  Lồng tiếng");
                 muc(ui, &mut self.trang, Trang::CloneGiong, "🎤  Clone giọng");
                 ui.add_space(6.0);
@@ -149,7 +159,9 @@ impl eframe::App for App {
                 Trang::CaiDat => self.trang_cai_dat(ui),
                 Trang::PhuDePhim => self.phu_de_phim.ve(ui),
                 Trang::VietHoaGame => self.viet_hoa.ve(ui),
-                Trang::LongTieng => sap_co(ui, "Lồng tiếng", "Tomb Raider (Rise / 2013): dùng ngay trong mục Việt hóa game, thẻ LỒNG TIẾNG VIỆT. Crimson Desert: sắp có. Quy trình: ghép file giọng - câu phụ đề > nhóm người nói > giọng mẫu > tự sửa giới tính (F0) > phiên âm tên riêng > VieNeu > hậu kỳ > mã hóa lại (Wwise .wem / FSB4 trong .mul)."),
+                Trang::TuDong => self.tu_dong.ve(ui),
+                Trang::SuaDich => self.sua_dich.ve(ui),
+                Trang::LongTieng => self.long_tieng.ve(ui),
                 Trang::CloneGiong => self.clone_giong.ve(ui),
             });
         });

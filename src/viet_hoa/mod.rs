@@ -8,6 +8,7 @@ pub mod do_file;
 pub mod font_rottr;
 pub mod font_viet;
 pub mod giong_vieneu;
+pub mod long_tieng_chung;
 pub mod mul;
 pub mod phien_am;
 pub mod tiger;

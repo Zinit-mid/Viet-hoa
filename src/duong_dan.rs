@@ -7,6 +7,31 @@ use std::sync::OnceLock;
 
 static GOC: OnceLock<PathBuf> = OnceLock::new();
 
+const SCRIPTS: [(&str, &str); 5] = [
+    ("dich_offline.py", include_str!("../scripts/dich_offline.py")),
+    ("tao_giong.py", include_str!("../scripts/tao_giong.py")),
+    ("long_tieng_tr.py", include_str!("../scripts/long_tieng_tr.py")),
+    ("nghe_phim.py", include_str!("../scripts/nghe_phim.py")),
+    ("tai_cong_cu.ps1", include_str!("../scripts/tai_cong_cu.ps1")),
+];
+
+/// Bản chạy độc lập (exe chép sang máy khác): chép các script nhúng trong exe ra `scripts\` cạnh exe.
+/// Khi chạy từ mã nguồn (có Cargo.toml) thì dùng thẳng thư mục scripts của dự án.
+pub fn chep_script_nhung() {
+    let g = goc();
+    if g.join("Cargo.toml").exists() {
+        return;
+    }
+    let d = g.join("scripts");
+    let _ = fs::create_dir_all(&d);
+    for (ten, nd) in SCRIPTS {
+        let p = d.join(ten);
+        if fs::read_to_string(&p).map(|c| c.replace("\r\n", "\n") != nd.replace("\r\n", "\n")).unwrap_or(true) {
+            let _ = fs::write(&p, nd);
+        }
+    }
+}
+
 /// Thư mục gốc: nơi chứa VietHoa.exe. Khi chạy từ mã nguồn (target\debug)
 /// thì lấy thư mục có Cargo.toml.
 pub fn goc() -> &'static Path {
