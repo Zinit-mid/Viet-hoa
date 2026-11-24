@@ -67,6 +67,21 @@ fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
 }
 
 impl TrangCloneGiong {
+    /// Đăng ký tiến trình toàn cục (thanh ở đáy cửa sổ).
+    pub fn dang_ky_tt(&self) {
+        let c = self.c.clone();
+        crate::tien_trinh::dang_ky("clone_giong", crate::tien_trinh::co_dinh(self.dung.clone()), move || {
+            let g = c.lock().unwrap();
+            crate::tien_trinh::Anh {
+                dang_ban: g.dang_ban,
+                ten: "Clone giọng".into(),
+                thong_bao: g.thong_bao.clone(),
+                tien: None,
+                loi: g.thong_bao.starts_with("Lỗi"),
+            }
+        });
+    }
+
     fn nen(&self, viec: impl FnOnce(&Arc<Mutex<Chung>>, &Arc<AtomicBool>) + Send + 'static) {
         {
             let mut c = self.c.lock().unwrap();

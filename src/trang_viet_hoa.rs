@@ -57,6 +57,8 @@ pub struct TrangVietHoa {
     /// thống kê đã tính: (số câu bộ nhớ, (dòng, tổng, đã, còn, ký tự), (phụ đề, đã dịch, đã lồng), USD, đã cài)
     tr_tk: Option<(usize, TkTr)>,
     hoi_go: bool,
+    /// cờ dừng hiện tại (cho thanh tiến trình toàn cục)
+    dung_g: Arc<Mutex<Arc<AtomicBool>>>,
 }
 
 type TkTr = (
@@ -128,6 +130,7 @@ impl Default for TrangVietHoa {
             tr: None,
             tr_tk: None,
             hoi_go: false,
+            dung_g: Arc::new(Mutex::new(Arc::new(AtomicBool::new(false)))),
         }
     }
 }
@@ -154,6 +157,20 @@ impl TrangVietHoa {
         let o = self.dang_tim.clone();
         std::thread::spawn(move || {
             *o.lock().unwrap() = Some(tim_game::tim_tat_ca());
+        });
+    }
+
+    pub fn dang_ky_tt(&self) {
+        let t = self.tt.clone();
+        crate::tien_trinh::dang_ky("viet_hoa", Some(self.dung_g.clone()), move || {
+            let g = t.lock().unwrap();
+            crate::tien_trinh::Anh {
+                dang_ban: g.viec.is_some(),
+                ten: g.viec.clone().unwrap_or_else(|| "Việt hóa game".into()),
+                thong_bao: g.thong_bao.clone(),
+                tien: (g.tong > 0).then(|| g.xong as f32 / g.tong as f32),
+                loi: g.thong_bao.starts_with("Lỗi"),
+            }
         });
     }
 
@@ -230,6 +247,7 @@ impl TrangVietHoa {
         self.tr = Some(o.clone());
         let dung = Arc::new(AtomicBool::new(false));
         self.dung = dung.clone();
+        *self.dung_g.lock().unwrap() = self.dung.clone();
         chay_nen(
             &self.tt,
             o,
@@ -260,6 +278,7 @@ impl TrangVietHoa {
             return;
         };
         self.dung = x.viec.dung.clone();
+        *self.dung_g.lock().unwrap() = self.dung.clone();
         let so_bo_nho = x.viec.bo_nho.lock().map(|b| b.len()).unwrap_or(0);
         if !ban && self.tr_tk.as_ref().map(|t| t.0) != Some(so_bo_nho) {
             let tk = x.thong_ke();
@@ -506,6 +525,7 @@ impl TrangVietHoa {
             return;
         };
         self.dung = cd.viec.dung.clone();
+        *self.dung_g.lock().unwrap() = self.dung.clone();
         let so_bo_nho = cd.viec.bo_nho.lock().map(|b| b.len()).unwrap_or(0);
         let khoa = (self.cd_dot, so_bo_nho);
         if self.cd_tk.as_ref().map(|t| t.0) != Some(khoa) && !ban {
@@ -858,6 +878,7 @@ impl TrangVietHoa {
                 let mut v = ViecFile::moi(&g.thu_muc, &g.ten);
                 v.doc_chon();
                 self.dung = v.viec.dung.clone();
+                *self.dung_g.lock().unwrap() = self.dung.clone();
                 self.viec = Some(Arc::new(Mutex::new(v)));
                 *self.tt.lock().unwrap() = TienTrinh::default();
             }

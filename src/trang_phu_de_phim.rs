@@ -55,6 +55,20 @@ impl Default for TrangPhuDePhim {
 }
 
 impl TrangPhuDePhim {
+    pub fn dang_ky_tt(&self) {
+        let t = self.tt.clone();
+        crate::tien_trinh::dang_ky("phu_de_phim", crate::tien_trinh::co_dinh(self.dung.clone()), move || {
+            let g = t.lock().unwrap();
+            crate::tien_trinh::Anh {
+                dang_ban: g.dang_ban,
+                ten: "Phụ đề phim".into(),
+                thong_bao: g.thong_bao.clone(),
+                tien: (g.tien > 0.0).then_some(g.tien),
+                loi: g.loi,
+            }
+        });
+    }
+
     fn bat_dau(&mut self) {
         let nguon = self.nguon.trim().trim_matches('"').to_string();
         {

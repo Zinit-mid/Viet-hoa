@@ -20,6 +20,7 @@ mod trang_long_tieng;
 mod trang_phu_de_phim;
 mod trang_sua_dich;
 mod trang_tu_dong;
+mod tien_trinh;
 mod tu_dong;
 mod trang_viet_hoa;
 #[allow(dead_code)] // các giai đoạn sau (Việt hóa từng game) sẽ dùng

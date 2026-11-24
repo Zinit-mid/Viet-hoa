@@ -53,6 +53,20 @@ fn mo_ta(l: LoaiGame) -> &'static str {
 }
 
 impl TrangTuDong {
+    pub fn dang_ky_tt(&self) {
+        let t = self.tt.clone();
+        crate::tien_trinh::dang_ky("tu_dong", crate::tien_trinh::co_dinh(self.dung.clone()), move || {
+            let g = t.lock().unwrap();
+            crate::tien_trinh::Anh {
+                dang_ban: g.dang_ban,
+                ten: "Làm tự động".into(),
+                thong_bao: g.thong_bao.clone(),
+                tien: (g.tien > 0.0).then_some(g.tien),
+                loi: g.loi,
+            }
+        });
+    }
+
     fn chay(&mut self, g: Game) {
         {
             let mut t = self.tt.lock().unwrap();

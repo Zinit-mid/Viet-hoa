@@ -222,7 +222,7 @@ pub fn nghe_thu(
         rms: RMS_DICH,
         ds: vec![("thu".into(), chu, 0.0)],
     };
-    let xong = gv::chay(&[nhom], &tam, 1.4, dung, &|_, _, s| bao(&format!("VieNeu đang đọc{s}")))?;
+    let xong = gv::chay(&[nhom], &tam, 1.4, dung, &|_, _, s| bao(&format!("VieNeu đang đọc: {}", s.trim_start_matches(" • "))))?;
     let ra = tam.join("ra").join("thu.wav");
     if !xong {
         return Ok(None);

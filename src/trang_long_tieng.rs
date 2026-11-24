@@ -85,6 +85,20 @@ fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
 }
 
 impl TrangLongTieng {
+    pub fn dang_ky_tt(&self) {
+        let t = self.tt.clone();
+        crate::tien_trinh::dang_ky("long_tieng", crate::tien_trinh::co_dinh(self.dung.clone()), move || {
+            let g = t.lock().unwrap();
+            crate::tien_trinh::Anh {
+                dang_ban: g.dang_ban,
+                ten: "Lồng tiếng".into(),
+                thong_bao: g.thong_bao.clone(),
+                tien: (g.tien > 0.0).then_some(g.tien),
+                loi: g.loi,
+            }
+        });
+    }
+
     /// Chạy việc nền; `viec` trả thông báo kết quả.
     fn nen(&self, ten: &str, viec: impl FnOnce(&Arc<Mutex<Tt>>, &Arc<AtomicBool>) -> anyhow::Result<String> + Send + 'static) {
         {

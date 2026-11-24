@@ -138,6 +138,20 @@ pub struct TrangThai {
 pub struct CapNhat(pub Arc<Mutex<TrangThai>>);
 
 impl CapNhat {
+    pub fn dang_ky_tt(&self) {
+        let c = self.0.clone();
+        crate::tien_trinh::dang_ky("cap_nhat", None, move || {
+            let t = c.lock().unwrap();
+            crate::tien_trinh::Anh {
+                dang_ban: t.dang_tai,
+                ten: "Cập nhật app".into(),
+                thong_bao: t.tb.clone(),
+                tien: (t.tien > 0.0).then_some(t.tien),
+                loi: t.loi,
+            }
+        });
+    }
+
     /// Kiểm tra bản mới trong luồng nền. `im_lang`: không báo gì khi đã là bản mới nhất / lỗi mạng.
     pub fn kiem_tra_nen(&self, im_lang: bool) {
         {

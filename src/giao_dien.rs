@@ -52,7 +52,7 @@ impl App {
     ) -> Self {
         nap_font_egui(&cc.egui_ctx);
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
-        Self {
+        let app = Self {
             chung,
             gui,
             trang: Trang::DichManHinh,
@@ -72,7 +72,14 @@ impl App {
                 c
             },
             long_tieng: Default::default(),
-        }
+        };
+        app.viet_hoa.dang_ky_tt();
+        app.clone_giong.dang_ky_tt();
+        app.phu_de_phim.dang_ky_tt();
+        app.tu_dong.dang_ky_tt();
+        app.long_tieng.dang_ky_tt();
+        app.cap_nhat.dang_ky_tt();
+        app
     }
 }
 
@@ -125,6 +132,8 @@ impl eframe::App for App {
                 }
             });
         });
+
+        crate::tien_trinh::ve(ctx);
 
         egui::SidePanel::left("menu")
             .exact_width(230.0)
