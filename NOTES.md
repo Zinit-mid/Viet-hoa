@@ -113,3 +113,14 @@ Mục tiêu: thao tác hoàn toàn trên app, không cần Claude Code; Claude A
 - Chưa làm: bảng "Vùng dịch" dạng bảng, 4 thẻ phát sáng ở Dịch màn hình, ô xem trước, blur kính thật (egui không có).
 
 - Icon: `assets/icon.ico` (exe, qua `build.rs` + winresource), `assets/icon_128.rgba` (cửa sổ/taskbar), `assets/icon_64.rgba` (logo thanh trên). Bảng màu thêm tím (vệt sáng, mặt kính, nút, công tắc) cho đỡ nhợt.
+
+## VIỆC TIẾP THEO (làm tuần sau): trình xem video trong app
+Mục tiêu: xem phim ngay trong app sau khi đã tạo phụ đề + thuyết minh/lồng tiếng.
+- **Cách chọn (đang nghiêng):** nhúng libVLC vào một khung của cửa sổ (HWND con), nạp `cong_cu\vlc\libvlc.dll` bằng `libloading` (~15 hàm FFI, không thêm crate nặng). Thanh điều khiển vẽ bằng egui NGOÀI khung hình (cửa sổ con không bị egui đè lên). Cách 2 (libVLC vẽ từng khung lên texture egui, nút đè lên hình được) nặng hơn; cách 3 (tự giải mã ffmpeg) không đáng.
+- **Cần hỏi người dùng:** có cần thanh điều khiển ĐÈ LÊN hình (kiểu YouTube) không? Có → phải dùng cách 2.
+- **Việc cần làm trước:** `thuyet_minh.rs` hiện xuất mp4 chỉ 1 đường tiếng đã trộn. Đổi thành mp4 nhiều đường tiếng (gốc / trộn thuyết minh / riêng giọng thuyết minh) + nhúng .srt, để player đổi đường tiếng gọn.
+- **Tính năng:** chọn phim đã xử lý từ danh sách; phụ đề Việt bật/tắt + cỡ chữ; đổi tiếng gốc ↔ thuyết minh; tua, tốc độ, toàn màn hình, nhớ vị trí xem dở. Thêm vào mục lớn "Phụ đề phim" (mục con "Xem phim").
+- Mở phim hiện dùng VLC ngoài (`phu_de_phim::mo_phim`).
+
+## Trạng thái cuối phiên (24/11/2026)
+Giao diện mới (kính tối tím hơi đen, nút neon, thanh trượt, viền đổi màu), trang Giọng mẫu, thuyết minh phim, cập nhật tự động, đã đẩy GitHub (main). Bản phát hành mới nhất là v0.1.1; từ đó đến nay CHƯA gắn tag mới (nút cập nhật chưa thấy giao diện mới) – khi muốn phát hành: tăng version trong Cargo.toml, commit, `git tag vX.Y.Z`, `git push origin vX.Y.Z`.
