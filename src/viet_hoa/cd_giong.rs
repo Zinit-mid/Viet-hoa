@@ -150,6 +150,54 @@ fn con_trong(thu_muc: &Path) -> Option<u64> {
     Some(trong)
 }
 
+
+/// Cao độ giọng (Hz, trung vị) của mảng mono; None nếu không đo được. Khung 40 ms, tự tương quan.
+pub fn cao_do(x: &[f32], sr: u32) -> Option<f64> {
+    let fr = (0.04 * sr as f64) as usize;
+    let (lo, hi) = ((sr / 450) as usize, (sr / 60) as usize);
+    if fr < hi + 1 || x.len() <= fr {
+        return None;
+    }
+    let mut r: Vec<f64> = Vec::new();
+    let mut i = 0;
+    while i + fr < x.len() {
+        let y = &x[i..i + fr];
+        i += fr;
+        if rms(y) < 0.02 {
+            continue;
+        }
+        let tb = y.iter().sum::<f32>() / fr as f32;
+        let y: Vec<f32> = y.iter().map(|v| v - tb).collect();
+        let c0: f64 = y.iter().map(|v| (*v as f64).powi(2)).sum();
+        let (mut tot, mut k) = (f64::MIN, lo);
+        for lag in lo..hi {
+            let c: f64 = y[..fr - lag].iter().zip(&y[lag..]).map(|(a, b)| *a as f64 * *b as f64).sum();
+            if c > tot {
+                (tot, k) = (c, lag);
+            }
+        }
+        if tot > 0.3 * c0 {
+            r.push(sr as f64 / k as f64);
+        }
+    }
+    if r.len() < 5 {
+        return None;
+    }
+    r.sort_by(f64::total_cmp);
+    let n = r.len();
+    Some(if n % 2 == 1 { r[n / 2] } else { (r[n / 2 - 1] + r[n / 2]) / 2.0 })
+}
+
+/// Giọng riêng KHÔNG dùng để xoay vòng (giọng đặc biệt: phù thủy, người già, trẻ em, nhân vật chính).
+const KHONG_XOAY: [&str; 7] = ["phu_thuy", "gia", "be_", "nam_chinh.wav", "giong_nam_chinh", "giong_nu_chinh", "nam_am"];
+
+fn la_nu(f: Option<f64>) -> bool {
+    f.is_some_and(|f| f >= 175.0)
+}
+fn la_nam(f: Option<f64>) -> bool {
+    f.is_some_and(|f| f <= 160.0)
+}
+
 impl CrimsonDesert {
     /// {người nói: [câu]} của phần 'A' (nhân vật có tên) hoặc 'B' (dân thường).
     pub fn ke_hoach_long_tieng(
@@ -285,6 +333,124 @@ impl CrimsonDesert {
         }
     }
 
+    /// Đo cao độ giọng gốc từng nhân vật → nhân vật NỮ đang bị gán giọng nam (và ngược lại) thì đổi sang
+    /// giọng cùng giới trong kho giọng riêng. Ghi lại phan_bo.json (sao lưu .truoc_sua_gioi_tinh).
+    /// Người đã gán tay (`_tay`) không bị đổi. → [(người nói, giọng cũ, giọng mới)]
+    pub fn sua_gioi_tinh(
+        &self,
+        phan: char,
+        nhom: &BTreeMap<String, Vec<CauGiong>>,
+        thu_muc_lv: &Path,
+        vgm: &Path,
+        dung: &AtomicBool,
+        bao: &dyn Fn(&str),
+    ) -> Result<Vec<(String, String, String)>> {
+        use serde_json::{json, Value};
+        let goc = thu_muc_lv.join("giong_rieng");
+        let tep = goc.join("phan_bo.json");
+        let Ok(b) = std::fs::read(&tep) else { return Ok(vec![]) };
+        let mut pb: Value = serde_json::from_slice(&b)?;
+        let ph = phan.to_string();
+        let Some(mut gan) = pb.get(&ph).and_then(Value::as_object).cloned().filter(|o| !o.is_empty()) else {
+            return Ok(vec![]);
+        };
+        // cao độ các giọng riêng
+        let mut cd_giong: BTreeMap<String, Option<f64>> = BTreeMap::new();
+        for ten in gan.values().filter_map(Value::as_str) {
+            let f0 = std::fs::read(goc.join(ten)).ok().and_then(|b| wwise::doc_wav(&b).ok()).and_then(|(x, sr)| cao_do(&x, sr));
+            cd_giong.insert(ten.to_string(), f0);
+        }
+        let xoay = |dk: fn(Option<f64>) -> bool| -> Vec<String> {
+            cd_giong.iter().filter(|(t, f)| dk(**f) && !KHONG_XOAY.iter().any(|k| t.contains(k))).map(|(t, _)| t.clone()).collect()
+        };
+        let (nu, nam) = (xoay(la_nu), xoay(la_nam));
+        // cao độ giọng gốc từng nhân vật (lưu đệm)
+        let dem_tep = thu_muc_lv.join(&ph).join("_cao_do_goc.json");
+        let mut dem: BTreeMap<String, Option<f64>> =
+            std::fs::read(&dem_tep).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let tam = thu_muc_lv.join(&ph).join("_do_cao_do");
+        let nhom_am = self.thu_muc_game.join("0006");
+        let ten_gan: Vec<String> = {
+            let mut v: Vec<String> = gan.keys().cloned().collect();
+            v.sort();
+            v
+        };
+        for (i, g) in ten_gan.iter().enumerate() {
+            if dem.contains_key(g) || !nhom.contains_key(g) {
+                continue;
+            }
+            bao(&format!("Đang kiểm tra giới tính giọng gốc {}/{}: {g}", i + 1, ten_gan.len()));
+            std::fs::create_dir_all(&tam)?;
+            let mut cau: Vec<&CauGiong> = nhom[g].iter().filter(|c| (1.5..=9.0).contains(&c.giay)).collect();
+            cau.sort_by(|a, b| b.giay.total_cmp(&a.giay));
+            let mut phan_am: Vec<f32> = Vec::new();
+            for c in cau.into_iter().take(4) {
+                let (wem, ra) = (tam.join("x.wem"), tam.join("x.wav"));
+                let Ok(d) = cd::doc_tep(&nhom_am, &c.f) else { continue };
+                if std::fs::write(&wem, d).is_err() || !giai_ma_wem(vgm, &wem, &ra) {
+                    continue;
+                }
+                if let Some((x, ts)) = std::fs::read(&ra).ok().and_then(|b| wwise::doc_wav(&b).ok()) {
+                    phan_am.extend(wwise::chuan_hoa(&x, ts, 0.0));
+                }
+            }
+            dem.insert(g.clone(), if phan_am.is_empty() { None } else { cao_do(&phan_am, 48000) });
+            if dung.load(Ordering::Relaxed) {
+                break;
+            }
+        }
+        let _ = std::fs::remove_dir_all(&tam);
+        std::fs::create_dir_all(dem_tep.parent().unwrap())?;
+        std::fs::write(&dem_tep, serde_json::to_vec_pretty(&dem)?)?;
+
+        let tay: Vec<String> = pb
+            .get("_tay")
+            .and_then(|t| t.get(&ph))
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+        let (mut doi, mut d_nu, mut d_nam) = (Vec::new(), 0usize, 0usize);
+        let mut thu_tu: Vec<&String> = ten_gan.iter().collect();
+        thu_tu.sort_by_key(|g| std::cmp::Reverse(nhom.get(*g).map_or(0, Vec::len)));
+        for g in thu_tu {
+            if tay.contains(g) {
+                continue;
+            }
+            let f0 = dem.get(g).copied().flatten();
+            let cu = gan[g].as_str().unwrap_or("").to_string();
+            let f_cu = cd_giong.get(&cu).copied().flatten();
+            let moi = if la_nu(f0) && !la_nu(f_cu) && !nu.is_empty() {
+                d_nu += 1;
+                Some(nu[(d_nu - 1) % nu.len()].clone())
+            } else if la_nam(f0) && !la_nam(f_cu) && !nam.is_empty() {
+                d_nam += 1;
+                Some(nam[(d_nam - 1) % nam.len()].clone())
+            } else {
+                None
+            };
+            if let Some(m) = moi.filter(|m| *m != cu) {
+                gan.insert(g.clone(), json!(m));
+                doi.push((g.clone(), cu, m));
+            }
+        }
+        if !doi.is_empty() {
+            let sao = PathBuf::from(format!("{}.truoc_sua_gioi_tinh", tep.display()));
+            if !sao.exists() {
+                std::fs::copy(&tep, &sao)?;
+            }
+            pb[&ph] = Value::Object(gan);
+            let t = PathBuf::from(format!("{}.tam", tep.display()));
+            std::fs::write(&t, serde_json::to_vec_pretty(&pb)?)?;
+            std::fs::rename(&t, &tep)?;
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new().create(true).append(true).open(thu_muc_lv.join(format!("doi_gioi_tinh_{phan}.txt")))?;
+            for (g, cu, m) in &doi {
+                let _ = writeln!(f, "{g}: {cu} -> {m} (giọng gốc {:.0} Hz)", dem.get(g).copied().flatten().unwrap_or(0.0));
+            }
+        }
+        Ok(doi)
+    }
+
     /// Cả quy trình cho phần A/B; ghi zip DMM vào `zip_ra`. Chạy lại = làm tiếp. → None nếu bị dừng.
     pub fn long_tieng_phan(
         &self,
@@ -325,6 +491,8 @@ impl CrimsonDesert {
         }
         let vgm = vgmstream()?;
         let tam = thu_muc_lv.join("tam");
+        // không đo được thì giữ phân bổ cũ
+        let _ = self.sua_gioi_tinh(phan, &nhom, thu_muc_lv, &vgm, dung, bao);
         let mut viec: Vec<gv::Nhom> = Vec::new();
         let mut thieu_mau = Vec::new();
         for (i, (g, ds)) in can.iter().enumerate() {
@@ -463,5 +631,40 @@ mod test {
                 println!("  {g}: {} câu", ds.len());
             }
         }
+    }
+
+    /// So với app cũ: dùng bản phan_bo TRƯỚC khi sửa + cao độ đã đệm → phải ra gần đúng doi_gioi_tinh_A.txt.
+    /// CD=<thư mục game> cargo test --release -- --ignored gioi_tinh_that --nocapture
+    #[test]
+    #[ignore]
+    fn gioi_tinh_that() {
+        let tm = PathBuf::from(std::env::var("CD").unwrap());
+        let cd = CrimsonDesert::nap(&tm).unwrap();
+        let cu = PathBuf::from(r"G:\DichGame_LongTieng");
+        let lv = std::env::temp_dir().join("vh_cd_gt");
+        let _ = std::fs::remove_dir_all(&lv);
+        std::fs::create_dir_all(lv.join("giong_rieng")).unwrap();
+        std::fs::create_dir_all(lv.join("A")).unwrap();
+        for e in std::fs::read_dir(cu.join("giong_rieng")).unwrap().flatten() {
+            let n = e.file_name().to_string_lossy().into_owned();
+            if n.ends_with(".wav") {
+                std::fs::copy(e.path(), lv.join("giong_rieng").join(&n)).unwrap();
+            }
+        }
+        std::fs::copy(cu.join("giong_rieng/phan_bo.json.truoc_sua_gioi_tinh"), lv.join("giong_rieng/phan_bo.json")).unwrap();
+        std::fs::copy(cu.join("A/_cao_do_goc.json"), lv.join("A/_cao_do_goc.json")).unwrap();
+        let k = cd.ke_hoach_long_tieng('A', &|_| {}).unwrap();
+        let doi = cd.sua_gioi_tinh('A', &k, &lv, &vgmstream().unwrap(), &AtomicBool::new(false), &|_| {}).unwrap();
+        let mong: std::collections::BTreeSet<String> = std::fs::read_to_string(cu.join("doi_gioi_tinh_A.txt"))
+            .unwrap()
+            .lines()
+            .filter_map(|l| l.split(':').next().map(String::from))
+            .collect();
+        let co: std::collections::BTreeSet<String> = doi.iter().map(|d| d.0.clone()).collect();
+        println!("app cũ đổi {} người, bản Rust đổi {}; giống nhau {}", mong.len(), co.len(), mong.intersection(&co).count());
+        for d in doi.iter().take(5) {
+            println!("  {} : {} -> {}", d.0, d.1, d.2);
+        }
+        assert!(mong.intersection(&co).count() as f64 >= mong.len() as f64 * 0.9);
     }
 }
