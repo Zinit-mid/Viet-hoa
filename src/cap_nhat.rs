@@ -213,7 +213,10 @@ impl CapNhat {
             let mut t = c.lock().unwrap();
             t.dang_tai = false;
             match kq {
-                Ok(()) => (t.tb, t.da_thay) = (format!("Đã cập nhật lên {}. Bấm Khởi động lại.", ban.ma), true),
+                Ok(()) => {
+                    (t.tb, t.da_thay) = (format!("Đã cập nhật lên {}. Bấm Khởi động lại.", ban.ma), true);
+                    t.ban = None; // ẩn dòng "Có bản mới" ở thanh bên
+                }
                 Err(e) => (t.tb, t.loi) = (format!("Lỗi: {e}"), true),
             }
         });
