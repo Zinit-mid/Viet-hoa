@@ -111,3 +111,5 @@ Mục tiêu: thao tác hoàn toàn trên app, không cần Claude Code; Claude A
 - Khung (`giao_dien.rs`): thanh trên (logo + 6 mục lớn + nút Dịch cả màn hình), cột trái "Mục con" (bấm = cuộn tới khối), giữa = trang, cột phải "Việc đang chạy" + "Kho giọng" (ẩn khi cửa sổ < 1280 điểm, thay bằng dải đầu cửa sổ).
 - Lưu ý egui: `Color32::from_rgba_unmultiplied` nhân alpha trong không gian tuyến tính nên màu mờ bị sáng; dùng `kieu::rgba(...)`.
 - Chưa làm: bảng "Vùng dịch" dạng bảng, 4 thẻ phát sáng ở Dịch màn hình, ô xem trước, blur kính thật (egui không có).
+
+- Icon: `assets/icon.ico` (exe, qua `build.rs` + winresource), `assets/icon_128.rgba` (cửa sổ/taskbar), `assets/icon_64.rgba` (logo thanh trên). Bảng màu thêm tím (vệt sáng, mặt kính, nút, công tắc) cho đỡ nhợt.

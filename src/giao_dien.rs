@@ -100,6 +100,7 @@ pub struct App {
     trang: Trang,
     muc: Muc,
     con: [usize; 6],
+    logo: egui::TextureHandle,
     o_khoa: String,
     o_khoa_deepl: String,
     thong_bao: String,
@@ -131,6 +132,11 @@ impl App {
             trang: Trang::DichManHinh,
             muc: Muc::DichManHinh,
             con: [0; 6],
+            logo: cc.egui_ctx.load_texture(
+                "logo",
+                egui::ColorImage::from_rgba_unmultiplied([64, 64], include_bytes!("../assets/icon_64.rgba")),
+                egui::TextureOptions::LINEAR,
+            ),
             o_khoa: String::new(),
             o_khoa_deepl: String::new(),
             thong_bao: String::new(),
@@ -186,10 +192,7 @@ impl App {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         // logo
-                        let (r, _) = ui.allocate_exact_size(egui::vec2(48.0, 48.0), egui::Sense::hover());
-                        ui.painter().rect_filled(r, 14.0, k::a(k::XANH, 60));
-                        ui.painter().rect_stroke(r, 14.0, egui::Stroke::new(1.5, k::CYAN), egui::StrokeKind::Inside);
-                        ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "V", egui::FontId::new(30.0, k::dam_ho()), k::CYAN);
+                        ui.add(egui::Image::new((self.logo.id(), egui::vec2(52.0, 52.0))));
                         let rong = ui.ctx().screen_rect().width();
                         if rong >= 1250.0 {
                             ui.label(k::dam("VIỆT HÓA").size(28.0).extra_letter_spacing(2.0));
@@ -205,7 +208,7 @@ impl App {
                             let ro = ro.on_hover_cursor(egui::CursorIcon::PointingHand);
                             if chon {
                                 let y = ro.rect.bottom() + 6.0;
-                                ui.painter().line_segment([egui::pos2(ro.rect.left(), y), egui::pos2(ro.rect.right(), y)], egui::Stroke::new(3.0, k::CYAN));
+                                ui.painter().line_segment([egui::pos2(ro.rect.left(), y), egui::pos2(ro.rect.right(), y)], egui::Stroke::new(3.0, k::TIM));
                             }
                             if ro.clicked() {
                                 doi = Some(m);
@@ -254,10 +257,10 @@ impl App {
                         let chon = i == cur;
                         let p = ui.painter();
                         if chon {
-                            p.rect_filled(rect, 16.0, crate::kieu::rgba(109, 240, 255, 36));
-                            p.rect_stroke(rect, 16.0, egui::Stroke::new(1.4, crate::kieu::rgba(109, 240, 255, 153)), egui::StrokeKind::Inside);
+                            p.rect_filled(rect, 16.0, crate::kieu::rgba(185, 138, 255, 48));
+                            p.rect_stroke(rect, 16.0, egui::Stroke::new(1.4, crate::kieu::rgba(185, 138, 255, 190)), egui::StrokeKind::Inside);
                         } else if ph.hovered() {
-                            p.rect_filled(rect, 16.0, crate::kieu::rgba(255, 255, 255, 14));
+                            p.rect_filled(rect, 16.0, crate::kieu::rgba(190, 150, 255, 26));
                         }
                         p.text(
                             egui::pos2(rect.left() + 18.0, rect.center().y),

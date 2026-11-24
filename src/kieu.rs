@@ -8,7 +8,7 @@ use std::time::Instant;
 use eframe::egui::{self, epaint, Color32, FontFamily, FontId, Pos2, Rect, Response, RichText, Sense, Stroke, TextStyle, Ui, Vec2};
 
 // ---------------- màu ----------------
-pub const NEN: Color32 = Color32::from_rgb(9, 8, 24);
+pub const NEN: Color32 = Color32::from_rgb(13, 8, 32);
 pub const CHU: Color32 = Color32::from_rgb(244, 244, 244);
 pub const CHU_PHU: Color32 = Color32::from_rgb(198, 198, 198);
 pub const CHU_MO: Color32 = Color32::from_rgb(168, 168, 168);
@@ -28,10 +28,10 @@ pub fn a(c: Color32, alpha: u8) -> Color32 {
 }
 
 fn kinh_nen() -> Color32 {
-    rgba(255, 255, 255, 18)
+    rgba(160, 120, 255, 26)
 }
 fn kinh_vien() -> Color32 {
-    rgba(255, 255, 255, 46)
+    rgba(190, 150, 255, 70)
 }
 
 // ---------------- cài đặt giao diện ----------------
@@ -118,7 +118,7 @@ pub fn ap_dung(ctx: &egui::Context) {
         let v = &mut s.visuals;
         *v = egui::Visuals::dark();
         v.panel_fill = Color32::TRANSPARENT;
-        v.window_fill = Color32::from_rgb(20, 20, 44);
+        v.window_fill = Color32::from_rgb(28, 20, 58);
         v.window_stroke = Stroke::new(1.0, kinh_vien());
         v.window_corner_radius = egui::CornerRadius::same(24);
         v.menu_corner_radius = egui::CornerRadius::same(16);
@@ -126,25 +126,25 @@ pub fn ap_dung(ctx: &egui::Context) {
         v.faint_bg_color = rgba(255, 255, 255, 8);
         v.override_text_color = Some(CHU);
         v.hyperlink_color = CYAN;
-        v.selection.bg_fill = Color32::from_rgb(31, 58, 138);
-        v.selection.stroke = Stroke::new(1.5, a(XANH_SANG, 230));
+        v.selection.bg_fill = Color32::from_rgb(70, 46, 160);
+        v.selection.stroke = Stroke::new(1.5, a(TIM, 235));
         let bo = egui::CornerRadius::same(20);
         v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, kinh_vien());
         v.widgets.noninteractive.corner_radius = bo;
         v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, CHU);
-        v.widgets.inactive.bg_fill = rgba(255, 255, 255, 20);
-        v.widgets.inactive.weak_bg_fill = rgba(255, 255, 255, 20);
-        v.widgets.inactive.bg_stroke = Stroke::new(1.0, rgba(255, 255, 255, 60));
+        v.widgets.inactive.bg_fill = rgba(175, 135, 255, 38);
+        v.widgets.inactive.weak_bg_fill = rgba(175, 135, 255, 38);
+        v.widgets.inactive.bg_stroke = Stroke::new(1.0, rgba(200, 160, 255, 90));
         v.widgets.inactive.fg_stroke = Stroke::new(1.0, CHU);
         v.widgets.inactive.corner_radius = bo;
-        v.widgets.hovered.bg_fill = rgba(255, 255, 255, 36);
-        v.widgets.hovered.weak_bg_fill = rgba(255, 255, 255, 36);
-        v.widgets.hovered.bg_stroke = Stroke::new(1.5, a(CYAN, 160));
+        v.widgets.hovered.bg_fill = rgba(190, 150, 255, 60);
+        v.widgets.hovered.weak_bg_fill = rgba(190, 150, 255, 60);
+        v.widgets.hovered.bg_stroke = Stroke::new(1.5, a(TIM, 200));
         v.widgets.hovered.fg_stroke = Stroke::new(1.5, CHU);
         v.widgets.hovered.corner_radius = bo;
-        v.widgets.active.bg_fill = rgba(255, 255, 255, 56);
-        v.widgets.active.weak_bg_fill = rgba(255, 255, 255, 56);
-        v.widgets.active.bg_stroke = Stroke::new(1.5, CYAN);
+        v.widgets.active.bg_fill = rgba(190, 150, 255, 84);
+        v.widgets.active.weak_bg_fill = rgba(190, 150, 255, 84);
+        v.widgets.active.bg_stroke = Stroke::new(1.5, TIM);
         v.widgets.active.fg_stroke = Stroke::new(1.5, CHU);
         v.widgets.active.corner_radius = bo;
         v.widgets.open.corner_radius = bo;
@@ -154,7 +154,7 @@ pub fn ap_dung(ctx: &egui::Context) {
 
 /// Màu nền cửa sổ (đằng sau mọi thứ).
 pub fn mau_nen() -> [f32; 4] {
-    [9.0 / 255.0, 8.0 / 255.0, 24.0 / 255.0, 1.0]
+    [13.0 / 255.0, 8.0 / 255.0, 32.0 / 255.0, 1.0]
 }
 
 /// 3 vệt sáng mờ phía sau (xanh dương góc trên trái, tím bên phải, cam phía dưới). Gọi đầu mỗi khung hình.
@@ -178,9 +178,10 @@ pub fn nen_anh_sang(ctx: &egui::Context) {
         }
         p.add(epaint::Shape::mesh(m));
     };
-    vet(Pos2::new(r.left() + w * 0.18, r.top()), (w * 0.45).max(500.0), rgba(60, 110, 255, 80));
-    vet(Pos2::new(r.left() + w * 0.88, r.top() + h * 0.30), (w * 0.38).max(420.0), rgba(170, 80, 255, 64));
-    vet(Pos2::new(r.left() + w * 0.5, r.bottom()), (w * 0.42).max(450.0), rgba(255, 150, 60, 40));
+    vet(Pos2::new(r.left() + w * 0.18, r.top()), (w * 0.42).max(480.0), rgba(70, 100, 255, 84));
+    vet(Pos2::new(r.left() + w * 0.88, r.top() + h * 0.30), (w * 0.46).max(480.0), rgba(170, 80, 255, 120));
+    vet(Pos2::new(r.left() + w * 0.12, r.top() + h * 0.80), (w * 0.34).max(420.0), rgba(150, 70, 255, 90));
+    vet(Pos2::new(r.left() + w * 0.55, r.bottom()), (w * 0.38).max(420.0), rgba(255, 140, 90, 30));
 }
 
 // ---------------- khối kính ----------------
@@ -226,7 +227,7 @@ fn ve_pill(ui: &mut Ui, rect: Rect, ph: &Response, nhan: &str, mau: Color32, bat
     let p = ui.painter();
     let ban_kinh = rect.height() / 2.0;
     let sang = if ph.hovered() && bat { 1.25 } else { 1.0 };
-    let nen = Color32::from_rgb((27.0 * sang) as u8, (27.0 * sang) as u8, (58.0 * sang) as u8);
+    let nen = Color32::from_rgb((34.0 * sang) as u8, (24.0 * sang) as u8, (70.0 * sang) as u8);
     p.rect_filled(rect.translate(Vec2::new(0.0, 6.0)).shrink(6.0), ban_kinh, a(mau, if bat { 60 } else { 15 })); // bóng màu
     p.rect_filled(rect, ban_kinh, nen);
     p.rect_stroke(rect, ban_kinh, Stroke::new(if ph.has_focus() { 2.0 } else { 1.2 }, if ph.has_focus() { Color32::WHITE } else { a(mau, if bat { 190 } else { 70 }) }), egui::StrokeKind::Inside);
@@ -328,7 +329,7 @@ pub fn nut_tien_do(ui: &mut Ui, khoa: &'static str, nhan: &str, dong_tu: &str, m
     let sang = matches!(tt, Tt::Chay(_));
     let p = ui.painter();
     p.rect_filled(rect.translate(Vec2::new(0.0, 6.0)).shrink(8.0), ban_kinh, a(mau_hien, if sang { 100 } else if bat { 50 } else { 12 }));
-    p.rect_filled(rect, ban_kinh, Color32::from_rgb(20, 20, 44));
+    p.rect_filled(rect, ban_kinh, Color32::from_rgb(28, 20, 60));
     // phần đổ màu
     let phan = match tt {
         Tt::Chay(Some(x)) => x.clamp(0.0, 1.0),
@@ -421,8 +422,8 @@ fn cong_tac_trong(ui: &mut Ui, bat: &mut bool, nhan: &str) -> Response {
     let t = ui.ctx().animate_bool_with_time(ph.id, *bat, 0.12);
     let p = ui.painter();
     if *bat {
-        p.rect_filled(rect.translate(Vec2::new(0.0, 6.0)).shrink(6.0), 18.0, rgba(80, 90, 255, 110));
-        let (c1, c2) = (Color32::from_rgb(20, 48, 122), Color32::from_rgb(61, 75, 216));
+        p.rect_filled(rect.translate(Vec2::new(0.0, 6.0)).shrink(6.0), 18.0, rgba(140, 80, 255, 120));
+        let (c1, c2) = (Color32::from_rgb(44, 40, 150), Color32::from_rgb(130, 76, 240));
         p.rect_filled(Rect::from_min_size(rect.min, Vec2::new(36.0, 36.0)), 18.0, c1);
         p.rect_filled(Rect::from_min_size(rect.min + Vec2::new(36.0, 0.0), Vec2::new(36.0, 36.0)), 18.0, c2);
         let mut m = epaint::Mesh::default();
@@ -434,7 +435,7 @@ fn cong_tac_trong(ui: &mut Ui, bat: &mut bool, nhan: &str) -> Response {
         m.add_triangle(1, 3, 2);
         p.add(epaint::Shape::mesh(m));
     } else {
-        p.rect_filled(rect, 18.0, Color32::from_rgb(17, 17, 42));
+        p.rect_filled(rect, 18.0, Color32::from_rgb(24, 16, 52));
     }
     p.rect_stroke(rect, 18.0, Stroke::new(1.2, rgba(255, 255, 255, 70)), egui::StrokeKind::Inside);
     let x = rect.left() + 18.0 + t * 34.0;
@@ -452,9 +453,9 @@ pub fn chip(ui: &mut Ui, chon: bool, nhan: &str) -> Response {
     let p = ui.painter();
     let br = rect.height() / 2.0;
     if chon {
-        p.rect_filled(rect.translate(Vec2::new(0.0, 5.0)).shrink(6.0), br, rgba(69, 137, 255, 100));
-        p.rect_filled(rect, br, Color32::from_rgb(25, 50, 125));
-        p.rect_stroke(rect, br, Stroke::new(1.4, a(XANH_SANG, 230)), egui::StrokeKind::Inside);
+        p.rect_filled(rect.translate(Vec2::new(0.0, 5.0)).shrink(6.0), br, rgba(150, 90, 255, 110));
+        p.rect_filled(rect, br, Color32::from_rgb(52, 34, 130));
+        p.rect_stroke(rect, br, Stroke::new(1.4, a(TIM, 235)), egui::StrokeKind::Inside);
     } else {
         p.rect_filled(rect, br, rgba(255, 255, 255, if ph.hovered() { 24 } else { 15 }));
         p.rect_stroke(rect, br, Stroke::new(1.0, rgba(255, 255, 255, 50)), egui::StrokeKind::Inside);

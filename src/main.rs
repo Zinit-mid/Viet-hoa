@@ -107,6 +107,7 @@ fn main() -> eframe::Result<()> {
     let tuy_chon = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Việt Hóa")
+            .with_icon(egui::IconData { rgba: include_bytes!("../assets/icon_128.rgba").to_vec(), width: 128, height: 128 })
             .with_inner_size([1480.0, 880.0])
             .with_min_inner_size([900.0, 560.0]),
         // Không lưu vị trí cửa sổ (từng lưu nhầm lúc thu nhỏ → mở ra 118×152),
