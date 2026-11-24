@@ -300,8 +300,7 @@ impl TrangPhuDePhim {
                 crate::kieu::cong_tac(ui, &mut self.nhan_nha, "Nhấn nhá theo câu: chỉnh to nhỏ, nhanh chậm, cao thấp theo dấu câu và từ khóa");
                 if self.nhan_nha {
                     ui.horizontal(|ui| {
-                        ui.label("Độ mạnh nhấn nhá:");
-                        ui.add(egui::Slider::new(&mut self.cuong_do, 0.3..=1.0).fixed_decimals(1));
+                        crate::kieu::thanh_truot(ui, &mut self.cuong_do, 0.3..=1.0, "Độ mạnh nhấn nhá", 1);
                     });
                 }
                 crate::kieu::cong_tac(ui, &mut self.chi_thu, "Chỉ làm thử 10 dòng đầu (phần còn lại giữ nguyên tiếng gốc – bỏ chọn để làm cả phim)");

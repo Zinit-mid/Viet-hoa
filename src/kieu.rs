@@ -8,14 +8,14 @@ use std::time::Instant;
 use eframe::egui::{self, epaint, Color32, FontFamily, FontId, Pos2, Rect, Response, RichText, Sense, Stroke, TextStyle, Ui, Vec2};
 
 // ---------------- màu ----------------
-pub const NEN: Color32 = Color32::from_rgb(7, 9, 26);
+pub const NEN: Color32 = Color32::from_rgb(12, 8, 22);
 pub const CHU: Color32 = Color32::from_rgb(244, 244, 244);
 pub const CHU_PHU: Color32 = Color32::from_rgb(198, 198, 198);
 pub const CHU_MO: Color32 = Color32::from_rgb(168, 168, 168);
 pub const XANH: Color32 = Color32::from_rgb(69, 137, 255);
 pub const XANH_SANG: Color32 = Color32::from_rgb(120, 169, 255);
 pub const CYAN: Color32 = Color32::from_rgb(109, 240, 255);
-pub const TIM: Color32 = Color32::from_rgb(185, 138, 255);
+pub const TIM: Color32 = Color32::from_rgb(156, 104, 242);
 pub const CAM: Color32 = Color32::from_rgb(255, 154, 60);
 pub const VANG: Color32 = Color32::from_rgb(245, 197, 66);
 pub const XANH_BIEN: Color32 = Color32::from_rgb(79, 195, 255);
@@ -28,10 +28,10 @@ pub fn a(c: Color32, alpha: u8) -> Color32 {
 }
 
 fn kinh_nen() -> Color32 {
-    rgba(150, 120, 255, 15)
+    rgba(30, 16, 54, 175)
 }
 fn kinh_vien() -> Color32 {
-    rgba(190, 150, 255, 70)
+    rgba(140, 96, 220, 96)
 }
 
 // ---------------- cài đặt giao diện ----------------
@@ -110,7 +110,9 @@ pub fn ap_dung(ctx: &egui::Context) {
         s.text_styles.insert(TextStyle::Monospace, FontId::new(15.0, FontFamily::Monospace));
         s.text_styles.insert(TextStyle::Heading, FontId::new(38.0, nhe_ho()));
         s.spacing.item_spacing = Vec2::new(10.0, 10.0);
-        s.spacing.button_padding = Vec2::new(18.0, 9.0);
+        s.spacing.button_padding = Vec2::new(22.0, 11.0);
+        s.spacing.slider_rail_height = 8.0;
+        s.visuals.handle_shape = egui::style::HandleShape::Circle;
         s.spacing.interact_size = Vec2::new(40.0, 36.0);
         s.spacing.combo_width = 220.0;
         s.spacing.scroll.bar_width = 8.0;
@@ -118,7 +120,7 @@ pub fn ap_dung(ctx: &egui::Context) {
         let v = &mut s.visuals;
         *v = egui::Visuals::dark();
         v.panel_fill = Color32::TRANSPARENT;
-        v.window_fill = Color32::from_rgb(28, 20, 58);
+        v.window_fill = Color32::from_rgb(22, 14, 40);
         v.window_stroke = Stroke::new(1.0, kinh_vien());
         v.window_corner_radius = egui::CornerRadius::same(24);
         v.menu_corner_radius = egui::CornerRadius::same(16);
@@ -126,24 +128,24 @@ pub fn ap_dung(ctx: &egui::Context) {
         v.faint_bg_color = rgba(255, 255, 255, 8);
         v.override_text_color = Some(CHU);
         v.hyperlink_color = CYAN;
-        v.selection.bg_fill = Color32::from_rgb(70, 46, 160);
+        v.selection.bg_fill = Color32::from_rgb(62, 34, 124);
         v.selection.stroke = Stroke::new(1.5, a(TIM, 235));
-        let bo = egui::CornerRadius::same(20);
+        let bo = egui::CornerRadius::same(26);
         v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, kinh_vien());
         v.widgets.noninteractive.corner_radius = bo;
         v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, CHU);
-        v.widgets.inactive.bg_fill = rgba(175, 135, 255, 38);
-        v.widgets.inactive.weak_bg_fill = rgba(175, 135, 255, 38);
-        v.widgets.inactive.bg_stroke = Stroke::new(1.0, rgba(200, 160, 255, 90));
+        v.widgets.inactive.bg_fill = rgba(20, 12, 40, 235);
+        v.widgets.inactive.weak_bg_fill = rgba(20, 12, 40, 235);
+        v.widgets.inactive.bg_stroke = Stroke::new(1.0, rgba(150, 104, 235, 130));
         v.widgets.inactive.fg_stroke = Stroke::new(1.0, CHU);
         v.widgets.inactive.corner_radius = bo;
-        v.widgets.hovered.bg_fill = rgba(190, 150, 255, 60);
-        v.widgets.hovered.weak_bg_fill = rgba(190, 150, 255, 60);
+        v.widgets.hovered.bg_fill = rgba(50, 28, 94, 245);
+        v.widgets.hovered.weak_bg_fill = rgba(50, 28, 94, 245);
         v.widgets.hovered.bg_stroke = Stroke::new(1.5, a(TIM, 200));
         v.widgets.hovered.fg_stroke = Stroke::new(1.5, CHU);
         v.widgets.hovered.corner_radius = bo;
-        v.widgets.active.bg_fill = rgba(190, 150, 255, 84);
-        v.widgets.active.weak_bg_fill = rgba(190, 150, 255, 84);
+        v.widgets.active.bg_fill = rgba(68, 38, 124, 250);
+        v.widgets.active.weak_bg_fill = rgba(68, 38, 124, 250);
         v.widgets.active.bg_stroke = Stroke::new(1.5, TIM);
         v.widgets.active.fg_stroke = Stroke::new(1.5, CHU);
         v.widgets.active.corner_radius = bo;
@@ -154,7 +156,7 @@ pub fn ap_dung(ctx: &egui::Context) {
 
 /// Màu nền cửa sổ (đằng sau mọi thứ).
 pub fn mau_nen() -> [f32; 4] {
-    [7.0 / 255.0, 9.0 / 255.0, 26.0 / 255.0, 1.0]
+    [12.0 / 255.0, 8.0 / 255.0, 22.0 / 255.0, 1.0]
 }
 
 /// Nền như ảnh mẫu HARIRI: đêm xanh đen, các mảng sáng màu (xanh ngọc, tím, xanh dương, vàng cam), bụi sao li ti,
@@ -182,13 +184,13 @@ pub fn nen_anh_sang(ctx: &egui::Context) {
     let at = |fx: f32, fy: f32| Pos2::new(r.left() + w * fx, r.top() + h * fy);
     let b = w.max(h);
     // xanh dương phía trên giữa, tím trái trên, tím hồng bên phải, xanh ngọc dưới trái, vàng cam dưới phải
-    vet(at(0.45, 0.0), b * 0.42, rgba(60, 110, 255, 56));
-    vet(at(0.06, 0.08), b * 0.36, rgba(150, 80, 255, 72));
-    vet(at(0.96, 0.32), b * 0.38, rgba(190, 90, 255, 64));
-    vet(at(0.04, 0.96), b * 0.30, rgba(30, 205, 225, 56));
-    vet(at(1.0, 0.88), b * 0.30, rgba(255, 170, 70, 46));
-    vet(at(0.55, 1.0), b * 0.28, rgba(255, 120, 90, 22));
-    vet(at(0.30, 0.55), b * 0.26, rgba(120, 70, 255, 22));
+    vet(at(0.45, 0.0), b * 0.42, rgba(70, 70, 210, 40));
+    vet(at(0.06, 0.08), b * 0.36, rgba(120, 56, 215, 58));
+    vet(at(0.96, 0.32), b * 0.38, rgba(150, 64, 215, 50));
+    vet(at(0.04, 0.96), b * 0.30, rgba(24, 150, 170, 38));
+    vet(at(1.0, 0.88), b * 0.30, rgba(210, 130, 60, 30));
+    vet(at(0.55, 1.0), b * 0.28, rgba(200, 80, 90, 16));
+    vet(at(0.30, 0.55), b * 0.26, rgba(100, 50, 220, 16));
 
     // tia sáng chéo mảnh (góc trên phải, góc dưới trái)
     let tia = |a1: Pos2, a2: Pos2, al: u8| {
@@ -243,7 +245,7 @@ pub fn kinh_khung() -> egui::Frame {
         .corner_radius(egui::CornerRadius::same(24))
         .inner_margin(egui::Margin::same(20))
         // quầng sáng màu quanh khối (như viền neon của ảnh mẫu)
-        .shadow(epaint::Shadow { offset: [0, 0], blur: 24, spread: 1, color: a(m, 42) })
+        .shadow(epaint::Shadow { offset: [0, 0], blur: 22, spread: 0, color: a(m, 30) })
 }
 
 /// Khối kính có tiêu đề (thẻ). Nếu thanh bên yêu cầu cuộn tới khối này thì cuộn tới.
@@ -308,7 +310,7 @@ fn ve_neon(p: &egui::Painter, rect: Rect, mau: Color32, cuong: f32) {
     for (e, al) in [(9.0f32, 9.0f32), (5.0, 15.0), (2.5, 26.0)] {
         p.rect_filled(rect.expand(e), br + e, a(mau, (al * cuong).min(120.0) as u8));
     }
-    p.rect_filled(rect, br, Color32::from_rgb(9, 8, 22));
+    p.rect_filled(rect, br, Color32::from_rgb(10, 6, 20));
     // ánh sáng màu ở nửa dưới
     for i in 0..7 {
         let hh = rect.height() * 0.5 * (1.0 - i as f32 / 7.0);
@@ -321,9 +323,81 @@ fn ve_neon(p: &egui::Painter, rect: Rect, mau: Color32, cuong: f32) {
     p.rect_stroke(rect.shrink(4.5), br - 4.5, Stroke::new(1.0, rgba(255, 255, 255, 34)), egui::StrokeKind::Inside);
 }
 
+/// Màu phụ đi cùng màu chính để viền đổi màu dần (trái = phụ → phải = chính), như nút mẫu.
+fn mau_phu(m: Color32) -> Color32 {
+    if m == TIM {
+        Color32::from_rgb(70, 130, 255)
+    } else if m == CAM {
+        Color32::from_rgb(255, 70, 70)
+    } else if m == VANG {
+        Color32::from_rgb(255, 140, 50)
+    } else if m == XANH_BIEN {
+        Color32::from_rgb(150, 100, 255)
+    } else if m == OK {
+        Color32::from_rgb(60, 220, 255)
+    } else if m == LOI {
+        Color32::from_rgb(255, 150, 60)
+    } else if m == CYAN {
+        Color32::from_rgb(110, 140, 255)
+    } else {
+        Color32::from_rgb(150, 100, 255)
+    }
+}
+
+/// Điểm + pháp tuyến ngoài dọc đường viền hình viên thuốc (theo chiều kim đồng hồ từ cạnh trên bên trái).
+fn duong_vien(rc: Rect) -> Vec<(Pos2, Vec2)> {
+    let br = rc.height() / 2.0;
+    let (cl, cr, cy) = (rc.left() + br, rc.right() - br, rc.center().y);
+    let mut v = Vec::new();
+    let (nb, nd) = (22, 14);
+    for i in 0..=nd {
+        let x = cl + (cr - cl) * i as f32 / nd as f32;
+        v.push((Pos2::new(x, rc.top()), Vec2::new(0.0, -1.0)));
+    }
+    for i in 1..nb {
+        let g = -std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / nb as f32;
+        let d = Vec2::new(g.cos(), g.sin());
+        v.push((Pos2::new(cr, cy) + d * br, d));
+    }
+    for i in 0..=nd {
+        let x = cr - (cr - cl) * i as f32 / nd as f32;
+        v.push((Pos2::new(x, rc.bottom()), Vec2::new(0.0, 1.0)));
+    }
+    for i in 1..nb {
+        let g = std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / nb as f32;
+        let d = Vec2::new(g.cos(), g.sin());
+        v.push((Pos2::new(cl, cy) + d * br, d));
+    }
+    v
+}
+
+/// Viền neon đổi màu dần theo chiều ngang (c_trai → c_phai).
+fn gradient_vien(p: &egui::Painter, rect: Rect, c_trai: Color32, c_phai: Color32, dam: f32) {
+    let rc = rect.shrink(dam / 2.0);
+    let pts = duong_vien(rc);
+    let mut m = epaint::Mesh::default();
+    let w = rc.width().max(1.0);
+    for (pt, n) in &pts {
+        let t = ((pt.x - rc.left()) / w).clamp(0.0, 1.0);
+        let c = lerp_mau(c_trai, c_phai, t);
+        m.colored_vertex(*pt - *n * (dam / 2.0), c);
+        m.colored_vertex(*pt + *n * (dam / 2.0), c);
+    }
+    let k = pts.len() as u32;
+    for i in 0..k {
+        let (a0, a1) = (i * 2, ((i + 1) % k) * 2);
+        m.add_triangle(a0, a0 + 1, a1);
+        m.add_triangle(a0 + 1, a1 + 1, a1);
+    }
+    p.add(epaint::Shape::mesh(m));
+}
+
 fn ve_vien(p: &egui::Painter, rect: Rect, mau: Color32, al: u8, focus: bool) {
-    let c = if focus { Color32::WHITE } else { a(mau, al) };
-    p.rect_stroke(rect, rect.height() / 2.0, Stroke::new(if focus { 2.5 } else { 2.0 }, c), egui::StrokeKind::Inside);
+    if focus {
+        p.rect_stroke(rect, rect.height() / 2.0, Stroke::new(2.5, Color32::WHITE), egui::StrokeKind::Inside);
+    } else {
+        gradient_vien(p, rect, a(mau_phu(mau), al), a(mau, al), 2.2);
+    }
 }
 
 /// Ô biểu tượng tròn ở đầu nút.
@@ -594,9 +668,9 @@ pub fn chip(ui: &mut Ui, chon: bool, nhan: &str) -> Response {
     let br = rect.height() / 2.0;
     if chon {
         ve_neon(p, rect, TIM, 1.0);
-        p.rect_stroke(rect, br, Stroke::new(1.8, a(TIM, 240)), egui::StrokeKind::Inside);
+        ve_vien(p, rect, TIM, 240, false);
     } else {
-        p.rect_filled(rect, br, Color32::from_rgb(if ph.hovered() { 20 } else { 12 }, 10, if ph.hovered() { 42 } else { 30 }));
+        p.rect_filled(rect, br, Color32::from_rgb(if ph.hovered() { 26 } else { 14 }, 10, if ph.hovered() { 50 } else { 32 }));
         p.rect_stroke(rect, br, Stroke::new(1.2, a(TIM, if ph.hovered() { 130 } else { 70 })), egui::StrokeKind::Inside);
     }
     p.text(rect.center(), egui::Align2::CENTER_CENTER, nhan, FontId::new(16.0, if chon { dam_ho() } else { FontFamily::Proportional }), CHU);
@@ -642,4 +716,40 @@ pub fn bat_dau_chuong() -> Instant {
 pub fn rgba(r: u8, g: u8, b: u8, al: u8) -> Color32 {
     let f = |x: u8| ((x as u32 * al as u32 + 127) / 255) as u8;
     Color32::from_rgba_premultiplied(f(r), f(g), f(b), al)
+}
+
+
+/// Thanh trượt dạng viên kính neon (như "Brightness" của ảnh mẫu): nhãn + giá trị ở trên, rãnh + núm trắng ở dưới.
+/// `dp`: số chữ số thập phân hiển thị. → Response (changed khi kéo).
+pub fn thanh_truot(ui: &mut Ui, gia_tri: &mut f64, khoang: std::ops::RangeInclusive<f64>, nhan: &str, dp: usize) -> Response {
+    let rong = ui.available_width().clamp(260.0, 460.0);
+    let cao = 68.0;
+    let (rect, mut ph) = ui.allocate_exact_size(Vec2::new(rong, cao), Sense::click_and_drag());
+    let (lo, hi) = (*khoang.start(), *khoang.end());
+    let rail_l = rect.left() + 26.0;
+    let rail_r = rect.right() - 26.0;
+    let rail_y = rect.bottom() - 20.0;
+    if (ph.dragged() || ph.clicked()) && ph.interact_pointer_pos().is_some() {
+        let x = ph.interact_pointer_pos().unwrap().x;
+        let t = ((x - rail_l) / (rail_r - rail_l)).clamp(0.0, 1.0) as f64;
+        let moi = lo + (hi - lo) * t;
+        if (moi - *gia_tri).abs() > f64::EPSILON {
+            *gia_tri = moi;
+            ph.mark_changed();
+        }
+    }
+    let t = ((*gia_tri - lo) / (hi - lo)).clamp(0.0, 1.0) as f32;
+    let p = ui.painter();
+    ve_neon(p, rect, TIM, if ph.hovered() || ph.dragged() { 1.2 } else { 0.8 });
+    ve_vien(p, rect, TIM, 230, false);
+    p.text(Pos2::new(rect.left() + 28.0, rect.top() + 22.0), egui::Align2::LEFT_CENTER, nhan, FontId::new(16.0, dam_ho()), CHU);
+    p.text(Pos2::new(rect.right() - 28.0, rect.top() + 22.0), egui::Align2::RIGHT_CENTER, format!("{:.*}", dp, gia_tri), FontId::new(16.0, FontFamily::Monospace), CHU_PHU);
+    let rail = Rect::from_min_max(Pos2::new(rail_l, rail_y - 4.0), Pos2::new(rail_r, rail_y + 4.0));
+    p.rect_filled(rail, 4.0, rgba(255, 255, 255, 36));
+    let xn = rail_l + (rail_r - rail_l) * t;
+    let day = Rect::from_min_max(rail.min, Pos2::new(xn.max(rail_l + 8.0), rail.max.y));
+    p.rect_filled(day, 4.0, lerp_mau(mau_phu(TIM), TIM, t));
+    p.circle_filled(Pos2::new(xn, rail_y + 1.5), 13.0, rgba(0, 0, 0, 90));
+    p.circle_filled(Pos2::new(xn, rail_y), 12.0, Color32::WHITE);
+    ph.on_hover_cursor(egui::CursorIcon::PointingHand)
 }

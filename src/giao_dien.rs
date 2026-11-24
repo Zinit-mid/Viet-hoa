@@ -368,7 +368,7 @@ impl eframe::App for App {
         }
         ctx.request_repaint_after(Duration::from_millis(300));
         crate::tien_trinh::cap_nhat();
-        crate::kieu::dat_mau_vien(self.muc.mau());
+        crate::kieu::dat_mau_vien(crate::kieu::TIM);
         crate::kieu::nen_anh_sang(ctx);
 
         egui::TopBottomPanel::bottom("trang_thai")
@@ -639,17 +639,23 @@ impl App {
                     )
                     .changed();
                 ui.horizontal(|ui| {
-                    ui.label("Độ đậm:");
                     if ch.kieu_hien == "khung" {
-                        doi |= ui
-                            .add(egui::Slider::new(&mut ch.do_mo, 0.2..=1.0))
-                            .changed();
+                        let mut v = ch.do_mo as f64;
+                        if crate::kieu::thanh_truot(ui, &mut v, 0.2..=1.0, "Độ đậm", 2).changed() {
+                            ch.do_mo = v as _;
+                            doi = true;
+                        }
                     } else {
-                        doi |= ui
-                            .add(egui::Slider::new(&mut ch.do_dam_chu, 0.2..=1.0))
-                            .changed();
-                        ui.label("Viền chữ:");
-                        doi |= ui.add(egui::Slider::new(&mut ch.vien_chu, 0..=5)).changed();
+                        let mut v = ch.do_dam_chu as f64;
+                        if crate::kieu::thanh_truot(ui, &mut v, 0.2..=1.0, "Độ đậm chữ", 2).changed() {
+                            ch.do_dam_chu = v as _;
+                            doi = true;
+                        }
+                        let mut w = ch.vien_chu as f64;
+                        if crate::kieu::thanh_truot(ui, &mut w, 0.0..=5.0, "Viền chữ", 0).changed() {
+                            ch.vien_chu = w.round() as _;
+                            doi = true;
+                        }
                     }
                 });
                 ui.horizontal(|ui| {
