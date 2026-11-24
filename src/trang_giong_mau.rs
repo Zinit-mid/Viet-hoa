@@ -51,12 +51,7 @@ impl Default for TrangGiongMau {
 }
 
 fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.label(RichText::new(tieu_de).color(Color32::from_rgb(64, 160, 255)).strong());
-        noi(ui);
-    });
-    ui.add_space(6.0);
+    crate::kieu::khoi(ui, tieu_de, noi);
 }
 
 impl TrangGiongMau {
@@ -188,7 +183,7 @@ impl TrangGiongMau {
                 for (n, t) in [(1, "1 bình thường"), (2, "2 gấp rút"), (3, "3 buồn")] {
                     ui.selectable_value(&mut self.chinh, n, t);
                 }
-                ui.checkbox(&mut self.ghi_de, "ghi đè nếu trùng tên");
+                crate::kieu::cong_tac(ui, &mut self.ghi_de, "ghi đè nếu trùng tên");
             });
             ui.label(RichText::new("File riêng lẻ: mỗi file thành một giọng, tên theo tên file (tự cắt lặng, mono 24 kHz, chuẩn hóa độ to). Tên dạng Giọng__1_binh_thuong, Giọng__2_gap_rut, Giọng__3_buon được gom thành MỘT giọng có cảm xúc (dùng cho thuyết minh).").small().weak());
         });

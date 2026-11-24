@@ -138,13 +138,13 @@ impl TrangTuDong {
         ui.add_space(6.0);
         ui.add_enabled_ui(!ban, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.checkbox(&mut self.t.dich, "Dịch chữ");
+                crate::kieu::cong_tac(ui, &mut self.t.dich, "Dịch chữ");
                 if matches!(loai, LoaiGame::CrimsonDesert | LoaiGame::Rise | LoaiGame::Tr2013) {
-                    ui.checkbox(&mut self.t.long_tieng, "Lồng tiếng");
+                    crate::kieu::cong_tac(ui, &mut self.t.long_tieng, "Lồng tiếng");
                 }
                 if loai != LoaiGame::CrimsonDesert {
-                    ui.checkbox(&mut self.t.cai, "Cài vào game");
-                    ui.checkbox(&mut self.t.khong_dau, "không dấu (nếu font game thiếu dấu)");
+                    crate::kieu::cong_tac(ui, &mut self.t.cai, "Cài vào game");
+                    crate::kieu::cong_tac(ui, &mut self.t.khong_dau, "không dấu (nếu font game thiếu dấu)");
                 }
             });
             ui.horizontal_wrapped(|ui| {
@@ -163,9 +163,7 @@ impl TrangTuDong {
         });
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            if ui
-                .add_enabled(!ban && (self.t.dich || self.t.long_tieng || self.t.cai), egui::Button::new(RichText::new("Bắt đầu").strong()))
-                .clicked()
+            if crate::kieu::nut_tien_do(ui, "tu_dong", "Bắt đầu", "Đang làm", crate::kieu::TIM, !ban && (self.t.dich || self.t.long_tieng || self.t.cai))
             {
                 self.chay(g.clone());
             }

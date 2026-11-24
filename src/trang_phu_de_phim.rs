@@ -236,9 +236,7 @@ impl TrangPhuDePhim {
         }
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            if ui
-                .add_enabled(!ban, egui::Button::new(RichText::new("Tạo phụ đề tiếng Việt").strong()))
-                .clicked()
+            if crate::kieu::nut_tien_do(ui, "phu_de_phim", "Tạo phụ đề tiếng Việt", "Đang tạo", crate::kieu::VANG, !ban)
             {
                 self.bat_dau();
             }
@@ -266,9 +264,7 @@ impl TrangPhuDePhim {
             ui.add(egui::ProgressBar::new(tien).show_percentage().animate(tien == 0.0));
         }
         ui.add_space(8.0);
-        egui::Frame::group(ui.style()).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.label(RichText::new("THUYẾT MINH TIẾNG VIỆT (giọng đọc có cảm xúc)").color(Color32::from_rgb(64, 160, 255)).strong());
+        crate::kieu::khoi(ui, "THUYẾT MINH TIẾNG VIỆT (giọng đọc có cảm xúc)", |ui| {
             ui.label(RichText::new("Dùng phụ đề tiếng Việt đã tạo ở trên: đọc từng dòng bằng một giọng chuẩn, đặt đúng thời điểm, hạ tiếng gốc khi thuyết minh nói, xuất phim mới.").small().weak());
             ui.add_enabled_ui(!ban, |ui| {
                 ui.horizontal_wrapped(|ui| {
@@ -300,22 +296,22 @@ impl TrangPhuDePhim {
                     }
                     self.them.nut(ui);
                 });
-                ui.checkbox(&mut self.theo_cam_xuc, "Giọng theo cảm xúc: dùng mẫu bình thường / gấp rút / buồn của giọng này theo từng câu");
-                ui.checkbox(&mut self.nhan_nha, "Nhấn nhá theo câu: chỉnh to nhỏ, nhanh chậm, cao thấp theo dấu câu và từ khóa");
+                crate::kieu::cong_tac(ui, &mut self.theo_cam_xuc, "Giọng theo cảm xúc: dùng mẫu bình thường / gấp rút / buồn của giọng này theo từng câu");
+                crate::kieu::cong_tac(ui, &mut self.nhan_nha, "Nhấn nhá theo câu: chỉnh to nhỏ, nhanh chậm, cao thấp theo dấu câu và từ khóa");
                 if self.nhan_nha {
                     ui.horizontal(|ui| {
                         ui.label("Độ mạnh nhấn nhá:");
                         ui.add(egui::Slider::new(&mut self.cuong_do, 0.3..=1.0).fixed_decimals(1));
                     });
                 }
-                ui.checkbox(&mut self.chi_thu, "Chỉ làm thử 10 dòng đầu (phần còn lại giữ nguyên tiếng gốc – bỏ chọn để làm cả phim)");
+                crate::kieu::cong_tac(ui, &mut self.chi_thu, "Chỉ làm thử 10 dòng đầu (phần còn lại giữ nguyên tiếng gốc – bỏ chọn để làm cả phim)");
                 ui.label(RichText::new("Cách đọc tên riêng: tên không ghi ở đây được đọc nguyên văn tiếng Anh. Muốn đọc khác thì thêm dòng `Tên => cách viết`, vd `Jess => Giét`.").small().weak());
                 if ui.add(egui::TextEdit::multiline(&mut self.ten_doc).desired_rows(3).desired_width(f32::INFINITY).hint_text("Jess => Giét")).changed() {
                     let _ = std::fs::write(crate::thuyet_minh::tep_ten_doc(), &self.ten_doc);
                 }
             });
             ui.horizontal(|ui| {
-                if ui.add_enabled(!ban, egui::Button::new(RichText::new("Tạo thuyết minh").strong())).clicked() {
+                if crate::kieu::nut_tien_do(ui, "phu_de_phim", "Tạo thuyết minh", "Đang tạo", crate::kieu::VANG, !ban) {
                     self.thuyet_minh();
                 }
                 if ui.add_enabled(phim_tm.is_some(), egui::Button::new("Mở phim thuyết minh")).clicked() {

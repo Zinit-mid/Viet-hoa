@@ -141,12 +141,7 @@ fn luu_tu_dien(ten: &str, sua: &str) -> Result<(), String> {
 }
 
 fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.label(RichText::new(tieu_de).color(Color32::from_rgb(64, 160, 255)).strong());
-        noi(ui);
-    });
-    ui.add_space(6.0);
+    crate::kieu::khoi(ui, tieu_de, noi);
 }
 
 impl TrangSuaDich {
@@ -253,9 +248,9 @@ impl TrangSuaDich {
             ui.horizontal_wrapped(|ui| {
                 ui.label("Tìm:");
                 ui.add(egui::TextEdit::singleline(&mut self.tim).desired_width(260.0).hint_text("chữ gốc hoặc bản dịch"));
-                ui.checkbox(&mut self.chi_sua, "chỉ câu vừa sửa");
-                ui.checkbox(&mut self.chi_giong, "chỉ câu giống bản gốc");
-                ui.checkbox(&mut self.chi_the, "chỉ câu lệch thẻ ⚠");
+                crate::kieu::cong_tac(ui, &mut self.chi_sua, "chỉ câu vừa sửa");
+                crate::kieu::cong_tac(ui, &mut self.chi_giong, "chỉ câu giống bản gốc");
+                crate::kieu::cong_tac(ui, &mut self.chi_the, "chỉ câu lệch thẻ ⚠");
                 if ui.add_enabled(sua > 0, egui::Button::new(RichText::new(format!("Lưu ({sua} câu sửa)")).strong())).clicked() {
                     self.luu();
                 }
@@ -270,7 +265,7 @@ impl TrangSuaDich {
                     ui.add(egui::TextEdit::singleline(&mut self.thay_bang).desired_width(200.0).hint_text("chữ đúng"));
                     let n = if self.thay_tim.is_empty() { 0 } else { self.muc.iter().filter(|m| m.vi.contains(&self.thay_tim)).count() };
                     ui.label(format!("{n} câu có chữ này"));
-                    ui.checkbox(&mut self.ghi_td, "nhớ cho các lần dịch sau");
+                    crate::kieu::cong_tac(ui, &mut self.ghi_td, "nhớ cho các lần dịch sau");
                     if ui.add_enabled(n > 0, egui::Button::new("Thay tất cả")).clicked() {
                         for m in &mut self.muc {
                             if m.vi.contains(&self.thay_tim) {

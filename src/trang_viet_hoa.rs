@@ -136,19 +136,7 @@ impl Default for TrangVietHoa {
 }
 
 fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::group(ui.style())
-        .inner_margin(12.0)
-        .show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.label(
-                RichText::new(tieu_de)
-                    .strong()
-                    .color(Color32::from_rgb(64, 160, 255)),
-            );
-            ui.add_space(4.0);
-            noi(ui);
-        });
-    ui.add_space(8.0);
+    crate::kieu::khoi(ui, tieu_de, noi);
 }
 
 impl TrangVietHoa {
@@ -316,21 +304,11 @@ impl TrangVietHoa {
                     );
                 }
                 ui.horizontal_wrapped(|ui| {
-                    if ui
-                        .add_enabled(
-                            !ban && con > 0 && dich::offline::co_the_dung(),
-                            egui::Button::new("Dịch offline (miễn phí)"),
-                        )
-                        .clicked()
+                    if crate::kieu::nut_tien_do(ui, "viet_hoa", "Dịch offline (miễn phí)", "Đang dịch", crate::kieu::TIM, !ban && con > 0 && dich::offline::co_the_dung())
                     {
                         lam = Some("offline");
                     }
-                    if ui
-                        .add_enabled(
-                            !ban && con > 0 && dich::claude::co_khoa(),
-                            egui::Button::new(format!("Dịch bằng Claude (~{usd:.2} USD)")),
-                        )
-                        .clicked()
+                    if crate::kieu::nut_tien_do(ui, "viet_hoa", &format!("Dịch bằng Claude (~{usd:.2} USD)"), "Đang dịch", crate::kieu::TIM, !ban && con > 0 && dich::claude::co_khoa())
                     {
                         lam = Some("claude");
                     }
@@ -349,18 +327,11 @@ impl TrangVietHoa {
                 RichText::new("Đang cài trong game: chưa")
             });
             ui.horizontal_wrapped(|ui| {
-                if ui
-                    .add_enabled(
-                        !ban && da > 0,
-                        egui::Button::new(RichText::new("Cài Việt hóa (có dấu)").strong()),
-                    )
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "Cài Việt hóa (có dấu)", "Đang cài", crate::kieu::TIM, !ban && da > 0)
                 {
                     lam = Some("cai");
                 }
-                if ui
-                    .add_enabled(!ban && da > 0, egui::Button::new("Cài (không dấu)"))
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "Cài (không dấu)", "Đang cài", crate::kieu::TIM, !ban && da > 0)
                 {
                     lam = Some("cai_kd");
                 }
@@ -403,18 +374,11 @@ impl TrangVietHoa {
                     );
                 }
                 ui.horizontal_wrapped(|ui| {
-                    if ui
-                        .add_enabled(!ban && co && pd_da > 0, egui::Button::new("Lồng thử ~16 đoạn đầu game"))
-                        .clicked()
+                    if crate::kieu::nut_tien_do(ui, "viet_hoa", "Lồng thử ~16 đoạn đầu game", "Đang lồng", crate::kieu::CAM, !ban && co && pd_da > 0)
                     {
                         lam = Some("long_thu");
                     }
-                    if ui
-                        .add_enabled(
-                            !ban && co && pd_da > 0,
-                            egui::Button::new(RichText::new("Lồng tiếng toàn bộ").strong()),
-                        )
-                        .clicked()
+                    if crate::kieu::nut_tien_do(ui, "viet_hoa", "Lồng tiếng toàn bộ", "Đang lồng", crate::kieu::CAM, !ban && co && pd_da > 0)
                     {
                         lam = Some("long");
                     }
@@ -556,21 +520,11 @@ impl TrangVietHoa {
                 "{tong} câu khác nhau • đã dịch {da} • còn {con} câu ({ky_con} ký tự)"
             ));
             ui.horizontal_wrapped(|ui| {
-                if ui
-                    .add_enabled(
-                        !ban && con > 0 && dich::offline::co_the_dung(),
-                        egui::Button::new("Dịch offline (miễn phí)"),
-                    )
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "Dịch offline (miễn phí)", "Đang dịch", crate::kieu::TIM, !ban && con > 0 && dich::offline::co_the_dung())
                 {
                     lam = Some("offline");
                 }
-                if ui
-                    .add_enabled(
-                        !ban && con > 0 && dich::claude::co_khoa(),
-                        egui::Button::new(format!("Dịch bằng Claude (~{usd:.2} USD)")),
-                    )
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", &format!("Dịch bằng Claude (~{usd:.2} USD)"), "Đang dịch", crate::kieu::TIM, !ban && con > 0 && dich::claude::co_khoa())
                 {
                     lam = Some("claude");
                 }
@@ -582,21 +536,14 @@ impl TrangVietHoa {
             ui.label(RichText::new("Giữ nguyên tiếng Anh: tên nhân vật, tên riêng, tên vật phẩm. Câu đã dịch được lưu lại, lần sau chỉ dịch câu mới.").small().weak());
         });
         the(ui, "GÓI CHO DMM", |ui| {
-            if ui
-                .add_enabled(
-                    !ban && so_bo_nho > 0,
-                    egui::Button::new(RichText::new("Xuất gói Việt hóa ra Desktop").strong()),
-                )
-                .clicked()
+            if crate::kieu::nut_tien_do(ui, "viet_hoa", "Xuất gói Việt hóa ra Desktop", "Đang xuất", crate::kieu::TIM, !ban && so_bo_nho > 0)
             {
                 lam = Some("goi");
             }
             ui.label(RichText::new("Game 2.04+ không cho sửa file trực tiếp: trong DMM tắt gói cũ > Import file VietHoa_CrimsonDesert.zip > bật > Mount Mods. Vào game để ngôn ngữ English.").small().weak());
         });
         the(ui, "MOD TĂNG Ô CHỨA ĐỒ", |ui| {
-            if ui
-                .add_enabled(!ban, egui::Button::new("Tạo mod tăng ô chứa đồ"))
-                .clicked()
+            if crate::kieu::nut_tien_do(ui, "viet_hoa", "Tạo mod tăng ô chứa đồ", "Đang tạo", crate::kieu::TIM, !ban)
             {
                 lam = Some("tui");
             }
@@ -612,15 +559,11 @@ impl TrangVietHoa {
                 );
             }
             ui.horizontal_wrapped(|ui| {
-                if ui
-                    .add_enabled(!ban && co && so_bo_nho > 0, egui::Button::new("Lồng nhân vật có tên (A)"))
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "Lồng nhân vật có tên (A)", "Đang lồng", crate::kieu::CAM, !ban && co && so_bo_nho > 0)
                 {
                     lam = Some("long_a");
                 }
-                if ui
-                    .add_enabled(!ban && co && so_bo_nho > 0, egui::Button::new("Lồng dân thường (B)"))
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "Lồng dân thường (B)", "Đang lồng", crate::kieu::CAM, !ban && co && so_bo_nho > 0)
                 {
                     lam = Some("long_b");
                 }
@@ -1062,21 +1005,11 @@ impl TrangVietHoa {
                 ui.label(RichText::new(format!("Lỗi đọc: {e}")).color(Color32::LIGHT_RED));
             }
             ui.horizontal_wrapped(|ui| {
-                if ui
-                    .add_enabled(
-                        !ban && con > 0 && dich::offline::co_the_dung(),
-                        egui::Button::new("Dịch offline (miễn phí)"),
-                    )
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "Dịch offline (miễn phí)", "Đang dịch", crate::kieu::TIM, !ban && con > 0 && dich::offline::co_the_dung())
                 {
                     lam = Some("offline");
                 }
-                if ui
-                    .add_enabled(
-                        !ban && con > 0 && dich::claude::co_khoa(),
-                        egui::Button::new(format!("Dịch bằng Claude (~{usd:.2} USD)")),
-                    )
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", &format!("Dịch bằng Claude (~{usd:.2} USD)"), "Đang dịch", crate::kieu::TIM, !ban && con > 0 && dich::claude::co_khoa())
                 {
                     lam = Some("claude");
                 }
@@ -1113,17 +1046,12 @@ impl TrangVietHoa {
         // ---- ghi vào game ----
         let da_ghi = v.da_ghi();
         the(ui, "GHI VÀO GAME", |ui| {
-            ui.checkbox(
+            crate::kieu::cong_tac(ui, 
                 &mut self.khong_dau,
                 "Không dấu (game không có font tiếng Việt)",
             );
             ui.horizontal_wrapped(|ui| {
-                if ui
-                    .add_enabled(
-                        !ban && da > 0,
-                        egui::Button::new(RichText::new("Ghi vào game").strong()),
-                    )
-                    .clicked()
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "Ghi vào game", "Đang ghi", crate::kieu::TIM, !ban && da > 0)
                 {
                     lam = Some("ghi");
                 }

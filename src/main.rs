@@ -11,6 +11,7 @@ mod duong_dan;
 mod giao_dien;
 mod giong_doc;
 mod khung_dich;
+mod kieu;
 mod lop_phu;
 mod ocr;
 mod phu_de_phim;
@@ -106,8 +107,8 @@ fn main() -> eframe::Result<()> {
     let tuy_chon = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Việt Hóa")
-            .with_inner_size([1100.0, 760.0])
-            .with_min_inner_size([760.0, 520.0]),
+            .with_inner_size([1480.0, 880.0])
+            .with_min_inner_size([900.0, 560.0]),
         // Không lưu vị trí cửa sổ (từng lưu nhầm lúc thu nhỏ → mở ra 118×152),
         // và mọi thứ của giao diện nằm ở ổ D, không ghi vào %APPDATA%
         persist_window: false,

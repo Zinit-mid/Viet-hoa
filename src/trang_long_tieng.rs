@@ -80,12 +80,7 @@ fn luu(lv: &std::path::Path, clips: &[lt::Clip]) {
 }
 
 fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.label(RichText::new(tieu_de).color(Color32::from_rgb(64, 160, 255)).strong());
-        noi(ui);
-    });
-    ui.add_space(6.0);
+    crate::kieu::khoi(ui, tieu_de, noi);
 }
 
 impl TrangLongTieng {
@@ -186,7 +181,7 @@ impl TrangLongTieng {
 
         the(ui, "1. QUÉT FILE ÂM THANH", |ui| {
             ui.horizontal(|ui| {
-                if ui.add_enabled(!ban, egui::Button::new("Quét file âm thanh")).clicked() {
+                if crate::kieu::nut_tien_do(ui, "long_tieng", "Quét file âm thanh", "Đang quét", crate::kieu::XANH_BIEN, !ban) {
                     let (dir, lv2) = (g.thu_muc.clone(), lv.clone());
                     self.nen("Đang quét file âm thanh", move |tt, dung| {
                         let t2 = tt.clone();
@@ -211,7 +206,7 @@ impl TrangLongTieng {
             let co_ghep = self.tt.lock().unwrap().clips.iter().filter(|c| c.vi.is_some()).count();
             ui.label(format!("{co_ghep} file đã có câu tiếng Việt"));
             ui.horizontal_wrapped(|ui| {
-                if ui.add_enabled(!ban && so_clip > 0, egui::Button::new("Ghép chữ + dịch câu còn thiếu (offline)")).clicked() {
+                if crate::kieu::nut_tien_do(ui, "long_tieng", "Ghép chữ + dịch câu còn thiếu (offline)", "Đang ghép", crate::kieu::TIM, !ban && so_clip > 0) {
                     let (dir, ten, lv2) = (g.thu_muc.clone(), g.ten.clone(), lv.clone());
                     self.nen("Đang ghép chữ", move |tt, dung| {
                         let mut v = ViecFile::moi(&dir, &ten);
@@ -314,7 +309,7 @@ impl TrangLongTieng {
             let da_lam = lv.join("LongTieng").is_dir();
             let da_cai = lv.join("sao_luu_goc").is_dir();
             ui.horizontal_wrapped(|ui| {
-                if ui.add_enabled(!ban && co_viet, egui::Button::new(RichText::new("Lồng tiếng").strong())).clicked() {
+                if crate::kieu::nut_tien_do(ui, "long_tieng", "Lồng tiếng", "Đang lồng", crate::kieu::CAM, !ban && co_viet) {
                     let (dir, lv2, gan) = (g.thu_muc.clone(), lv.clone(), self.gan.clone());
                     let gan: HashMap<String, PathBuf> = gan.into_iter().map(|(k, v)| (k, clone_giong::kho_giong().join(v))).collect();
                     self.nen("Đang lồng tiếng", move |tt, dung| {
@@ -339,7 +334,7 @@ impl TrangLongTieng {
                         })
                     });
                 }
-                if ui.add_enabled(!ban && da_lam, egui::Button::new("Cài vào game")).clicked() {
+                if crate::kieu::nut_tien_do(ui, "long_tieng", "Cài vào game", "Đang cài", crate::kieu::TIM, !ban && da_lam) {
                     let (dir, lv2) = (g.thu_muc.clone(), lv.clone());
                     self.nen("Đang cài", move |_, _| Ok(format!("Đã chép {} file lồng tiếng vào game (bản gốc ở {}\\sao_luu_goc).", lt::cai(&dir, &lv2)?, lv2.display())));
                 }

@@ -58,12 +58,7 @@ impl Default for TrangCloneGiong {
 }
 
 fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.label(RichText::new(tieu_de).color(Color32::from_rgb(64, 160, 255)).strong());
-        noi(ui);
-    });
-    ui.add_space(6.0);
+    crate::kieu::khoi(ui, tieu_de, noi);
 }
 
 impl TrangCloneGiong {
@@ -129,9 +124,7 @@ impl TrangCloneGiong {
                 ui.add(egui::DragValue::new(&mut self.ket_thuc).range(0.0..=36000.0).speed(0.1).fixed_decimals(1));
                 ui.label(RichText::new("(đến = 0: hết file)").small().weak());
             });
-            if ui
-                .add_enabled(!ban && !self.nguon.trim().is_empty(), egui::Button::new(RichText::new("Xử lý giọng mẫu").strong()))
-                .clicked()
+            if crate::kieu::nut_tien_do(ui, "clone_giong", "Xử lý giọng mẫu", "Đang xử lý", crate::kieu::CAM, !ban && !self.nguon.trim().is_empty())
             {
                 let (p, a, b) = (PathBuf::from(self.nguon.trim().trim_matches('"')), self.bat_dau, self.ket_thuc);
                 self.nen(move |c, _| {
@@ -200,7 +193,7 @@ impl TrangCloneGiong {
             ui.horizontal(|ui| {
                 ui.label("Tên giọng:");
                 ui.add(egui::TextEdit::singleline(&mut self.ten_luu).desired_width(220.0).hint_text("vd nam_tre_2"));
-                ui.checkbox(&mut self.ghi_de, "ghi đè nếu trùng tên");
+                crate::kieu::cong_tac(ui, &mut self.ghi_de, "ghi đè nếu trùng tên");
                 if ui.add_enabled(co_mau && !self.ten_luu.trim().is_empty(), egui::Button::new("Lưu")).clicked() {
                     let m = self.c.lock().unwrap().mau.clone().unwrap_or_default();
                     let tb = match cg::luu(&self.ten_luu, &m, self.ghi_de) {

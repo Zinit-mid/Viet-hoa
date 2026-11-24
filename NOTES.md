@@ -105,3 +105,9 @@ Mục tiêu: thao tác hoàn toàn trên app, không cần Claude Code; Claude A
 
 ## Giọng mẫu (menu chính)
 `trang_giong_mau.rs`: thư viện giọng (kho `giong_rieng`): thêm nhiều file / cả thư mục cùng lúc (`clone_giong::nhap_nhieu`), bộ 3 mẫu `Tên__1_binh_thuong / __2_gap_rut / __3_buon` tự gom thành một giọng có cảm xúc (`Tên.wav` + `Tên_gap_rut.wav` + `Tên_buon.wav`; mẫu số `chinh` làm giọng chính, mặc định 2), thêm giọng dựng sẵn VieNeu vào kho, nghe, xóa. Thuyết minh phim chọn được giọng trong kho.
+
+## Giao diện mới (theo GiaoDien_VietHoa_ChoClaudeCode.md, dựng bằng egui)
+- `kieu.rs`: nền tối + 3 vệt sáng (tắt được ở Cài đặt > Giao diện), mặt kính, font IBM Plex nhúng trong exe (`assets/fonts/IBMPlex*.ttf`, OFL), cỡ chữ ≥ 14, nút viên thuốc, **nút tiến độ đổ màu theo % thật** (`kieu::nut_tien_do(ui, khoa, nhãn, động từ, màu, bật)` đọc từ `tien_trinh`), công tắc, chip, khối kính (`kieu::khoi`). Màu: Việt hóa = tím, Lồng tiếng = cam, Phụ đề = vàng, Dò file = xanh biển.
+- Khung (`giao_dien.rs`): thanh trên (logo + 6 mục lớn + nút Dịch cả màn hình), cột trái "Mục con" (bấm = cuộn tới khối), giữa = trang, cột phải "Việc đang chạy" + "Kho giọng" (ẩn khi cửa sổ < 1280 điểm, thay bằng dải đầu cửa sổ).
+- Lưu ý egui: `Color32::from_rgba_unmultiplied` nhân alpha trong không gian tuyến tính nên màu mờ bị sáng; dùng `kieu::rgba(...)`.
+- Chưa làm: bảng "Vùng dịch" dạng bảng, 4 thẻ phát sáng ở Dịch màn hình, ô xem trước, blur kính thật (egui không có).

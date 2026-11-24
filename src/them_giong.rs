@@ -148,7 +148,7 @@ impl ThemGiong {
             ui.horizontal(|ui| {
                 ui.label("Tên giọng:");
                 ui.add(egui::TextEdit::singleline(&mut self.ten).desired_width(220.0).hint_text("vd nam_tre_2"));
-                ui.checkbox(&mut self.ghi_de, "ghi đè nếu trùng tên");
+                crate::kieu::cong_tac(ui, &mut self.ghi_de, "ghi đè nếu trùng tên");
             });
             ui.horizontal_wrapped(|ui| {
                 ui.label("Gán luôn cho nhân vật (tùy chọn):");
