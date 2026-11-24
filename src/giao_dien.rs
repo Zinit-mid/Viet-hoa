@@ -37,6 +37,7 @@ pub struct App {
     phu_de_phim: crate::trang_phu_de_phim::TrangPhuDePhim,
     sua_dich: crate::trang_sua_dich::TrangSuaDich,
     tu_dong: crate::trang_tu_dong::TrangTuDong,
+    cap_nhat: crate::cap_nhat::CapNhat,
     long_tieng: crate::trang_long_tieng::TrangLongTieng,
 }
 
@@ -64,6 +65,12 @@ impl App {
             phu_de_phim: Default::default(),
             sua_dich: Default::default(),
             tu_dong: Default::default(),
+            cap_nhat: {
+                crate::cap_nhat::don_dep();
+                let c = crate::cap_nhat::CapNhat::default();
+                c.kiem_tra_nen(true);
+                c
+            },
             long_tieng: Default::default(),
         }
     }
@@ -129,6 +136,14 @@ impl eframe::App for App {
                         .small()
                         .weak(),
                 );
+                if let Some(b) = self.cap_nhat.0.lock().unwrap().ban.as_ref() {
+                    if ui
+                        .link(RichText::new(format!("⬆ Có bản mới {}", b.ma)).color(Color32::LIGHT_GREEN))
+                        .clicked()
+                    {
+                        self.trang = Trang::CaiDat;
+                    }
+                }
                 ui.add_space(10.0);
                 let muc = |ui: &mut egui::Ui, trang: &mut Trang, t: Trang, chu: &str| {
                     if ui
@@ -470,9 +485,53 @@ impl App {
         });
     }
 
+    fn ve_cap_nhat(&mut self, ui: &mut egui::Ui) {
+        let cn = self.cap_nhat.clone();
+        let (kiem, tai, tien, tb, loi, ban, da_thay) = {
+            let t = cn.0.lock().unwrap();
+            (t.dang_kiem, t.dang_tai, t.tien, t.tb.clone(), t.loi, t.ban.clone(), t.da_thay)
+        };
+        if kiem || tai {
+            ui.ctx().request_repaint_after(Duration::from_millis(200));
+        }
+        the(ui, "CẬP NHẬT", |ui| {
+            ui.label(format!("Phiên bản đang chạy: {}  •  nguồn: github.com/{}", crate::cap_nhat::PHIEN_BAN, crate::cap_nhat::KHO));
+            ui.horizontal_wrapped(|ui| {
+                if ui.add_enabled(!kiem && !tai && !da_thay, egui::Button::new("Kiểm tra bản mới")).clicked() {
+                    cn.kiem_tra_nen(false);
+                }
+                if let Some(b) = &ban {
+                    if ui
+                        .add_enabled(!tai && !da_thay, egui::Button::new(RichText::new(format!("Cập nhật lên {}", b.ma)).strong()))
+                        .clicked()
+                    {
+                        cn.cap_nhat_nen();
+                    }
+                }
+                if da_thay && ui.button(RichText::new("Khởi động lại").strong()).clicked() {
+                    crate::cap_nhat::mo_lai();
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            });
+            if tai {
+                ui.add(egui::ProgressBar::new(tien).show_percentage());
+            }
+            if !tb.is_empty() {
+                ui.label(if loi { RichText::new(tb).color(Color32::LIGHT_RED) } else { RichText::new(tb) });
+            }
+            if let Some(b) = &ban {
+                if !b.ghi_chu.trim().is_empty() {
+                    ui.label(RichText::new("Có gì mới:").small().weak());
+                    egui::ScrollArea::vertical().max_height(120.0).show(ui, |ui| ui.label(RichText::new(&b.ghi_chu).small()));
+                }
+            }
+        });
+    }
+
     fn trang_cai_dat(&mut self, ui: &mut egui::Ui) {
         ui.heading("Cài đặt");
         ui.add_space(8.0);
+        self.ve_cap_nhat(ui);
         the(ui, "MÃ API", |ui| {
             for (ten, file, o) in [
                 ("Claude", "khoa_api.txt", &mut self.o_khoa),

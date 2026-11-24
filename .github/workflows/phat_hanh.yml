@@ -1,0 +1,54 @@
+name: Phát hành
+
+# Đẩy tag dạng v0.2.0 (khớp version trong Cargo.toml) → build exe, tạo bản phát hành trên GitHub
+# kèm VietHoa.exe (app tự cập nhật từ file này) và gói zip độc lập.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kiểm tra tag khớp version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $ver = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          $tag = "${{ github.ref_name }}".TrimStart('v')
+          if ($ver -ne $tag) { throw "Tag v$tag không khớp version Cargo.toml ($ver)" }
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build release
+        run: cargo build --release --locked
+
+      - name: Đóng gói
+        shell: pwsh
+        run: |
+          $ver = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          $thu = "dist/VietHoa_$ver"
+          New-Item -ItemType Directory -Force $thu, "$thu/scripts" | Out-Null
+          Copy-Item target/release/VietHoa.exe $thu
+          Copy-Item scripts/* "$thu/scripts"
+          Remove-Item "$thu/scripts/dong_goi.ps1" -ErrorAction SilentlyContinue
+          "Giải nén, mở VietHoa.exe > Cài đặt > Tải công cụ còn thiếu. Xem NOTES.md." | Set-Content -Encoding UTF8 "$thu/HUONG_DAN.txt"
+          Compress-Archive -Path "$thu/*" -DestinationPath "dist/VietHoa_$ver.zip"
+          Copy-Item target/release/VietHoa.exe dist/VietHoa.exe
+
+      - name: Tạo bản phát hành
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/VietHoa.exe
+            dist/VietHoa_*.zip
+          generate_release_notes: true
