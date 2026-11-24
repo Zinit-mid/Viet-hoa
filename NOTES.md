@@ -102,3 +102,6 @@ Mục tiêu: thao tác hoàn toàn trên app, không cần Claude Code; Claude A
 
 ## Thuyết minh phim (GĐ10)
 `thuyet_minh.rs` + `scripts\thuyet_minh.py` + thẻ THUYẾT MINH trong trang Phụ đề phim: đọc phụ đề Việt bằng 1 trong 6 giọng VieNeu dựng sẵn (Thiện Minh, Thái Sơn, Đức Trí, Ngọc Linh, Mỹ Duyên, Thục Đoan), có cảm xúc bằng 2 cách kết hợp: (1) nhấn nhá theo câu (đoán cảm xúc từ dấu câu/từ khóa → to nhỏ, nhanh chậm, cao thấp), (2) bộ giọng 3 mẫu bình thường/gấp rút/buồn cho mỗi giọng (`du_lieu\giong_thuyet_minh\<giọng>\`). Đặt đúng thời điểm, ép nhịp, trộn bằng ffmpeg (sidechain hạ tiếng gốc) ra `<phim>_thuyetminh.mp4` + `_giong.m4a`. Đã thử thật 75 giây phim: 7 dòng, đúng thời điểm, hình giữ nguyên. Giới hạn: VieNeu không có nút chỉnh cảm xúc thật nên mức "diễn" vừa phải; chưa nghe đánh giá bằng tai.
+
+## Giọng mẫu (menu chính)
+`trang_giong_mau.rs`: thư viện giọng (kho `giong_rieng`): thêm nhiều file / cả thư mục cùng lúc (`clone_giong::nhap_nhieu`), bộ 3 mẫu `Tên__1_binh_thuong / __2_gap_rut / __3_buon` tự gom thành một giọng có cảm xúc (`Tên.wav` + `Tên_gap_rut.wav` + `Tên_buon.wav`; mẫu số `chinh` làm giọng chính, mặc định 2), thêm giọng dựng sẵn VieNeu vào kho, nghe, xóa. Thuyết minh phim chọn được giọng trong kho.

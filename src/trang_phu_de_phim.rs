@@ -65,7 +65,7 @@ impl Default for TrangPhuDePhim {
             tt: Arc::new(Mutex::new(Tt::default())),
             dung: Arc::new(AtomicBool::new(false)),
             giong: "Thiện Minh".into(),
-            kho: crate::viet_hoa::clone_giong::liet_ke(),
+            kho: crate::viet_hoa::clone_giong::liet_ke_chinh(),
             kho_so: 0,
             them: Default::default(),
             theo_cam_xuc: true,
@@ -296,7 +296,7 @@ impl TrangPhuDePhim {
                     let so = crate::them_giong::SO_LAN_LUU.load(Ordering::SeqCst);
                     if so != self.kho_so {
                         self.kho_so = so;
-                        self.kho = crate::viet_hoa::clone_giong::liet_ke();
+                        self.kho = crate::viet_hoa::clone_giong::liet_ke_chinh();
                     }
                     self.them.nut(ui);
                 });

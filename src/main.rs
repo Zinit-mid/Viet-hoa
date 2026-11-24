@@ -16,6 +16,7 @@ mod ocr;
 mod phu_de_phim;
 mod quan_ly_chup;
 mod trang_clone_giong;
+mod trang_giong_mau;
 mod trang_long_tieng;
 mod trang_phu_de_phim;
 mod trang_sua_dich;

@@ -3,6 +3,7 @@
 //! dùng chung với app cũ) → gán cho người nói từng game (`phan_bo.json`: "A", "B" = Crimson Desert,
 //! "TR2013" = Tomb Raider 2013).
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicBool;
@@ -42,6 +43,28 @@ pub fn liet_ke() -> Vec<String> {
         .collect();
     v.sort_by_key(|n| n.to_lowercase());
     v
+}
+
+/// Giọng "chính" trong kho: bỏ `<tên>_gap_rut.wav` / `<tên>_buon.wav` khi đã có `<tên>.wav`
+/// (đó là mẫu cảm xúc đi kèm, không phải giọng riêng).
+pub fn liet_ke_chinh() -> Vec<String> {
+    let ds = liet_ke();
+    ds.iter()
+        .filter(|f| {
+            ["_gap_rut.wav", "_buon.wav"]
+                .iter()
+                .find_map(|h| f.strip_suffix(h))
+                .map_or(true, |goc| !ds.iter().any(|x| x == &format!("{goc}.wav")))
+        })
+        .cloned()
+        .collect()
+}
+
+/// Giọng này có kèm mẫu cảm xúc (gấp rút / buồn) không.
+pub fn co_cam_xuc(file: &str) -> bool {
+    let k = kho_giong();
+    let stem = file.trim_end_matches(".wav");
+    k.join(format!("{stem}_gap_rut.wav")).is_file() || k.join(format!("{stem}_buon.wav")).is_file()
 }
 
 /// Đọc file ghi âm: WAV đọc thẳng, định dạng khác (mp3, m4a, mp4, ogg...) qua ffmpeg.
@@ -306,6 +329,137 @@ pub fn nguoi_da_co(phan: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+// ---------------- nhập nhiều giọng cùng lúc ----------------
+
+#[derive(Default, Debug)]
+pub struct KetQuaNhap {
+    /// giọng đã thêm vào kho (tên file)
+    pub them: Vec<String>,
+    /// bỏ qua vì đã có trong kho
+    pub bo_qua: Vec<String>,
+    /// lỗi: (file, lý do)
+    pub loi: Vec<(String, String)>,
+}
+
+/// Mọi file âm thanh trong một thư mục (kể cả thư mục con).
+pub fn tim_am_thanh(thu_muc: &Path) -> Vec<PathBuf> {
+    let mut ra = Vec::new();
+    let mut cho = vec![thu_muc.to_path_buf()];
+    while let Some(d) = cho.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                cho.push(p);
+            } else if p.extension().is_some_and(|x| ["wav", "mp3", "m4a", "ogg", "flac", "aac", "opus"].contains(&x.to_string_lossy().to_lowercase().as_str())) {
+                ra.push(p);
+            }
+        }
+    }
+    ra.sort();
+    ra
+}
+
+/// "Đức_Trí__2_gap_rut" → ("Đức_Trí", 2, "gap_rut"): bộ 3 mẫu cảm xúc của cùng một giọng.
+fn tach_bo(stem: &str) -> Option<(String, usize, &'static str)> {
+    for (hau, loai) in [("binh_thuong", "binh_thuong"), ("gap_rut", "gap_rut"), ("buon", "buon")] {
+        let Some(dau) = stem.strip_suffix(hau) else { continue };
+        let dau = dau.trim_end_matches('_');
+        let (ten, so) = dau.rsplit_once('_')?;
+        let so: usize = so.parse().ok().filter(|n| (1..=3).contains(n))?;
+        let ten = ten.trim_end_matches('_');
+        return (!ten.is_empty()).then(|| (ten.to_string(), so, loai));
+    }
+    None
+}
+
+fn xu_ly_file(p: &Path) -> Result<Vec<f32>> {
+    let (x, ts) = doc_nguon(p)?;
+    chuan_bi(&x, ts, 0.0, 0.0)
+}
+
+/// Thêm nhiều file vào kho giọng cùng lúc.
+/// - File tên dạng `<Giọng>__1_binh_thuong` / `__2_gap_rut` / `__3_buon` được gom thành MỘT giọng
+///   (`<Giọng>.wav` + `<Giọng>_gap_rut.wav` + `<Giọng>_buon.wav`); `chinh` (1..3) là mẫu làm giọng chính.
+/// - File khác: mỗi file một giọng, tên theo tên file.
+pub fn nhap_nhieu(files: &[PathBuf], chinh: usize, ghi_de: bool, bao: &dyn Fn(&str, usize, usize)) -> KetQuaNhap {
+    let mut kq = KetQuaNhap::default();
+    let mut bo: BTreeMap<String, BTreeMap<usize, PathBuf>> = BTreeMap::new();
+    let mut le: Vec<&PathBuf> = Vec::new();
+    for p in files {
+        let stem = p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        match tach_bo(&stem) {
+            Some((ten, so, _)) => {
+                bo.entry(ten).or_default().insert(so, p.clone());
+            }
+            None => le.push(p),
+        }
+    }
+    let tong = bo.len() + le.len();
+    let mut xong = 0;
+    let mut luu_mot = |ten: &str, p: &Path, kq: &mut KetQuaNhap| {
+        let ten_file = format!("{}.wav", sach_ten(ten));
+        match xu_ly_file(p).and_then(|m| luu(ten, &m, ghi_de)) {
+            Ok(_) => kq.them.push(ten_file),
+            Err(e) if e.to_string().contains("đã có giọng") => kq.bo_qua.push(ten_file),
+            Err(e) => kq.loi.push((p.display().to_string(), e.to_string())),
+        }
+    };
+    for (ten, mau) in &bo {
+        bao(&format!("Đang thêm giọng {ten}"), xong, tong);
+        let loai = |n: usize| match n {
+            1 => "binh_thuong",
+            2 => "gap_rut",
+            _ => "buon",
+        };
+        let goc = mau.get(&chinh).or_else(|| mau.values().next()).cloned();
+        if let Some(g) = goc {
+            luu_mot(ten, &g, &mut kq);
+        }
+        // mẫu cảm xúc đi kèm: gấp rút / buồn (mẫu nào chưa có thì dùng lại mẫu chính khi lồng)
+        for (n, p) in mau {
+            let hau = loai(*n);
+            if hau == "binh_thuong" && *n == chinh {
+                continue;
+            }
+            if hau == "binh_thuong" {
+                continue; // đã dùng mẫu chính
+            }
+            luu_mot(&format!("{ten}_{hau}"), p, &mut kq);
+        }
+        xong += 1;
+    }
+    for p in le {
+        let stem = p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        bao(&format!("Đang thêm giọng {stem}"), xong, tong);
+        luu_mot(&stem, p, &mut kq);
+        xong += 1;
+    }
+    bao("Xong", tong, tong);
+    kq
+}
+
+fn sach_ten(ten: &str) -> String {
+    ten.trim()
+        .trim_end_matches(".wav")
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .collect()
+}
+
+/// Xóa một giọng khỏi kho (chỉ file .wav của giọng đó).
+pub fn xoa(file: &str) -> Result<()> {
+    if file.contains(['/', '\\']) || !file.to_lowercase().ends_with(".wav") {
+        bail!("tên file không hợp lệ");
+    }
+    std::fs::remove_file(kho_giong().join(file))?;
+    Ok(())
+}
+
+/// Thời lượng (giây) ước tính của file wav 16 bit trong kho.
+pub fn giay_cua(file: &str) -> f64 {
+    std::fs::read(kho_giong().join(file)).ok().and_then(|b| wwise::doc_wav(&b).ok()).map(|(x, ts)| x.len() as f64 / ts as f64).unwrap_or(0.0)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -334,6 +488,15 @@ mod test {
     }
 
     #[test]
+    fn tach_bo_mau_cam_xuc() {
+        assert_eq!(tach_bo("Đức_Trí__2_gap_rut"), Some(("Đức_Trí".into(), 2, "gap_rut")));
+        assert_eq!(tach_bo("Mỹ_Duyên__1_binh_thuong"), Some(("Mỹ_Duyên".into(), 1, "binh_thuong")));
+        assert_eq!(tach_bo("Thục_Đoan__3_buon"), Some(("Thục_Đoan".into(), 3, "buon")));
+        assert_eq!(tach_bo("nam_chinh"), None);
+        assert_eq!(tach_bo("giong_gap_rut"), None);
+    }
+
+    #[test]
     fn loc_cao_bo_tieng_u() {
         let mut u = tieng(24000, 1.0, 0.5);
         let mut thap: Vec<f32> = (0..24000).map(|i| 0.5 * (i as f32 * 2.0 * std::f32::consts::PI * 20.0 / 24000.0).sin()).collect();
@@ -357,5 +520,20 @@ mod test {
         let (z, zs) = wwise::doc_wav(&std::fs::read(ra).unwrap()).unwrap();
         println!("đọc thử {:.1}s {zs}Hz", z.len() as f64 / zs as f64);
         assert!(z.len() as u32 > zs);
+    }
+
+    /// Nhập thư mục mẫu vào kho thật: DIR=<thư mục> CHINH=2 cargo test --release -- --ignored nhap_thu_muc_that --nocapture
+    #[test]
+    #[ignore]
+    fn nhap_thu_muc_that() {
+        let d = PathBuf::from(std::env::var("DIR").unwrap());
+        let chinh = std::env::var("CHINH").ok().and_then(|x| x.parse().ok()).unwrap_or(2);
+        let files = tim_am_thanh(&d);
+        println!("{} file", files.len());
+        let kq = nhap_nhieu(&files, chinh, false, &|s, a, b| println!("{a}/{b} {s}"));
+        println!("thêm {:?}
+bỏ qua {:?}
+lỗi {:?}", kq.them, kq.bo_qua, kq.loi);
+        assert!(kq.loi.is_empty());
     }
 }

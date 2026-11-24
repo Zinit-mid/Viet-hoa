@@ -19,6 +19,7 @@ enum Trang {
     VietHoaGame,
     TuDong,
     SuaDich,
+    GiongMau,
     LongTieng,
     CloneGiong,
     CaiDat,
@@ -39,6 +40,7 @@ pub struct App {
     tu_dong: crate::trang_tu_dong::TrangTuDong,
     cap_nhat: crate::cap_nhat::CapNhat,
     long_tieng: crate::trang_long_tieng::TrangLongTieng,
+    giong_mau: crate::trang_giong_mau::TrangGiongMau,
 }
 
 const XANH: Color32 = Color32::from_rgb(64, 160, 255);
@@ -72,7 +74,9 @@ impl App {
                 c
             },
             long_tieng: Default::default(),
+            giong_mau: Default::default(),
         };
+        app.giong_mau.dang_ky_tt();
         app.viet_hoa.dang_ky_tt();
         app.clone_giong.dang_ky_tt();
         app.phu_de_phim.dang_ky_tt();
@@ -170,6 +174,7 @@ impl eframe::App for App {
                 muc(ui, &mut self.trang, Trang::TuDong, "⚡  Làm tự động");
                 muc(ui, &mut self.trang, Trang::VietHoaGame, "📝  Việt hóa game");
                 muc(ui, &mut self.trang, Trang::SuaDich, "✏  Sửa bản dịch");
+                muc(ui, &mut self.trang, Trang::GiongMau, "🎧  Giọng mẫu");
                 muc(ui, &mut self.trang, Trang::LongTieng, "🔊  Lồng tiếng");
                 muc(ui, &mut self.trang, Trang::CloneGiong, "🎤  Clone giọng");
                 ui.add_space(6.0);
@@ -185,6 +190,7 @@ impl eframe::App for App {
                 Trang::VietHoaGame => self.viet_hoa.ve(ui),
                 Trang::TuDong => self.tu_dong.ve(ui),
                 Trang::SuaDich => self.sua_dich.ve(ui),
+                Trang::GiongMau => self.giong_mau.ve(ui),
                 Trang::LongTieng => self.long_tieng.ve(ui),
                 Trang::CloneGiong => self.clone_giong.ve(ui),
             });
