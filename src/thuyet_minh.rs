@@ -14,7 +14,7 @@ use serde_json::json;
 
 use crate::duong_dan;
 use crate::viet_hoa::cd_giong::lam_sach_loi;
-use crate::viet_hoa::{giong_vieneu as gv, phien_am, wwise};
+use crate::viet_hoa::{giong_vieneu as gv, wwise};
 
 /// 6 giọng thuyết minh (kể chuyện / đọc truyện) trong số 25 giọng dựng sẵn của VieNeu.
 pub const GIONG: [(&str, &str); 6] = [
@@ -37,6 +37,37 @@ pub struct Tuy {
     pub cuong_do: f64,
     /// chỉ làm N dòng đầu để nghe thử
     pub thu_dau: Option<usize>,
+}
+
+/// Bảng "cách đọc tên riêng" của người dùng: mỗi dòng `Tên => cách viết để đọc` (vd `Jess => Giét`).
+/// Tên không có trong bảng được đọc NGUYÊN VĂN – VieNeu đọc tên tiếng Anh tốt hơn các luật phiên âm tự động.
+pub fn tep_ten_doc() -> PathBuf {
+    duong_dan::file_du_lieu("doc_ten_rieng.txt")
+}
+
+pub fn doc_ten_doc() -> Vec<(String, String)> {
+    std::fs::read_to_string(tep_ten_doc())
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| {
+            let (a, b) = l.split_once("=>")?;
+            let (a, b) = (a.trim(), b.trim());
+            (!a.is_empty() && !b.is_empty()).then(|| (a.to_string(), b.to_string()))
+        })
+        .collect()
+}
+
+fn ap_ten(chu: &str, bang: &[(String, String)]) -> String {
+    let mut ra = chu.to_string();
+    for (a, b) in bang {
+        if let Ok(re) = regex::Regex::new(&format!(r"(?i)(^|[^\p{{L}}]){}($|[^\p{{L}}])", regex::escape(a))) {
+            // thay lặp (hai tên sát nhau cùng dùng một ký tự ngăn)
+            for _ in 0..2 {
+                ra = re.replace_all(&ra, |c: &regex::Captures| format!("{}{}{}", &c[1], b, &c[2])).into_owned();
+            }
+        }
+    }
+    ra
 }
 
 /// Đoán cảm xúc từ câu tiếng Việt (ưu tiên: gấp rút > nhấn mạnh > buồn > hỏi > bình thường).
@@ -151,7 +182,11 @@ pub struct KetQua {
     pub phim_moi: PathBuf,
     pub giong: PathBuf,
     pub so_dong: usize,
+    pub tong_dong: usize,
     pub bo_qua: usize,
+    /// dòng bị rút ngắn vì đọc quá dài so với khoảng trống đến câu sau
+    pub so_cat: usize,
+    pub bao_cao: PathBuf,
 }
 
 fn id_dong(g: &str, cx: &str, chu: &str, t: &Tuy) -> String {
@@ -192,6 +227,7 @@ pub fn thuyet_minh(
             return Ok(None);
         }
     }
+    let ten_doc = doc_ten_doc();
     // 3. VieNeu đọc từng dòng
     let wav_dir = tm.join("thuyet_minh").join("wav");
     std::fs::create_dir_all(&wav_dir)?;
@@ -199,7 +235,7 @@ pub fn thuyet_minh(
     let mut ids = Vec::new();
     for (i, (a, _, vi)) in dl.iter().enumerate() {
         let cx = phan_loai(vi);
-        let chu = phien_am::doc_duoc(&lam_sach_loi(vi));
+        let chu = ap_ten(&lam_sach_loi(vi), &ten_doc);
         let khung = dl.get(i + 1).map(|n| n.0 - a - 0.05).unwrap_or(8.0).clamp(0.6, 12.0);
         let id = id_dong(&t.giong, cx, &chu, t);
         ds.push(json!({"id": id, "text": chu, "giay": khung, "cam_xuc": cx}));
@@ -208,7 +244,7 @@ pub fn thuyet_minh(
     let viec = json!({
         "che_do": "doc", "giong": t.giong, "ra": wav_dir.to_string_lossy(), "ds": ds,
         "bo": if t.theo_cam_xuc { Some(thu_muc_giong(&t.giong).to_string_lossy().into_owned()) } else { None },
-        "nhan_nha": t.nhan_nha, "cuong_do": t.cuong_do, "toi_da": 1.35,
+        "nhan_nha": t.nhan_nha, "cuong_do": t.cuong_do, "toi_da": 1.45,
     });
     let n = dl.len();
     bao(&format!("VieNeu đang đọc {n} dòng bằng giọng {}...", t.giong));
@@ -227,31 +263,58 @@ pub fn thuyet_minh(
     let tong = (dai.max(cuoi) * SR as f64) as u64;
     let giong_wav = tm.join("thuyet_minh").join("giong.wav");
     let mut w = WavDai::tao(&giong_wav, tong)?;
-    let mut da = 0;
-    for (i, (a, _, _)) in dl.iter().enumerate() {
-        let p = wav_dir.join(format!("{}.wav", ids[i]));
-        let Ok(b) = std::fs::read(&p) else { continue };
-        let Ok((x, ts)) = wwise::doc_wav(&b) else { continue };
-        let mut x = if ts == SR { x } else { wwise::chuan_hoa(&x, ts, 0.0) };
-        let vt = (a * SR as f64) as u64;
-        // không đè lên dòng sau: cắt ở lúc dòng sau bắt đầu (mờ dần 30 ms)
-        if let Some(n) = dl.get(i + 1) {
-            let toi_da = ((n.0 - a) * SR as f64) as usize;
-            if x.len() > toi_da && toi_da > 1500 {
-                x.truncate(toi_da);
-                let m = 1440.min(x.len());
-                let l = x.len();
-                for k in 0..m {
-                    x[l - m + k] *= 1.0 - k as f32 / m as f32;
-                }
-            }
+    // mỗi dòng bắt đầu đúng lúc thoại (a); nếu dòng trước còn đang đọc thì lùi lại tối đa MAX_TRE giây
+    // (không cắt cụt). Chỉ khi lùi quá MAX_TRE mới rút ngắn dòng trước.
+    const MAX_TRE: f64 = 2.5;
+    let (mut da, mut so_cat) = (0usize, 0usize);
+    let mut bc: Vec<(f64, String)> = Vec::new();
+    for (a, _, vi) in dong.iter().filter(|d| lam_sach_loi(&d.2).is_empty()) {
+        bc.push((*a, format!("{a:7.1}s  BỎ QUA  (chưa có bản dịch tiếng Việt)  {vi}")));
+    }
+    if let Some(n) = t.thu_dau {
+        for (a, _, vi) in dong.iter().filter(|d| !lam_sach_loi(&d.2).is_empty()).skip(n) {
+            bc.push((*a, format!("{a:7.1}s  CHƯA LÀM  (chế độ thử {n} dòng đầu)  {vi}")));
         }
-        w.ghi_tai(vt, &x)?;
+    }
+    let mut truoc: Option<(u64, Vec<f32>, usize)> = None; // (vị trí mẫu, dữ liệu, chỉ số trong bc)
+    let mut het_truoc = 0.0f64;
+    for (i, (a, _, vi)) in dl.iter().enumerate() {
+        let p = wav_dir.join(format!("{}.wav", ids[i]));
+        let doc = std::fs::read(&p).ok().and_then(|b| wwise::doc_wav(&b).ok());
+        let Some((x, ts)) = doc else {
+            bc.push((*a, format!("{a:7.1}s  BỎ QUA  (VieNeu không tạo được giọng)  {vi}")));
+            continue;
+        };
+        let x = if ts == SR { x } else { wwise::chuan_hoa(&x, ts, 0.0) };
+        let bd = a.max(het_truoc + 0.08).min(a + MAX_TRE);
+        if let Some((vt, mut xs, idx)) = truoc.take() {
+            let toi_da = ((bd * SR as f64) as i64 - vt as i64).max(0) as usize;
+            if xs.len() > toi_da && toi_da > 1500 {
+                xs.truncate(toi_da);
+                let m = 1440.min(xs.len());
+                let l = xs.len();
+                for k in 0..m {
+                    xs[l - m + k] *= 1.0 - k as f32 / m as f32;
+                }
+                so_cat += 1;
+                bc[idx].1.push_str("  [bị cắt cuối câu]");
+            }
+            w.ghi_tai(vt, &xs)?;
+        }
+        het_truoc = bd + x.len() as f64 / SR as f64;
+        bc.push((*a, format!("{a:7.1}s  đọc lúc {bd:.1}s (+{:.1}s)  [{}]  {vi}", bd - a, phan_loai(vi))));
+        truoc = Some(((bd * SR as f64) as u64, x, bc.len() - 1));
         da += 1;
         if dung.load(Ordering::Relaxed) {
             return Ok(None);
         }
     }
+    if let Some((vt, xs, _)) = truoc.take() {
+        w.ghi_tai(vt, &xs)?;
+    }
+    bc.sort_by(|x, y| x.0.total_cmp(&y.0));
+    let bao_cao = tm.join("thuyet_minh").join("bao_cao.txt");
+    let _ = std::fs::write(&bao_cao, bc.iter().map(|x| x.1.as_str()).collect::<Vec<_>>().join("\n"));
     drop(w);
     // 5. trộn: hạ tiếng gốc khi thuyết minh nói (sidechain), giữ hình
     bao("Đang trộn giọng thuyết minh vào phim (ffmpeg)...");
@@ -290,7 +353,7 @@ pub fn thuyet_minh(
     an(&mut c2).args(["-y", "-v", "error", "-i"]).arg(&giong_wav).args(["-t", &format!("{dai:.2}"), "-c:a", "aac", "-b:a", "96k"]).arg(&giong_m4a).stdout(Stdio::null()).stderr(Stdio::null());
     let _ = c2.status();
     let _ = std::fs::remove_file(&giong_wav);
-    Ok(Some(KetQua { phim_moi, giong: giong_m4a, so_dong: da, bo_qua }))
+    Ok(Some(KetQua { phim_moi, giong: giong_m4a, so_dong: da, tong_dong: dong.len(), bo_qua, so_cat, bao_cao }))
 }
 
 #[cfg(test)]
@@ -305,6 +368,15 @@ mod test {
         assert_eq!(phan_loai("Bạn đi đâu vậy?"), "hoi");
         assert_eq!(phan_loai("Thành phố này rất yên bình."), "binh_thuong");
         assert_eq!(phan_loai("Không! Không! Đừng!"), "gap_rut");
+    }
+
+    #[test]
+    fn ten_rieng_nguyen_van_hoac_theo_bang() {
+        let b = vec![("Jess".to_string(), "Giét".to_string())];
+        assert_eq!(ap_ten("Đưa Jess và Lara ra ngoài", &b), "Đưa Giét và Lara ra ngoài");
+        assert_eq!(ap_ten("Jess, Jess!", &b), "Giét, Giét!");
+        assert_eq!(ap_ten("Jessica ở đây", &b), "Jessica ở đây");
+        assert_eq!(ap_ten("Lara Croft", &[]), "Lara Croft");
     }
 
     #[test]

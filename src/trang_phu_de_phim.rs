@@ -48,6 +48,8 @@ pub struct TrangPhuDePhim {
     nhan_nha: bool,
     cuong_do: f64,
     chi_thu: bool,
+    /// bảng cách đọc tên riêng (mỗi dòng: Tên => cách viết để đọc)
+    ten_doc: String,
 }
 
 impl Default for TrangPhuDePhim {
@@ -62,7 +64,8 @@ impl Default for TrangPhuDePhim {
             theo_cam_xuc: true,
             nhan_nha: true,
             cuong_do: 0.7,
-            chi_thu: true,
+            chi_thu: false,
+            ten_doc: crate::thuyet_minh::doc_ten_doc().iter().map(|(a, b)| format!("{a} => {b}")).collect::<Vec<_>>().join("\n"),
         }
     }
 }
@@ -131,7 +134,15 @@ impl TrangPhuDePhim {
             match kq {
                 Ok(Some(k)) => {
                     t.xong = true;
-                    t.thong_bao = format!("Xong ✓ Thuyết minh {} dòng: {}\nGiọng riêng: {}", k.so_dong, k.phim_moi.display(), k.giong.display());
+                    t.thong_bao = format!(
+                        "Xong ✓ Đã thuyết minh {}/{} dòng{}{}. Phim: {}\nBáo cáo từng dòng (đọc lúc nào, dòng nào bị bỏ qua / cắt): {}",
+                        k.so_dong,
+                        k.tong_dong,
+                        if k.bo_qua > 0 { format!(" • bỏ qua {} dòng chưa có bản dịch", k.bo_qua) } else { String::new() },
+                        if k.so_cat > 0 { format!(" • {} dòng bị cắt cuối câu vì đọc quá dài", k.so_cat) } else { String::new() },
+                        k.phim_moi.display(),
+                        k.bao_cao.display()
+                    );
                     t.phim_tm = Some(k.phim_moi);
                 }
                 Ok(None) => (t.thong_bao, t.loi) = ("Đã dừng – bấm lại để làm tiếp.".into(), true),
@@ -270,7 +281,11 @@ impl TrangPhuDePhim {
                         ui.add(egui::Slider::new(&mut self.cuong_do, 0.3..=1.0).fixed_decimals(1));
                     });
                 }
-                ui.checkbox(&mut self.chi_thu, "Chỉ làm thử 10 dòng đầu (nghe trước khi làm cả phim)");
+                ui.checkbox(&mut self.chi_thu, "Chỉ làm thử 10 dòng đầu (phần còn lại giữ nguyên tiếng gốc – bỏ chọn để làm cả phim)");
+                ui.label(RichText::new("Cách đọc tên riêng: tên không ghi ở đây được đọc nguyên văn tiếng Anh. Muốn đọc khác thì thêm dòng `Tên => cách viết`, vd `Jess => Giét`.").small().weak());
+                if ui.add(egui::TextEdit::multiline(&mut self.ten_doc).desired_rows(3).desired_width(f32::INFINITY).hint_text("Jess => Giét")).changed() {
+                    let _ = std::fs::write(crate::thuyet_minh::tep_ten_doc(), &self.ten_doc);
+                }
             });
             ui.horizontal(|ui| {
                 if ui.add_enabled(!ban, egui::Button::new(RichText::new("Tạo thuyết minh").strong())).clicked() {
