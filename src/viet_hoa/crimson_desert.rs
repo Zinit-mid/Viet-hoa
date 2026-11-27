@@ -251,7 +251,11 @@ impl CrimsonDesert {
             .find(|f| f.ten == "inventory" && f.duoi == ".staticinfobody")
             .ok_or_else(|| anyhow!("không thấy file inventory.staticinfobody trong nhóm 0008"))?;
         let b = cd::doc_tep(&nhom, f)?;
-        let (kq, bao_cao) = tim_o_chua(&b);
+        let dau = ds
+            .iter()
+            .find(|f| f.ten == "inventory" && f.duoi == ".staticinfoheader")
+            .and_then(|f| cd::doc_tep(&nhom, f).ok());
+        let (kq, bao_cao) = tim_o_chua(&b, dau.as_deref());
         if kq.is_empty() {
             return Err(anyhow!(
                 "không tìm thấy ô chứa đồ nào – {}",
@@ -303,12 +307,43 @@ pub struct OChua {
 }
 
 /// Bản ghi: [u32 độ dài][tên][u32 mã][3 byte][u16 mặc định][4 byte][u16 tối đa]
-pub fn tim_o_chua(b: &[u8]) -> (Vec<OChua>, Vec<String>) {
+/// Bố cục game 2.06: tên bản ghi nằm trong file header
+/// [u16 số bản ghi]{[u16 mã][u32 dài][tên][u32 vị trí][u32 cỡ]}; bản ghi = [u16 mã][...][3 byte cờ][u16 mặc định][4 byte][u16 tối đa].
+fn tim_theo_header(b: &[u8], h: &[u8], ten: &str) -> Option<(usize, usize)> {
+    let rd32 = |o: usize| h.get(o..o + 4).map(|x| u32::from_le_bytes(x.try_into().unwrap()) as usize);
+    let n = u16::from_le_bytes([*h.first()?, *h.get(1)?]) as usize;
+    let mut p = 2;
+    for _ in 0..n {
+        let l = rd32(p + 2)?;
+        let nm = h.get(p + 6..p + 6 + l)?;
+        let (o, c) = (rd32(p + 6 + l)?, rd32(p + 10 + l)?);
+        p += 14 + l;
+        if nm == ten.as_bytes() {
+            let r = b.get(o..o + c)?;
+            let i = (6..16.min(r.len().saturating_sub(3))).find(|&i| r[i..i + 3] == [1, 1, 1] || r[i..i + 3] == [1, 0, 1])?;
+            let a = o + i + 3;
+            return (a + 8 <= b.len()).then_some((a, a + 6));
+        }
+    }
+    None
+}
+
+pub fn tim_o_chua(b: &[u8], header: Option<&[u8]>) -> (Vec<OChua>, Vec<String>) {
     let u16_at = |o: usize| u16::from_le_bytes([b[o], b[o + 1]]);
     let mut kq = Vec::new();
     let mut bao_cao = Vec::new();
     for &(ten_viet, ten, loai) in O_CHUA {
         let ma = ten.as_bytes();
+        if let Some((vd, vm)) = header.and_then(|h| tim_theo_header(b, h, ten)) {
+            let (md, td) = (u16_at(vd), u16_at(vm));
+            if !(1 <= md && md <= td && td <= 5000) {
+                bao_cao.push(format!("- {ten_viet}: số ô lạ ({md}/{td}) – game đổi cấu trúc"));
+                continue;
+            }
+            bao_cao.push(format!("+ {ten_viet}: {md} ô (tối đa {td})"));
+            kq.push(OChua { ten_viet, vt_mac_dinh: vd, mac_dinh: md, vt_toi_da: vm, toi_da: td, loai });
+            continue;
+        }
         let vt = b.windows(ma.len()).enumerate().find_map(|(i, w)| {
             (w == ma
                 && i >= 4
@@ -361,7 +396,7 @@ pub fn json_mod_tui_do(kq: &[OChua], tui_max: u16, mo_ta: &str) -> serde_json::V
             "original": hex16(o.toi_da), "patched": hex16(moi)}));
     }
     serde_json::json!({
-        "name": format!("Tăng ô chứa đồ – {mo_ta}"), "version": "CD2.05", "author": "Việt Hóa",
+        "name": format!("Tăng ô chứa đồ – {mo_ta}"), "version": "CD2.06", "author": "Việt Hóa",
         "description": mo_ta, "dmm_v3upgrade_disable": "true",
         "patches": [{"game_file": "gamedata/inventory.staticinfobody", "changes": doi}]
     })
@@ -381,7 +416,7 @@ mod tests {
         b.extend(240u16.to_le_bytes());
         b.extend([0u8; 4]);
         b.extend(732u16.to_le_bytes());
-        let (kq, bc) = tim_o_chua(&b);
+        let (kq, bc) = tim_o_chua(&b, None);
         assert_eq!(kq.len(), 1, "{bc:?}");
         assert_eq!((kq[0].mac_dinh, kq[0].toi_da), (240, 732));
         let j = json_mod_tui_do(&kq, 732, "thử");
