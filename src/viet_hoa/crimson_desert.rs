@@ -433,3 +433,54 @@ mod tests {
         );
     }
 }
+
+/// Chỉ ĐỌC game: giải nén bảng thú cưỡi / minigame thuần hóa ngựa ra `thu_ra` để phân tích
+/// (nhóm 0008: bảng tĩnh; 0014: kịch bản rodeo; 0012: giao diện minigame ngựa).
+pub fn xuat_bang_thu_cuoi(thu_muc_game: &Path, thu_ra: &Path, bao: &dyn Fn(&str)) -> Result<Vec<String>> {
+    const BANG: [&str; 4] = ["vehicleinfo", "minigamedatainfo", "characterinfo", "knowledgeinfo"];
+    std::fs::create_dir_all(thu_ra)?;
+    let mut ra = Vec::new();
+    let mut ghi = |nhom: &Path, f: &cd::TepPamt, tien_to: &str, ra: &mut Vec<String>| -> Result<()> {
+        bao(&format!("Đang xuất {}{}...", f.ten, f.duoi));
+        let ten = format!("{tien_to}{}{}", f.ten, f.duoi);
+        std::fs::write(thu_ra.join(&ten), cd::doc_tep(nhom, f)?)?;
+        ra.push(ten);
+        Ok(())
+    };
+    let n8 = thu_muc_game.join("0008");
+    for f in cd::doc_pamt(&n8.join("0.pamt"))? {
+        let ten = f.ten.strip_prefix("bin").unwrap_or(&f.ten);
+        if BANG.contains(&ten) && (f.duoi == ".staticinfobody" || f.duoi == ".staticinfoheader") {
+            ghi(&n8, &f, "", &mut ra)?;
+        }
+    }
+    let n14 = thu_muc_game.join("0014");
+    match cd::doc_pamt(&n14.join("0.pamt")) {
+        Ok(ds) => {
+            for f in ds {
+                if f.ten.contains("minigame_rodeo") && [".paseq", ".paseqc", ".pastage"].contains(&f.duoi.as_str()) {
+                    let t = if f.thu_muc.contains("binary__") { "bin_" } else { "goc_" };
+                    ghi(&n14, &f, t, &mut ra)?;
+                }
+            }
+        }
+        Err(e) => bao(&format!("(bỏ qua kịch bản rodeo: {e})")),
+    }
+    let n12 = thu_muc_game.join("0012");
+    match cd::doc_pamt(&n12.join("0.pamt")) {
+        Ok(ds) => {
+            for f in ds {
+                if (f.ten.contains("rodeominigameview") || f.ten.contains("minigame_rodeo"))
+                    && [".html", ".css", ".uibinary", ".xml"].contains(&f.duoi.as_str())
+                {
+                    ghi(&n12, &f, "ui_", &mut ra)?;
+                }
+            }
+        }
+        Err(e) => bao(&format!("(bỏ qua giao diện rodeo: {e})")),
+    }
+    if ra.is_empty() {
+        return Err(anyhow!("không thấy bảng thú cưỡi trong nhóm 0008"));
+    }
+    Ok(ra)
+}

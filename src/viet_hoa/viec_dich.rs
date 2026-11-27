@@ -169,12 +169,17 @@ pub fn tach_json(chu: &str, so: usize) -> Result<Vec<String>> {
 
 /// Chia danh sách thành lô ≤ 40 câu, ≤ 6000 ký tự.
 pub fn chia_lo(ds: &[String]) -> Vec<Vec<String>> {
+    chia_lo_cap(ds, CAU_MOI_LO)
+}
+
+/// Như `chia_lo` nhưng tối đa `cau_moi_lo` câu một lô (vòng thử lại dùng lô nhỏ cho chắc).
+pub fn chia_lo_cap(ds: &[String], cau_moi_lo: usize) -> Vec<Vec<String>> {
     let mut ra = Vec::new();
     let mut lo: Vec<String> = Vec::new();
     let mut ky = 0;
     for v in ds {
         let n = v.chars().count();
-        if !lo.is_empty() && (lo.len() >= CAU_MOI_LO || ky + n > KY_TU_MOI_LO) {
+        if !lo.is_empty() && (lo.len() >= cau_moi_lo || ky + n > KY_TU_MOI_LO) {
             ra.push(std::mem::take(&mut lo));
             ky = 0;
         }
@@ -473,6 +478,18 @@ impl ViecDich {
                 ten.into_iter().take(150).collect::<Vec<_>>().join(", ")
             ));
         }
+        if lo.len() <= 8 {
+            // lô nhỏ (vòng thử lại): nhắc rõ các thẻ phải giữ để khỏi bị loại vì sai thẻ
+            let mut the_dong: Vec<String> = lo.iter().flat_map(|v| (self.the)(v)).collect();
+            the_dong.sort();
+            the_dong.dedup();
+            if !the_dong.is_empty() {
+                noi_dung.push_str(&format!(
+                    "Mỗi bản dịch PHẢI chứa đúng các thẻ của câu gốc, giữ nguyên từng ký tự: {}\n\n",
+                    the_dong.join("  ")
+                ));
+            }
+        }
         noi_dung.push_str(&serde_json::to_string(lo)?);
         let ky: usize = lo.iter().map(|v| v.chars().count()).sum();
         let toi_da = ((ky as f64 / 1.2) as u32 + 800).min(16000);
@@ -508,25 +525,20 @@ impl ViecDich {
         ))
     }
 
-    /// Dịch bằng Claude (4 luồng) tới khi hết câu / chạm giới hạn tiền / bị dừng.
-    /// Trả true nếu đã dịch xong hết.
-    pub fn chay_claude(
+    /// Một vòng dịch Claude 4 luồng trên `ds`. Trả (tiền vòng này, lỗi dừng nếu có).
+    fn vong_claude(
         &mut self,
-        ds: Vec<String>,
+        ds: &[String],
         gioi_han_usd: f64,
+        tien_truoc: f64,
         bc: &dyn BaoCao,
-    ) -> Result<bool> {
+        cau_moi_lo: usize,
+        ten_vong: &str,
+    ) -> Result<(f64, Option<String>)> {
         let tong = ds.len();
-        if tong == 0 {
-            bc.bao("Đã dịch xong hết.");
-            return Ok(true);
-        }
-        let _thuc = duong_dan::GiuMayThuc::moi();
-        self.dung.store(false, Ordering::SeqCst);
-        self.tien = 0.0;
         let gia = doc_gia();
-        let cac_lo = chia_lo(&ds);
-        bc.bao(&format!("Bắt đầu dịch {tong} câu ({} lô)...", cac_lo.len()));
+        let cac_lo = chia_lo_cap(ds, cau_moi_lo);
+        bc.bao(&format!("{ten_vong}: {tong} câu ({} lô)...", cac_lo.len()));
         let hang = Mutex::new(cac_lo.into_iter());
         let chung = Mutex::new((
             0usize,
@@ -540,7 +552,7 @@ impl ViecDich {
         std::thread::scope(|s| {
             for _ in 0..SO_LUONG {
                 s.spawn(|| loop {
-                    if viec.dung.load(Ordering::SeqCst) || chung.lock().unwrap().1 >= gioi_han_usd {
+                    if viec.dung.load(Ordering::SeqCst) || tien_truoc + chung.lock().unwrap().1 >= gioi_han_usd {
                         return;
                     }
                     let Some(lo) = hang.lock().unwrap().next() else {
@@ -589,23 +601,72 @@ impl ViecDich {
                 });
             }
         });
-        let (_, tien, doi, loi, _, loi_dung) = chung.into_inner().unwrap();
-        self.tien = tien;
+        let (_, tien, doi, _loi, _, loi_dung) = chung.into_inner().unwrap();
         self.da_doi += doi;
-        self.loi += loi;
         self.luu()?;
-        if let Some(e) = loi_dung {
-            bc.bao(&format!("Dừng: {e}"));
-            return Ok(false);
+        Ok((tien, loi_dung))
+    }
+
+    /// Dịch bằng Claude (4 luồng) tới khi hết câu / chạm giới hạn tiền / bị dừng.
+    /// Câu nào hỏng (sai thẻ, sai số phần tử...) được thử lại tối đa 2 vòng với lô nhỏ hơn.
+    /// Trả true nếu đã dịch xong hết. `self.loi` = số câu còn chưa dịch được.
+    pub fn chay_claude(
+        &mut self,
+        ds: Vec<String>,
+        gioi_han_usd: f64,
+        bc: &dyn BaoCao,
+    ) -> Result<bool> {
+        if ds.is_empty() {
+            bc.bao("Đã dịch xong hết.");
+            return Ok(true);
         }
-        if tien >= gioi_han_usd {
-            bc.bao(&format!(
-                "Đã chạm giới hạn {gioi_han_usd:.2} USD – bấm Dịch lần nữa để chạy tiếp."
-            ));
-            return Ok(false);
+        let _thuc = duong_dan::GiuMayThuc::moi();
+        self.dung.store(false, Ordering::SeqCst);
+        self.tien = 0.0;
+        self.loi = 0;
+        let mut can = ds.clone();
+        for (vong, cau_lo, ten) in [(0, CAU_MOI_LO, "Dịch"), (1, 8, "Thử lại câu hỏng"), (2, 1, "Thử lại từng câu")] {
+            if can.is_empty() {
+                break;
+            }
+            let (tien, loi_dung) = self.vong_claude(&can, gioi_han_usd, self.tien, bc, cau_lo, ten)?;
+            self.tien += tien;
+            if let Some(e) = loi_dung {
+                bc.bao(&format!("Dừng: {e}"));
+                self.loi = self.cau_can_dich(ds.iter().map(String::as_str)).len();
+                return Ok(false);
+            }
+            if self.dung.load(Ordering::SeqCst) {
+                break;
+            }
+            if self.tien >= gioi_han_usd {
+                bc.bao(&format!(
+                    "Đã chạm giới hạn {gioi_han_usd:.2} USD – bấm Dịch lần nữa để chạy tiếp."
+                ));
+                break;
+            }
+            can = self.cau_can_dich(ds.iter().map(String::as_str));
+            if vong == 0 && !can.is_empty() {
+                duong_dan::nhat_ky(&format!("Claude: {} câu chưa qua kiểm thẻ, thử lại lô nhỏ", can.len()));
+            }
         }
         let con = self.cau_can_dich(ds.iter().map(String::as_str));
+        self.loi = con.len();
+        if !con.is_empty() {
+            self.ghi_cau_chua_dich(&con);
+        }
         Ok(!self.dung.load(Ordering::SeqCst) && con.is_empty())
+    }
+
+    /// Ghi các câu chưa dịch được ra cau_chua_dich.txt cạnh bộ nhớ để xem / dịch tay.
+    fn ghi_cau_chua_dich(&self, con: &[String]) {
+        if let Some(thu_muc) = self.duong_bo_nho.parent() {
+            let nd: String = con.iter().map(|c| format!("{}\n", c.replace('\n', "\\n"))).collect();
+            let _ = duong_dan::ghi_file(&thu_muc.join("cau_chua_dich.txt"), nd.as_bytes());
+        }
+        for c in con.iter().take(5) {
+            duong_dan::nhat_ky(&format!("Chưa dịch được: {}", c.chars().take(120).collect::<String>()));
+        }
     }
 
     /// Dịch offline (CHỈ tiếng Anh) theo lô 24 câu. Trả true nếu xong hết.
@@ -623,6 +684,8 @@ impl ViecDich {
         }
         let _thuc = duong_dan::GiuMayThuc::moi();
         self.dung.store(false, Ordering::SeqCst);
+        self.loi = 0;
+        let mut hong: Vec<String> = Vec::new();
         bc.bao(&format!("Bắt đầu dịch offline {tong} câu..."));
         // dịch từng câu: chữ IN HOA hạ thường trước, từ menu dịch thẳng, cắt bản dịch lặp
         let dich_cau = |cau: &[String]| -> Result<Vec<String>> {
@@ -664,7 +727,7 @@ impl ViecDich {
                             bn.insert(en.clone(), crate::dich::ap_dung_sua(&vi));
                             self.da_doi += 1;
                         }
-                        _ => self.loi += 1,
+                        _ => hong.push(en.clone()),
                     }
                 }
             }
@@ -675,8 +738,38 @@ impl ViecDich {
                 lan_luu = Instant::now();
             }
         }
+        // Câu bị loại (sai thẻ, dịch lặp...): thử lại bằng Google (vẫn giữ thẻ qua offline_lo)
+        if !hong.is_empty() && !self.dung.load(Ordering::SeqCst) {
+            bc.bao(&format!("{} câu offline dịch hỏng – thử lại bằng Google...", hong.len()));
+            let dich_google = |cau: &[String]| -> Result<Vec<String>> {
+                let (ra, loi) = crate::dich::google::dich_nhieu(cau);
+                if ra.iter().any(Option::is_none) {
+                    return Err(anyhow!("Google lỗi: {}", loi.unwrap_or_default()));
+                }
+                Ok(ra.into_iter().zip(cau).map(|(v, en)| crate::dich::the::bo_lap_doi(en, &v.unwrap_or_default())).collect())
+            };
+            for lo in hong.chunks(24) {
+                if self.dung.load(Ordering::SeqCst) {
+                    break;
+                }
+                let Ok(kq) = offline_lo(lo, &dich_google) else { continue };
+                let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
+                for (en, vi) in lo.iter().zip(kq) {
+                    if let Some(vi) = vi {
+                        if (self.the)(en) == (self.the)(&vi) && !crate::dich::the::bi_lap(en, &vi) {
+                            bn.insert(en.clone(), crate::dich::ap_dung_sua(&vi));
+                            self.da_doi += 1;
+                        }
+                    }
+                }
+            }
+        }
         self.luu()?;
         let con = self.cau_can_dich(ds.iter().map(String::as_str));
+        self.loi = con.len();
+        if !con.is_empty() && !self.dung.load(Ordering::SeqCst) {
+            self.ghi_cau_chua_dich(&con);
+        }
         Ok(!self.dung.load(Ordering::SeqCst) && con.is_empty())
     }
 }

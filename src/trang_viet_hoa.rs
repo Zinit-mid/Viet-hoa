@@ -396,7 +396,7 @@ impl TrangVietHoa {
                 Ok(if ok {
                     "Dịch offline xong. Bấm Cài Việt hóa (tắt game trước).".into()
                 } else {
-                    format!("Đã dừng / còn câu lỗi ({} câu lỗi).", x.viec.loi)
+                    format!("Chưa dịch hết: còn {} câu (đã thử lại, danh sách ở cau_chua_dich.txt trong thư mục dữ liệu game). Bấm dịch lần nữa để thử tiếp.", x.viec.loi)
                 })
             }),
             Some("claude") => self.chay_tr("Đang dịch bằng Claude", move |x, bc| {
@@ -410,7 +410,7 @@ impl TrangVietHoa {
                     if ok {
                         "Dịch bằng Claude xong"
                     } else {
-                        "Đã dừng – bấm lại để dịch tiếp"
+                        "Chưa dịch hết (bị dừng, chạm giới hạn USD hoặc còn câu hỏng, xem nhật ký) – bấm lại để dịch tiếp"
                     },
                     x.viec.tien
                 ))
@@ -581,7 +581,7 @@ impl TrangVietHoa {
                 Ok(if xong {
                     format!("Dịch offline xong đợt {}. Bấm Xuất gói Việt hóa.", dot + 1)
                 } else {
-                    format!("Đã dừng / còn câu lỗi ({} câu lỗi).", cd.viec.loi)
+                    format!("Chưa dịch hết: còn {} câu (đã thử lại, danh sách ở cau_chua_dich.txt trong thư mục dữ liệu game). Bấm dịch lần nữa để thử tiếp.", cd.viec.loi)
                 })
             }),
             Some("claude") => self.chay_cd("Đang dịch bằng Claude", move |cd, bc| {
@@ -595,7 +595,7 @@ impl TrangVietHoa {
                     if xong {
                         "Dịch bằng Claude xong đợt này"
                     } else {
-                        "Đã dừng – bấm lại để dịch tiếp"
+                        "Chưa dịch hết (bị dừng, chạm giới hạn USD hoặc còn câu hỏng, xem nhật ký) – bấm lại để dịch tiếp"
                     },
                     cd.viec.tien
                 ))
@@ -1092,12 +1092,12 @@ impl TrangVietHoa {
             Some("offline") => self.chay("Đang dịch offline", |v, bc| {
                 let ds = v.viec.cau_can_dich(v.cac_cau().iter().map(String::as_str));
                 let xong = v.viec.chay_offline(ds, bc).map_err(|e| e.to_string())?;
-                Ok(if xong { "Dịch offline xong hết.".into() } else { format!("Đã dừng / còn câu lỗi ({} câu lỗi).", v.viec.loi) })
+                Ok(if xong { "Dịch offline xong hết.".into() } else { format!("Chưa dịch hết: còn {} câu (đã thử lại, danh sách ở cau_chua_dich.txt trong thư mục dữ liệu game). Bấm dịch lần nữa để thử tiếp.", v.viec.loi) })
             }),
             Some("claude") => self.chay("Đang dịch bằng Claude", move |v, bc| {
                 let ds = v.viec.cau_can_dich(v.cac_cau().iter().map(String::as_str));
                 let xong = v.viec.chay_claude(ds, gioi_han, bc).map_err(|e| e.to_string())?;
-                Ok(format!("{} • tốn {:.3} USD", if xong { "Dịch bằng Claude xong hết" } else { "Đã dừng – bấm lại để dịch tiếp" }, v.viec.tien))
+                Ok(format!("{} • tốn {:.3} USD", if xong { "Dịch bằng Claude xong hết" } else { "Chưa dịch hết (bị dừng, chạm giới hạn USD hoặc còn câu hỏng, xem nhật ký) – bấm lại để dịch tiếp" }, v.viec.tien))
             }),
             Some("xuat") => self.chay("Đang xuất CSV", move |v, _| {
                 let ten: String = v.ten_game.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();

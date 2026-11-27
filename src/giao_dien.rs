@@ -59,6 +59,7 @@ impl Muc {
                 ("Làm tự động", Trang::TuDong, None),
                 ("Thư viện game", Trang::VietHoaGame, None),
                 ("Sửa bản dịch", Trang::SuaDich, None),
+                ("Bản đồ Crimson Desert", Trang::BanDo, None),
             ],
             Muc::LongTieng => &[
                 ("Lồng tiếng game", Trang::LongTieng, None),
@@ -88,6 +89,7 @@ enum Trang {
     VietHoaGame,
     TuDong,
     SuaDich,
+    BanDo,
     GiongMau,
     LongTieng,
     CloneGiong,
@@ -110,6 +112,7 @@ pub struct App {
     clone_giong: crate::trang_clone_giong::TrangCloneGiong,
     phu_de_phim: crate::trang_phu_de_phim::TrangPhuDePhim,
     sua_dich: crate::trang_sua_dich::TrangSuaDich,
+    ban_do: crate::trang_ban_do::TrangBanDo,
     tu_dong: crate::trang_tu_dong::TrangTuDong,
     cap_nhat: crate::cap_nhat::CapNhat,
     long_tieng: crate::trang_long_tieng::TrangLongTieng,
@@ -146,6 +149,7 @@ impl App {
             clone_giong: Default::default(),
             phu_de_phim: Default::default(),
             sua_dich: Default::default(),
+            ban_do: Default::default(),
             tu_dong: Default::default(),
             cap_nhat: {
                 crate::cap_nhat::don_dep();
@@ -405,6 +409,7 @@ impl eframe::App for App {
                 Trang::DoFile => self.viet_hoa.ve(ui),
                 Trang::TuDong => self.tu_dong.ve(ui),
                 Trang::SuaDich => self.sua_dich.ve(ui),
+                Trang::BanDo => self.ban_do.ve(ui),
                 Trang::GiongMau => self.giong_mau.ve(ui),
                 Trang::LongTieng => self.long_tieng.ve(ui),
                 Trang::CloneGiong => self.clone_giong.ve(ui),

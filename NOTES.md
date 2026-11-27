@@ -124,3 +124,11 @@ Mục tiêu: xem phim ngay trong app sau khi đã tạo phụ đề + thuyết m
 
 ## Trạng thái cuối phiên (24/11/2026)
 Giao diện mới (kính tối tím hơi đen, nút neon, thanh trượt, viền đổi màu), trang Giọng mẫu, thuyết minh phim, cập nhật tự động, đã đẩy GitHub (main). Bản phát hành mới nhất là v0.1.1; từ đó đến nay CHƯA gắn tag mới (nút cập nhật chưa thấy giao diện mới) – khi muốn phát hành: tăng version trong Cargo.toml, commit, `git tag vX.Y.Z`, `git push origin vX.Y.Z`.
+
+## v0.1.3 (27/11/2026) – sửa theo báo lỗi
+- **Claude bật/tắt:** `claude::co_khoa()` chỉ xét có mã + mã chưa bị từ chối (Việt hóa, phụ đề phim dùng cái này); `claude::co_bat()` thêm công tắc BAT, chỉ dùng cho dịch màn hình trực tiếp. `ly_do_khong_dung()` cho thông báo đúng.
+- **Dịch chừa câu:** `ViecDich::chay_claude` chạy 3 vòng (lô 40 → lô 8 có nhắc thẻ → từng câu); `chay_offline` thử lại câu hỏng bằng Google (vẫn giữ thẻ). `viec.loi` = số câu còn lại (không cộng dồn); danh sách ghi ở `cau_chua_dich.txt` cạnh bộ nhớ dịch của game.
+- **Phụ đề phim:** nút Dừng giết tiến trình Python ngay (luồng canh riêng); Whisper nạp `local_files_only` trước (không hỏi mạng); tải YouTube thử 3 cách, tự bỏ cách bị kẹt 45 giây.
+- **Bản đồ Crimson Desert** (`trang_ban_do.rs`, chuyển từ ban_do_cd.py) + nút **Xuất bảng thú cưỡi** (`crimson_desert::xuat_bang_thu_cuoi`, chỉ đọc game).
+- **Chưa làm:** mod "dễ bắt ngựa" (timeScale trong `rodeominigameview` nhóm 0012) chưa có trong app – cần file `ui_rodeominigameview*.uibinary/.html` xuất ra để vá; app cũ cũng chưa có.
+- Phát hành: đẩy `main` có version mới trong Cargo.toml là workflow tự build + đăng Release (không cần tag).
