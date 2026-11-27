@@ -28,10 +28,10 @@ pub fn a(c: Color32, alpha: u8) -> Color32 {
 }
 
 fn kinh_nen() -> Color32 {
-    rgba(30, 16, 54, 175)
+    rgba(2, 40, 84, 165)
 }
 fn kinh_vien() -> Color32 {
-    rgba(140, 96, 220, 96)
+    rgba(190, 240, 255, 110)
 }
 
 // ---------------- cài đặt giao diện ----------------
@@ -120,7 +120,7 @@ pub fn ap_dung(ctx: &egui::Context) {
         let v = &mut s.visuals;
         *v = egui::Visuals::dark();
         v.panel_fill = Color32::TRANSPARENT;
-        v.window_fill = Color32::from_rgb(22, 14, 40);
+        v.window_fill = Color32::from_rgb(4, 44, 92);
         v.window_stroke = Stroke::new(1.0, kinh_vien());
         v.window_corner_radius = egui::CornerRadius::same(24);
         v.menu_corner_radius = egui::CornerRadius::same(16);
@@ -134,18 +134,18 @@ pub fn ap_dung(ctx: &egui::Context) {
         v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, kinh_vien());
         v.widgets.noninteractive.corner_radius = bo;
         v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, CHU);
-        v.widgets.inactive.bg_fill = rgba(20, 12, 40, 235);
-        v.widgets.inactive.weak_bg_fill = rgba(20, 12, 40, 235);
-        v.widgets.inactive.bg_stroke = Stroke::new(1.0, rgba(150, 104, 235, 130));
+        v.widgets.inactive.bg_fill = rgba(3, 38, 80, 235);
+        v.widgets.inactive.weak_bg_fill = rgba(3, 38, 80, 235);
+        v.widgets.inactive.bg_stroke = Stroke::new(1.0, rgba(150, 225, 255, 130));
         v.widgets.inactive.fg_stroke = Stroke::new(1.0, CHU);
         v.widgets.inactive.corner_radius = bo;
-        v.widgets.hovered.bg_fill = rgba(50, 28, 94, 245);
-        v.widgets.hovered.weak_bg_fill = rgba(50, 28, 94, 245);
+        v.widgets.hovered.bg_fill = rgba(6, 66, 128, 245);
+        v.widgets.hovered.weak_bg_fill = rgba(6, 66, 128, 245);
         v.widgets.hovered.bg_stroke = Stroke::new(1.5, a(TIM, 200));
         v.widgets.hovered.fg_stroke = Stroke::new(1.5, CHU);
         v.widgets.hovered.corner_radius = bo;
-        v.widgets.active.bg_fill = rgba(68, 38, 124, 250);
-        v.widgets.active.weak_bg_fill = rgba(68, 38, 124, 250);
+        v.widgets.active.bg_fill = rgba(8, 84, 156, 250);
+        v.widgets.active.weak_bg_fill = rgba(8, 84, 156, 250);
         v.widgets.active.bg_stroke = Stroke::new(1.5, TIM);
         v.widgets.active.fg_stroke = Stroke::new(1.5, CHU);
         v.widgets.active.corner_radius = bo;
@@ -156,7 +156,7 @@ pub fn ap_dung(ctx: &egui::Context) {
 
 /// Màu nền cửa sổ (đằng sau mọi thứ).
 pub fn mau_nen() -> [f32; 4] {
-    [12.0 / 255.0, 8.0 / 255.0, 22.0 / 255.0, 1.0]
+    [0.0, 165.0 / 255.0, 207.0 / 255.0, 1.0]
 }
 
 /// Nền như ảnh mẫu HARIRI: đêm xanh đen, các mảng sáng màu (xanh ngọc, tím, xanh dương, vàng cam), bụi sao li ti,
@@ -182,15 +182,20 @@ pub fn nen_anh_sang(ctx: &egui::Context) {
         p.add(epaint::Shape::mesh(m));
     };
     let at = |fx: f32, fy: f32| Pos2::new(r.left() + w * fx, r.top() + h * fy);
+    // nền chuyển màu xanh ngọc → xanh dương (lấy từ ảnh mẫu: #01c4cd, #00a5cf, #0086ce)
+    {
+        let mut m = epaint::Mesh::default();
+        m.colored_vertex(r.left_top(), Color32::from_rgb(1, 196, 205));
+        m.colored_vertex(r.right_top(), Color32::from_rgb(0, 165, 207));
+        m.colored_vertex(r.right_bottom(), Color32::from_rgb(0, 134, 206));
+        m.colored_vertex(r.left_bottom(), Color32::from_rgb(0, 165, 207));
+        m.add_triangle(0, 1, 2);
+        m.add_triangle(0, 2, 3);
+        p.add(epaint::Shape::mesh(m));
+    }
     let b = w.max(h);
-    // xanh dương phía trên giữa, tím trái trên, tím hồng bên phải, xanh ngọc dưới trái, vàng cam dưới phải
-    vet(at(0.45, 0.0), b * 0.42, rgba(70, 70, 210, 40));
-    vet(at(0.06, 0.08), b * 0.36, rgba(120, 56, 215, 58));
-    vet(at(0.96, 0.32), b * 0.38, rgba(150, 64, 215, 50));
-    vet(at(0.04, 0.96), b * 0.30, rgba(24, 150, 170, 38));
-    vet(at(1.0, 0.88), b * 0.30, rgba(210, 130, 60, 30));
-    vet(at(0.55, 1.0), b * 0.28, rgba(200, 80, 90, 16));
-    vet(at(0.30, 0.55), b * 0.26, rgba(100, 50, 220, 16));
+    vet(at(0.12, 0.05), b * 0.30, rgba(255, 255, 255, 26));
+    vet(at(0.90, 0.95), b * 0.30, rgba(20, 60, 190, 40));
 
     // tia sáng chéo mảnh (góc trên phải, góc dưới trái)
     let tia = |a1: Pos2, a2: Pos2, al: u8| {
