@@ -23,7 +23,10 @@ pub fn mo_hinh() -> String {
 
 /// Ollama đang chạy và trả lời.
 pub fn san_sang() -> bool {
-    ureq::get(&format!("{URL}/api/tags")).timeout(Duration::from_secs(2)).call().is_ok()
+    ureq::get(&format!("{URL}/api/tags"))
+        .timeout(Duration::from_secs(2))
+        .call()
+        .is_ok()
 }
 
 /// Giữ suốt thời gian lồng tiếng: AI bị tắt và chặn.
@@ -90,7 +93,9 @@ fn hoi(he_thong: &str, noi_dung: &str) -> Result<String> {
     let tra: serde_json::Value = ureq::post(&format!("{URL}/api/chat"))
         .timeout(Duration::from_secs(300))
         .send_json(than)
-        .map_err(|e| anyhow!("không gọi được Ollama ({e}) – mở app Ollama / AI Local Studio trước"))?
+        .map_err(|e| {
+            anyhow!("không gọi được Ollama ({e}) – mở app Ollama / AI Local Studio trước")
+        })?
         .into_json()?;
     let mut s = tra["message"]["content"].as_str().unwrap_or("").to_string();
     if let (Some(a), Some(b)) = (s.find("<think>"), s.find("</think>")) {
@@ -110,7 +115,9 @@ pub fn dich_lo(cau: &[String]) -> Result<Vec<String>> {
         &vao,
     )?;
     let (a, b) = (r.find('['), r.rfind(']'));
-    let (Some(a), Some(b)) = (a, b) else { bail!("AI trả lời không đúng dạng") };
+    let (Some(a), Some(b)) = (a, b) else {
+        bail!("AI trả lời không đúng dạng")
+    };
     let v: Vec<String> = serde_json::from_str(&r[a..=b])?;
     if v.len() != cau.len() {
         bail!("AI trả {} câu, cần {}", v.len(), cau.len());
@@ -120,7 +127,8 @@ pub fn dich_lo(cau: &[String]) -> Result<Vec<String>> {
 
 /// Đoán giới tính nhân vật từ tên + vài câu thoại. Some(true) = nữ, Some(false) = nam, None = không rõ.
 pub fn gioi_tinh(ten: &str, cau_mau: &[String]) -> Result<Option<bool>> {
-    let mut nd = format!("Nhân vật trong game Crimson Desert, mã tên: {ten}.\nMột vài câu thoại:\n");
+    let mut nd =
+        format!("Nhân vật trong game Crimson Desert, mã tên: {ten}.\nMột vài câu thoại:\n");
     for c in cau_mau {
         nd.push_str(&format!("- {c}\n"));
     }
@@ -142,7 +150,9 @@ pub fn gioi_tinh(ten: &str, cau_mau: &[String]) -> Result<Option<bool>> {
 
 fn mang_json(r: &str, n: usize) -> Result<Vec<String>> {
     let (a, b) = (r.find('['), r.rfind(']'));
-    let (Some(a), Some(b)) = (a, b) else { bail!("AI trả lời không đúng dạng") };
+    let (Some(a), Some(b)) = (a, b) else {
+        bail!("AI trả lời không đúng dạng")
+    };
     let v: Vec<String> = serde_json::from_str(&r[a..=b])?;
     if v.len() != n {
         bail!("AI trả {} câu, cần {n}", v.len());
@@ -152,7 +162,11 @@ fn mang_json(r: &str, n: usize) -> Result<Vec<String>> {
 
 /// Soát bản dịch: cặp (tiếng Anh, bản dịch hiện có) → bản dịch đã sửa (tốt thì giữ nguyên).
 pub fn sua_dich(cap: &[(String, String)]) -> Result<Vec<String>> {
-    let vao = serde_json::to_string(&cap.iter().map(|(en, vi)| serde_json::json!({"en": en, "vi": vi})).collect::<Vec<_>>())?;
+    let vao = serde_json::to_string(
+        &cap.iter()
+            .map(|(en, vi)| serde_json::json!({"en": en, "vi": vi}))
+            .collect::<Vec<_>>(),
+    )?;
     let r = hoi(
         "Bạn là biên tập viên dịch game / phụ đề phim Anh-Việt. Nhận mảng JSON các đối tượng {en, vi}. Với mỗi cặp: nếu bản dịch vi đã tốt thì giữ NGUYÊN; \
          nếu sai nghĩa, cứng, còn sót tiếng Anh hoặc chưa dịch thì sửa lại tự nhiên, ngắn gọn. Giữ nguyên tên riêng và mọi thẻ như {..}, <..>, [..], %s. \
@@ -164,7 +178,11 @@ pub fn sua_dich(cap: &[(String, String)]) -> Result<Vec<String>> {
 
 /// Rút gọn các câu thuyết minh quá dài: (câu Việt, số giây được đọc) → câu ngắn hơn, giữ ý chính.
 pub fn rut_gon(cau: &[(String, f64)]) -> Result<Vec<String>> {
-    let vao = serde_json::to_string(&cau.iter().map(|(c, g)| serde_json::json!({"vi": c, "giay": (g * 10.0).round() / 10.0})).collect::<Vec<_>>())?;
+    let vao = serde_json::to_string(
+        &cau.iter()
+            .map(|(c, g)| serde_json::json!({"vi": c, "giay": (g * 10.0).round() / 10.0}))
+            .collect::<Vec<_>>(),
+    )?;
     let r = hoi(
         "Bạn viết lời thuyết minh phim tiếng Việt. Nhận mảng JSON {vi, giay}. Mỗi câu phải đọc xong trong số giây cho phép (người đọc khoảng 13 chữ cái mỗi giây). \
          Hãy rút gọn câu vi cho vừa, giữ ý chính và giọng văn, giữ tên riêng. Trả về DUY NHẤT một mảng JSON các chuỗi, cùng số phần tử, cùng thứ tự.",
@@ -179,6 +197,49 @@ pub fn giai_thich_loi(loi: &str) -> Result<String> {
          ngắn gọn: (1) lỗi nghĩa là gì, (2) 2-3 bước cụ thể nên làm. Không bịa tên nút không có.",
         loi,
     )
+}
+
+/// Trò chuyện nhiều lượt (như nhắn tin). `lich_su`: (true = người dùng, nội dung). `boi_canh`: lỗi / tình hình hiện tại của app.
+pub fn tro_chuyen(lich_su: &[(bool, String)], boi_canh: &str) -> Result<String> {
+    let _g = DangDung::vao()?;
+    let mut he_thong = "Bạn là trợ lý tích hợp trong app \"Việt hóa\" (dịch màn hình game, phụ đề phim, Việt hóa game, lồng tiếng, mod Crimson Desert). \
+        Người dùng không rành kỹ thuật, nhắn bằng tiếng Việt. Trả lời tiếng Việt, ngắn gọn, chia bước đánh số, nói rõ bấm nút nào ở đâu. \
+        Không bịa tên nút hay tính năng không có. Nếu không chắc nguyên nhân, nói thẳng là chưa chắc, hỏi thêm một điều cần biết (hoặc bảo chụp màn hình / báo lỗi cho người phát triển app)."
+        .to_string();
+    if !boi_canh.trim().is_empty() {
+        he_thong.push_str("\n\nTình hình hiện tại của app (thông báo / lỗi gần đây):\n");
+        he_thong.push_str(boi_canh.trim());
+    }
+    let mut tin = vec![serde_json::json!({"role": "system", "content": he_thong})];
+    for (nguoi, nd) in lich_su.iter().rev().take(20).rev() {
+        tin.push(
+            serde_json::json!({"role": if *nguoi { "user" } else { "assistant" }, "content": nd}),
+        );
+    }
+    let tra: serde_json::Value = ureq::post(&format!("{URL}/api/chat"))
+        .timeout(Duration::from_secs(300))
+        .send_json(serde_json::json!({
+            "model": mo_hinh(), "stream": false, "think": false, "keep_alive": "5m",
+            "options": {"temperature": 0.4, "num_ctx": 8192}, "messages": tin,
+        }))
+        .map_err(|e| {
+            anyhow!("không gọi được Ollama ({e}) – mở app Ollama / AI Local Studio trước")
+        })?
+        .into_json()?;
+    let mut s = tra["message"]["content"].as_str().unwrap_or("").to_string();
+    if let (Some(a), Some(b)) = (s.find("<think>"), s.find("</think>")) {
+        if b > a {
+            s.replace_range(a..b + 8, "");
+        }
+    }
+    Ok(s.trim().to_string())
+}
+
+#[derive(Default)]
+struct Chat {
+    lich_su: Vec<(bool, String)>,
+    dang_nghi: bool,
+    boi_canh: String,
 }
 
 // ---------------- trang giao diện ----------------
@@ -199,11 +260,23 @@ pub struct TrangAi {
     tt: Arc<Mutex<Tt>>,
     mo_hinh: String,
     loi_dan: String,
+    chat: Arc<Mutex<Chat>>,
+    o_nhap: String,
 }
 
 impl Default for TrangAi {
     fn default() -> Self {
-        Self { games: Vec::new(), da_tim: false, dang_tim: Arc::new(Mutex::new(None)), chon: 0, tt: Arc::new(Mutex::new(Tt::default())), mo_hinh: mo_hinh(), loi_dan: String::new() }
+        Self {
+            games: Vec::new(),
+            da_tim: false,
+            dang_tim: Arc::new(Mutex::new(None)),
+            chon: 0,
+            tt: Arc::new(Mutex::new(Tt::default())),
+            mo_hinh: mo_hinh(),
+            loi_dan: String::new(),
+            chat: Arc::new(Mutex::new(Chat::default())),
+            o_nhap: String::new(),
+        }
     }
 }
 
@@ -230,11 +303,16 @@ fn gom_nhan_vat(g: &crate::viet_hoa::tim_game::Game, tt: &Arc<Mutex<Tt>>) -> Res
     use crate::viet_hoa::crimson_desert::CrimsonDesert;
     let lv = crate::viet_hoa::tomb_raider::thu_muc_lam_viec(&g.thu_muc);
     let mau_cau = |ds: Vec<String>| -> Vec<String> {
-        ds.into_iter().filter(|c| c.chars().count() > 12).take(6).map(|c| c.chars().take(160).collect()).collect()
+        ds.into_iter()
+            .filter(|c| c.chars().count() > 12)
+            .take(6)
+            .map(|c| c.chars().take(160).collect())
+            .collect()
     };
     let mut ra: Vec<Hang> = Vec::new();
     if g.ten.to_lowercase().contains("crimson") {
-        tt.lock().unwrap_or_else(|e| e.into_inner()).thong_bao = "Đang đọc danh sách nhân vật...".into();
+        tt.lock().unwrap_or_else(|e| e.into_inner()).thong_bao =
+            "Đang đọc danh sách nhân vật...".into();
         let cd = CrimsonDesert::nap(&g.thu_muc)?;
         let k = cd.ke_hoach_long_tieng('A', &|_| {})?;
         let pb: serde_json::Value = std::fs::read(lv.join("giong_rieng").join("phan_bo.json"))
@@ -242,27 +320,42 @@ fn gom_nhan_vat(g: &crate::viet_hoa::tim_game::Game, tt: &Arc<Mutex<Tt>>) -> Res
             .and_then(|b| serde_json::from_slice(&b).ok())
             .unwrap_or_default();
         let tay = pb.get("_tay").map(|v| v.to_string()).unwrap_or_default();
-        let hz: std::collections::BTreeMap<String, Option<f64>> = std::fs::read(lv.join("A").join("_cao_do_goc.json"))
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
+        let hz: std::collections::BTreeMap<String, Option<f64>> =
+            std::fs::read(lv.join("A").join("_cao_do_goc.json"))
+                .ok()
+                .and_then(|b| serde_json::from_slice(&b).ok())
+                .unwrap_or_default();
         for (ten, ds) in &k {
-            let gan = pb.get("A").and_then(|a| a.get(ten)).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let gan = pb
+                .get("A")
+                .and_then(|a| a.get(ten))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let mau = mau_cau(ds.iter().filter_map(|c| c.en.clone()).collect());
-            ra.push((ten.clone(), mau, gan, hz.get(ten).copied().flatten(), tay.contains(&format!("\"{ten}\""))));
+            ra.push((
+                ten.clone(),
+                mau,
+                gan,
+                hz.get(ten).copied().flatten(),
+                tay.contains(&format!("\"{ten}\"")),
+            ));
         }
     } else {
         // game khác: dùng danh sách file âm thanh đã quét ở mục Lồng tiếng game
         let d = crate::viet_hoa::long_tieng_chung::thu_muc_lv(&lv, &g.ten);
-        let clips: Vec<crate::viet_hoa::long_tieng_chung::Clip> = std::fs::read(d.join("clips.json"))
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
+        let clips: Vec<crate::viet_hoa::long_tieng_chung::Clip> =
+            std::fs::read(d.join("clips.json"))
+                .ok()
+                .and_then(|b| serde_json::from_slice(&b).ok())
+                .unwrap_or_default();
         if clips.is_empty() {
             bail!("game này chưa quét file âm thanh – vào Lồng tiếng > Lồng tiếng game, chọn game rồi bấm Quét file âm thanh, sau đó quay lại đây");
         }
-        let gan: std::collections::HashMap<String, String> =
-            std::fs::read(d.join("gan.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let gan: std::collections::HashMap<String, String> = std::fs::read(d.join("gan.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
         let mut theo: std::collections::BTreeMap<String, Vec<String>> = Default::default();
         for c in &clips {
             if let Some(en) = &c.en {
@@ -285,14 +378,21 @@ fn kiem_tra_gioi_tinh(tt: &Arc<Mutex<Tt>>, g: &crate::viet_hoa::tim_game::Game) 
     if tong == 0 {
         bail!("không thấy nhân vật nào có câu thoại tiếng Anh");
     }
-    let mut dong = vec!["nguoi_noi,ai_doan,giong_dang_gan,gioi_tinh_giong,cao_do_goc_hz,khoa_tay,nghi_sai,cau_mau".to_string()];
+    let mut dong = vec![
+        "nguoi_noi,ai_doan,giong_dang_gan,gioi_tinh_giong,cao_do_goc_hz,khoa_tay,nghi_sai,cau_mau"
+            .to_string(),
+    ];
     let mut nghi = 0usize;
     for (i, (ten, mau, gan, hz, khoa)) in hang.iter().enumerate() {
         if DANG_LONG_TIENG.load(Ordering::SeqCst) {
             bail!("đang lồng tiếng – dừng kiểm tra AI");
         }
         bao(format!("AI đang xem nhân vật {}/{tong}: {ten}", i + 1));
-        let ai = if mau.is_empty() { None } else { gioi_tinh(ten, mau)? };
+        let ai = if mau.is_empty() {
+            None
+        } else {
+            gioi_tinh(ten, mau)?
+        };
         let gt_giong = gioi_tinh_giong(gan);
         let sai = matches!((ai, gt_giong), (Some(a), Some(b)) if a != b);
         if sai {
@@ -324,11 +424,61 @@ fn kiem_tra_gioi_tinh(tt: &Arc<Mutex<Tt>>, g: &crate::viet_hoa::tim_game::Game) 
 }
 
 impl TrangAi {
+    /// Gửi một tin cho AI (chạy nền). `tin` rỗng chỉ cập nhật bối cảnh.
+    fn gui(&self, tin: String) {
+        let c = self.chat.clone();
+        let (ls, bc) = {
+            let mut g = c.lock().unwrap_or_else(|e| e.into_inner());
+            if g.dang_nghi || tin.trim().is_empty() {
+                return;
+            }
+            g.lich_su.push((true, tin));
+            g.dang_nghi = true;
+            (g.lich_su.clone(), g.boi_canh.clone())
+        };
+        std::thread::spawn(move || {
+            let kq = if DANG_LONG_TIENG.load(Ordering::SeqCst) {
+                Err(anyhow!("đang lồng tiếng – AI tạm tắt để nhường card đồ họa, lồng tiếng xong hỏi lại nhé"))
+            } else {
+                tro_chuyen(&ls, &bc)
+            };
+            let mut g = c.lock().unwrap_or_else(|e| e.into_inner());
+            g.dang_nghi = false;
+            match kq {
+                Ok(t) => g.lich_su.push((false, t)),
+                Err(e) => g.lich_su.push((false, format!("⚠ Lỗi: {e}"))),
+            }
+        });
+    }
+
+    /// Gọi từ nút "Hỏi AI" ở thanh dưới: mở cuộc trò chuyện mới kèm lỗi hiện tại; AI trả lời ngay.
+    pub fn hoi_ve_loi(&mut self, boi_canh: String, loi: Option<String>) {
+        {
+            let mut g = self.chat.lock().unwrap_or_else(|e| e.into_inner());
+            if g.dang_nghi {
+                return;
+            }
+            g.lich_su.clear();
+            g.boi_canh = boi_canh;
+        }
+        if let Some(l) = loi {
+            self.gui(format!(
+                "App báo lỗi này, nghĩa là gì và tôi nên làm gì?\n{l}"
+            ));
+        }
+    }
+
     pub fn dang_ky_tt(&self) {
         let t = self.tt.clone();
         crate::tien_trinh::dang_ky("ai_local", None, move || {
             let g = t.lock().unwrap_or_else(|e| e.into_inner());
-            crate::tien_trinh::Anh { dang_ban: g.dang_ban, ten: "AI local".into(), thong_bao: g.thong_bao.clone(), tien: None, loi: g.loi }
+            crate::tien_trinh::Anh {
+                dang_ban: g.dang_ban,
+                ten: "AI local".into(),
+                thong_bao: g.thong_bao.clone(),
+                tien: None,
+                loi: g.loi,
+            }
         });
     }
 
@@ -372,9 +522,76 @@ impl TrangAi {
             ui.ctx().request_repaint_after(Duration::from_millis(400));
         }
         let long_tieng = DANG_LONG_TIENG.load(Ordering::SeqCst);
+        crate::kieu::khoi(ui, "NHẮN TIN VỚI AI", |ui| {
+            let (ls, nghi) = {
+                let g = self.chat.lock().unwrap_or_else(|e| e.into_inner());
+                (g.lich_su.clone(), g.dang_nghi)
+            };
+            if nghi {
+                ui.ctx().request_repaint_after(Duration::from_millis(400));
+            }
+            if ls.is_empty() {
+                ui.label("Nhắn như nhắn tin: hỏi cách dùng, báo lỗi, nhờ giải thích. Gặp lỗi ở bất kỳ trang nào, bấm \"Hỏi AI\" ở thanh dưới cùng là AI tự đọc lỗi đó.");
+            }
+            egui::ScrollArea::vertical()
+                .id_salt("ai_chat")
+                .max_height(360.0)
+                .stick_to_bottom(true)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    for (nguoi, nd) in &ls {
+                        ui.add_space(4.0);
+                        ui.label(
+                            RichText::new(if *nguoi { "Bạn" } else { "AI" })
+                                .strong()
+                                .color(if *nguoi {
+                                    Color32::from_rgb(120, 190, 255)
+                                } else {
+                                    Color32::from_rgb(140, 220, 160)
+                                }),
+                        );
+                        ui.add(egui::Label::new(nd.as_str()).wrap());
+                    }
+                    if nghi {
+                        ui.add_space(4.0);
+                        ui.label(RichText::new("AI đang trả lời...").italics());
+                    }
+                });
+            ui.add_space(6.0);
+            ui.add(
+                egui::TextEdit::multiline(&mut self.o_nhap)
+                    .desired_rows(3)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("Nhập câu hỏi, Ctrl+Enter để gửi"),
+            );
+            let phim = ui.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::Enter));
+            ui.horizontal(|ui| {
+                let gui = ui
+                    .add_enabled(
+                        !nghi && !long_tieng && !self.o_nhap.trim().is_empty(),
+                        egui::Button::new("Gửi"),
+                    )
+                    .clicked();
+                if (gui || phim) && !nghi && !long_tieng && !self.o_nhap.trim().is_empty() {
+                    let t = std::mem::take(&mut self.o_nhap);
+                    self.gui(t);
+                }
+                if ui
+                    .add_enabled(!nghi, egui::Button::new("Cuộc trò chuyện mới"))
+                    .clicked()
+                {
+                    let mut g = self.chat.lock().unwrap_or_else(|e| e.into_inner());
+                    g.lich_su.clear();
+                    g.boi_canh.clear();
+                }
+            });
+        });
         crate::kieu::khoi(ui, "KẾT NỐI", |ui| {
             if long_tieng {
-                ui.label(RichText::new("Đang lồng tiếng – AI đã bị tắt và tạm khóa.").color(Color32::YELLOW));
+                ui.label(
+                    RichText::new("Đang lồng tiếng – AI đã bị tắt và tạm khóa.")
+                        .color(Color32::YELLOW),
+                );
             }
             ui.horizontal_wrapped(|ui| {
                 ui.label("Mô hình:");
@@ -382,16 +599,24 @@ impl TrangAi {
                 if ui.button("Lưu").clicked() && !self.mo_hinh.trim().is_empty() {
                     let _ = cau_hinh::luu_khoa("ai_local_mo_hinh.txt", &self.mo_hinh);
                 }
-                if ui.add_enabled(!ban, egui::Button::new("Kiểm tra kết nối")).clicked() {
+                if ui
+                    .add_enabled(!ban, egui::Button::new("Kiểm tra kết nối"))
+                    .clicked()
+                {
                     self.nen("Đang kiểm tra...", |_| {
                         if san_sang() {
                             Ok(format!("Ollama đang chạy. Mô hình: {}", mo_hinh()))
                         } else {
-                            Err(anyhow!("chưa thấy Ollama – mở app Ollama hoặc AI Local Studio rồi thử lại"))
+                            Err(anyhow!(
+                                "chưa thấy Ollama – mở app Ollama hoặc AI Local Studio rồi thử lại"
+                            ))
                         }
                     });
                 }
-                if ui.add_enabled(!ban, egui::Button::new("Xả sạch VRAM")).clicked() {
+                if ui
+                    .add_enabled(!ban, egui::Button::new("Xả sạch VRAM"))
+                    .clicked()
+                {
                     self.nen("Đang xả VRAM...", |_| {
                         xa_vram()?;
                         Ok("Đã trả lại bộ nhớ card đồ họa.".into())
@@ -402,42 +627,76 @@ impl TrangAi {
         if !self.da_tim {
             self.da_tim = true;
             let o = self.dang_tim.clone();
-            std::thread::spawn(move || *o.lock().unwrap_or_else(|e| e.into_inner()) = Some(crate::viet_hoa::tim_game::tim_tat_ca()));
+            std::thread::spawn(move || {
+                *o.lock().unwrap_or_else(|e| e.into_inner()) =
+                    Some(crate::viet_hoa::tim_game::tim_tat_ca())
+            });
         }
-        if let Some(g) = self.dang_tim.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        if let Some(g) = self
+            .dang_tim
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
+        {
             self.games = g;
         }
-        crate::kieu::khoi(ui, "KIỂM TRA GIỚI TÍNH NHÂN VẬT (mọi game)", |ui| {
-            ui.label("Chọn game. AI đọc tên + vài câu thoại từng nhân vật rồi so với giọng đang gán, xuất danh sách nghi sai ra Desktop. Crimson Desert đọc thẳng từ game; game khác cần đã quét file âm thanh ở Lồng tiếng game.");
-            if self.games.is_empty() {
-                ui.label("Đang tìm game trên máy...");
-                ui.ctx().request_repaint_after(Duration::from_millis(300));
-            } else {
-                if self.chon >= self.games.len() {
-                    self.chon = 0;
-                }
-                let ten = self.games[self.chon].ten.clone();
-                egui::ComboBox::from_id_salt("ai_game").selected_text(ten).width(360.0).show_ui(ui, |ui| {
-                    for (i, g) in self.games.iter().enumerate() {
-                        ui.selectable_value(&mut self.chon, i, &g.ten);
+        crate::kieu::khoi(
+            ui,
+            "KIỂM TRA GIỚI TÍNH NHÂN VẬT (mọi game)",
+            |ui| {
+                ui.label("Chọn game. AI đọc tên + vài câu thoại từng nhân vật rồi so với giọng đang gán, xuất danh sách nghi sai ra Desktop. Crimson Desert đọc thẳng từ game; game khác cần đã quét file âm thanh ở Lồng tiếng game.");
+                if self.games.is_empty() {
+                    ui.label("Đang tìm game trên máy...");
+                    ui.ctx().request_repaint_after(Duration::from_millis(300));
+                } else {
+                    if self.chon >= self.games.len() {
+                        self.chon = 0;
                     }
-                });
-                if ui.add_enabled(!ban && !long_tieng, egui::Button::new("Bắt đầu kiểm tra")).clicked() {
-                    let g = self.games[self.chon].clone();
-                    self.nen("Đang kiểm tra giới tính...", move |tt| kiem_tra_gioi_tinh(tt, &g));
+                    let ten = self.games[self.chon].ten.clone();
+                    egui::ComboBox::from_id_salt("ai_game")
+                        .selected_text(ten)
+                        .width(360.0)
+                        .show_ui(ui, |ui| {
+                            for (i, g) in self.games.iter().enumerate() {
+                                ui.selectable_value(&mut self.chon, i, &g.ten);
+                            }
+                        });
+                    if ui
+                        .add_enabled(!ban && !long_tieng, egui::Button::new("Bắt đầu kiểm tra"))
+                        .clicked()
+                    {
+                        let g = self.games[self.chon].clone();
+                        self.nen("Đang kiểm tra giới tính...", move |tt| {
+                            kiem_tra_gioi_tinh(tt, &g)
+                        });
+                    }
                 }
-            }
-        });
+            },
+        );
         crate::kieu::khoi(ui, "GIẢI THÍCH LỖI", |ui| {
             ui.label("Dán thông báo lỗi vào đây, AI giải thích bằng tiếng Việt.");
-            ui.add(egui::TextEdit::multiline(&mut self.loi_dan).desired_rows(4).desired_width(f32::INFINITY));
-            if ui.add_enabled(!ban && !long_tieng && !self.loi_dan.trim().is_empty(), egui::Button::new("Giải thích")).clicked() {
+            ui.add(
+                egui::TextEdit::multiline(&mut self.loi_dan)
+                    .desired_rows(4)
+                    .desired_width(f32::INFINITY),
+            );
+            if ui
+                .add_enabled(
+                    !ban && !long_tieng && !self.loi_dan.trim().is_empty(),
+                    egui::Button::new("Giải thích"),
+                )
+                .clicked()
+            {
                 let l = self.loi_dan.clone();
                 self.nen("AI đang đọc lỗi...", move |_| giai_thich_loi(&l));
             }
         });
         if !tb.is_empty() {
-            ui.label(if loi { RichText::new(&tb).color(Color32::from_rgb(255, 131, 137)) } else { RichText::new(&tb) });
+            ui.label(if loi {
+                RichText::new(&tb).color(Color32::from_rgb(255, 131, 137))
+            } else {
+                RichText::new(&tb)
+            });
         }
         let _ = kq;
     }

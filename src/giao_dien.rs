@@ -141,7 +141,10 @@ impl App {
             con: [0; 6],
             logo: cc.egui_ctx.load_texture(
                 "logo",
-                egui::ColorImage::from_rgba_unmultiplied([64, 64], include_bytes!("../assets/icon_64.rgba")),
+                egui::ColorImage::from_rgba_unmultiplied(
+                    [64, 64],
+                    include_bytes!("../assets/icon_64.rgba"),
+                ),
                 egui::TextureOptions::LINEAR,
             ),
             o_khoa: String::new(),
@@ -196,54 +199,93 @@ impl App {
     fn thanh_tren(&mut self, ctx: &egui::Context) {
         use crate::kieu as k;
         egui::TopBottomPanel::top("thanh_tren")
-            .frame(egui::Frame::NONE.inner_margin(egui::Margin { left: 20, right: 20, top: 14, bottom: 6 }))
+            .frame(egui::Frame::NONE.inner_margin(egui::Margin {
+                left: 20,
+                right: 20,
+                top: 14,
+                bottom: 6,
+            }))
             .show(ctx, |ui| {
-                k::kinh_khung().inner_margin(egui::Margin::symmetric(24, 12)).show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.horizontal(|ui| {
-                        // logo
-                        ui.add(egui::Image::new((self.logo.id(), egui::vec2(52.0, 52.0))));
-                        let rong = ui.ctx().screen_rect().width();
-                        if rong >= 1250.0 {
-                            ui.label(k::dam("VIỆT HÓA").size(28.0).extra_letter_spacing(2.0));
-                        }
-                        ui.add_space(if rong >= 1250.0 { 24.0 } else { 6.0 });
-                        let mut doi = None;
-                        for (m, ten) in MUC {
-                            let chon = self.muc == m;
-                            let ro = ui.add(
-                                egui::Label::new(if chon { k::dam(ten).size(18.0) } else { egui::RichText::new(ten).size(18.0).color(k::CHU_PHU) })
+                k::kinh_khung()
+                    .inner_margin(egui::Margin::symmetric(24, 12))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.horizontal(|ui| {
+                            // logo
+                            ui.add(egui::Image::new((self.logo.id(), egui::vec2(52.0, 52.0))));
+                            let rong = ui.ctx().screen_rect().width();
+                            if rong >= 1250.0 {
+                                ui.label(k::dam("VIỆT HÓA").size(28.0).extra_letter_spacing(2.0));
+                            }
+                            ui.add_space(if rong >= 1250.0 { 24.0 } else { 6.0 });
+                            let mut doi = None;
+                            for (m, ten) in MUC {
+                                let chon = self.muc == m;
+                                let ro = ui.add(
+                                    egui::Label::new(if chon {
+                                        k::dam(ten).size(18.0)
+                                    } else {
+                                        egui::RichText::new(ten).size(18.0).color(k::CHU_PHU)
+                                    })
                                     .sense(egui::Sense::click()),
-                            );
-                            let ro = ro.on_hover_cursor(egui::CursorIcon::PointingHand);
-                            if chon {
-                                let y = ro.rect.bottom() + 6.0;
-                                ui.painter().line_segment([egui::pos2(ro.rect.left(), y), egui::pos2(ro.rect.right(), y)], egui::Stroke::new(3.0, k::TIM));
-                            }
-                            if ro.clicked() {
-                                doi = Some(m);
-                            }
-                            ui.add_space(if ui.ctx().screen_rect().width() >= 1250.0 { 14.0 } else { 4.0 });
-                        }
-                        if let Some(m) = doi {
-                            self.doi_muc(ctx, m);
-                        }
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let tm = self.chung.toan_man.load(Ordering::SeqCst);
-                            let nhan = if tm { "● Đang dịch · bấm để dừng" } else { "Dịch cả màn hình (F12)" };
-                            if k::pill(ui, nhan, if tm { k::OK } else { k::XANH }, true).clicked() {
-                                let _ = self.gui.send(Lenh::Phim(PhimTat::ToanMan));
-                            }
-                            if let Some(b) = self.cap_nhat.0.lock().unwrap().ban.as_ref() {
-                                if ui.link(egui::RichText::new(format!("⬆ Có bản mới {}", b.ma)).color(k::OK)).clicked() {
-                                    self.muc = Muc::CaiDat;
-                                    self.trang = Trang::CaiDat;
-                                    k::yeu_cau_cuon(ctx, "CẬP NHẬT");
+                                );
+                                let ro = ro.on_hover_cursor(egui::CursorIcon::PointingHand);
+                                if chon {
+                                    let y = ro.rect.bottom() + 6.0;
+                                    ui.painter().line_segment(
+                                        [
+                                            egui::pos2(ro.rect.left(), y),
+                                            egui::pos2(ro.rect.right(), y),
+                                        ],
+                                        egui::Stroke::new(3.0, k::TIM),
+                                    );
                                 }
+                                if ro.clicked() {
+                                    doi = Some(m);
+                                }
+                                ui.add_space(if ui.ctx().screen_rect().width() >= 1250.0 {
+                                    14.0
+                                } else {
+                                    4.0
+                                });
                             }
+                            if let Some(m) = doi {
+                                self.doi_muc(ctx, m);
+                            }
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    let tm = self.chung.toan_man.load(Ordering::SeqCst);
+                                    let nhan = if tm {
+                                        "● Đang dịch · bấm để dừng"
+                                    } else {
+                                        "Dịch cả màn hình (F12)"
+                                    };
+                                    if k::pill(ui, nhan, if tm { k::OK } else { k::XANH }, true)
+                                        .clicked()
+                                    {
+                                        let _ = self.gui.send(Lenh::Phim(PhimTat::ToanMan));
+                                    }
+                                    if let Some(b) = self.cap_nhat.0.lock().unwrap().ban.as_ref() {
+                                        if ui
+                                            .link(
+                                                egui::RichText::new(format!(
+                                                    "⬆ Có bản mới {}",
+                                                    b.ma
+                                                ))
+                                                .color(k::OK),
+                                            )
+                                            .clicked()
+                                        {
+                                            self.muc = Muc::CaiDat;
+                                            self.trang = Trang::CaiDat;
+                                            k::yeu_cau_cuon(ctx, "CẬP NHẬT");
+                                        }
+                                    }
+                                },
+                            );
                         });
                     });
-                });
             });
     }
 
@@ -253,7 +295,12 @@ impl App {
         egui::SidePanel::left("muc_con")
             .exact_width(276.0)
             .resizable(false)
-            .frame(egui::Frame::NONE.inner_margin(egui::Margin { left: 20, right: 8, top: 8, bottom: 8 }))
+            .frame(egui::Frame::NONE.inner_margin(egui::Margin {
+                left: 20,
+                right: 8,
+                top: 8,
+                bottom: 8,
+            }))
             .show(ctx, |ui| {
                 k::kinh_khung().show(ui, |ui| {
                     ui.set_width(ui.available_width());
@@ -263,12 +310,20 @@ impl App {
                     let cur = self.con[muc.so()];
                     let mut doi = None;
                     for (i, (ten, _, _)) in muc.con().iter().enumerate() {
-                        let (rect, ph) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 48.0), egui::Sense::click());
+                        let (rect, ph) = ui.allocate_exact_size(
+                            egui::vec2(ui.available_width(), 48.0),
+                            egui::Sense::click(),
+                        );
                         let chon = i == cur;
                         let p = ui.painter();
                         if chon {
                             p.rect_filled(rect, 16.0, crate::kieu::rgba(185, 138, 255, 48));
-                            p.rect_stroke(rect, 16.0, egui::Stroke::new(1.4, crate::kieu::rgba(185, 138, 255, 190)), egui::StrokeKind::Inside);
+                            p.rect_stroke(
+                                rect,
+                                16.0,
+                                egui::Stroke::new(1.4, crate::kieu::rgba(185, 138, 255, 190)),
+                                egui::StrokeKind::Inside,
+                            );
                         } else if ph.hovered() {
                             p.rect_filled(rect, 16.0, crate::kieu::rgba(190, 150, 255, 26));
                         }
@@ -276,7 +331,14 @@ impl App {
                             egui::pos2(rect.left() + 18.0, rect.center().y),
                             egui::Align2::LEFT_CENTER,
                             ten,
-                            egui::FontId::new(17.0, if chon { k::dam_ho() } else { egui::FontFamily::Proportional }),
+                            egui::FontId::new(
+                                17.0,
+                                if chon {
+                                    k::dam_ho()
+                                } else {
+                                    egui::FontFamily::Proportional
+                                },
+                            ),
                             if chon { k::CHU } else { k::CHU_PHU },
                         );
                         if ph.clicked() {
@@ -296,7 +358,12 @@ impl App {
         egui::SidePanel::right("cot_phai")
             .exact_width(336.0)
             .resizable(false)
-            .frame(egui::Frame::NONE.inner_margin(egui::Margin { left: 8, right: 20, top: 8, bottom: 8 }))
+            .frame(egui::Frame::NONE.inner_margin(egui::Margin {
+                left: 8,
+                right: 20,
+                top: 8,
+                bottom: 8,
+            }))
             .show(ctx, |ui| {
                 k::kinh_khung().show(ui, |ui| {
                     ui.set_width(ui.available_width());
@@ -305,21 +372,46 @@ impl App {
                     let dang = crate::tien_trinh::dang_chay();
                     let xong = crate::tien_trinh::vua_xong();
                     if dang.is_empty() && xong.is_empty() {
-                        ui.label(egui::RichText::new("Không có việc nào đang chạy.").size(14.0).color(k::CHU_MO));
+                        ui.label(
+                            egui::RichText::new("Không có việc nào đang chạy.")
+                                .size(14.0)
+                                .color(k::CHU_MO),
+                        );
                     }
                     for (khoa, a, giay) in &dang {
                         ui.horizontal(|ui| {
-                            ui.label(k::dam(if a.ten.is_empty() { "Đang làm việc" } else { &a.ten }).size(16.0));
-                            ui.label(egui::RichText::new(crate::tien_trinh::dung_mm(*giay)).size(14.0).color(k::CHU_MO));
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                if ui.small_button("Dừng").clicked() {
-                                    crate::tien_trinh::dung_viec(khoa);
-                                }
-                            });
+                            ui.label(
+                                k::dam(if a.ten.is_empty() {
+                                    "Đang làm việc"
+                                } else {
+                                    &a.ten
+                                })
+                                .size(16.0),
+                            );
+                            ui.label(
+                                egui::RichText::new(crate::tien_trinh::dung_mm(*giay))
+                                    .size(14.0)
+                                    .color(k::CHU_MO),
+                            );
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if ui.small_button("Dừng").clicked() {
+                                        crate::tien_trinh::dung_viec(khoa);
+                                    }
+                                },
+                            );
                         });
                         k::thanh_nho(ui, a.tien, k::XANH_SANG);
                         if !a.thong_bao.is_empty() {
-                            ui.add(egui::Label::new(egui::RichText::new(&a.thong_bao).size(14.0).color(k::CHU_PHU)).truncate());
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(&a.thong_bao)
+                                        .size(14.0)
+                                        .color(k::CHU_PHU),
+                                )
+                                .truncate(),
+                            );
                         }
                         ui.add_space(6.0);
                     }
@@ -328,7 +420,10 @@ impl App {
                         ui.horizontal(|ui| {
                             let m = if *loi { k::LOI_CHU } else { k::OK };
                             ui.label(egui::RichText::new(if *loi { "✘" } else { "✔" }).color(m));
-                            ui.add(egui::Label::new(egui::RichText::new(tb).size(14.0).color(m)).truncate());
+                            ui.add(
+                                egui::Label::new(egui::RichText::new(tb).size(14.0).color(m))
+                                    .truncate(),
+                            );
                             if ui.small_button("Ẩn").clicked() {
                                 tat.push(*khoa);
                             }
@@ -345,16 +440,28 @@ impl App {
                     ui.add_space(6.0);
                     let ds = crate::viet_hoa::clone_giong::liet_ke_chinh();
                     if ds.is_empty() {
-                        ui.label(egui::RichText::new("Chưa có giọng nào.").size(14.0).color(k::CHU_MO));
+                        ui.label(
+                            egui::RichText::new("Chưa có giọng nào.")
+                                .size(14.0)
+                                .color(k::CHU_MO),
+                        );
                     }
                     ui.horizontal_wrapped(|ui| {
                         for f in ds.iter().take(3) {
-                            ui.label(egui::RichText::new(f.trim_end_matches(".wav")).family(egui::FontFamily::Monospace).size(14.0));
+                            ui.label(
+                                egui::RichText::new(f.trim_end_matches(".wav"))
+                                    .family(egui::FontFamily::Monospace)
+                                    .size(14.0),
+                            );
                             ui.add_space(6.0);
                         }
                     });
                     if ds.len() > 3 {
-                        ui.label(egui::RichText::new(format!("… và {} giọng khác", ds.len() - 3)).size(14.0).color(k::CHU_MO));
+                        ui.label(
+                            egui::RichText::new(format!("… và {} giọng khác", ds.len() - 3))
+                                .size(14.0)
+                                .color(k::CHU_MO),
+                        );
                     }
                     ui.add_space(8.0);
                     if k::pill_phu(ui, "+ Clone giọng mới", true).clicked() {
@@ -383,14 +490,43 @@ impl eframe::App for App {
         egui::TopBottomPanel::bottom("trang_thai")
             .frame(egui::Frame::NONE.inner_margin(egui::Margin::symmetric(24, 6)))
             .show(ctx, |ui| {
-                let dang = self.chung.dang_dich.load(Ordering::SeqCst) || self.chung.toan_man.load(Ordering::SeqCst);
-                let (chu, mau) = if dang { ("● Đang chạy dịch màn hình", crate::kieu::OK) } else { ("○ Dịch màn hình đang dừng", crate::kieu::CHU_MO) };
+                let dang = self.chung.dang_dich.load(Ordering::SeqCst)
+                    || self.chung.toan_man.load(Ordering::SeqCst);
+                let (chu, mau) = if dang {
+                    ("● Đang chạy dịch màn hình", crate::kieu::OK)
+                } else {
+                    ("○ Dịch màn hình đang dừng", crate::kieu::CHU_MO)
+                };
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(chu).size(14.0).color(mau));
                     if !self.thong_bao.is_empty() {
                         ui.separator();
                         ui.label(RichText::new(&self.thong_bao).size(14.0));
                     }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let mut loi: Vec<String> = crate::tien_trinh::vua_xong()
+                            .into_iter()
+                            .filter(|x| x.2)
+                            .map(|x| x.1)
+                            .collect();
+                        if self.thong_bao.contains("Lỗi") || self.thong_bao.contains("lỗi") {
+                            loi.push(self.thong_bao.clone());
+                        }
+                        let co_loi = !loi.is_empty();
+                        if ui
+                            .button(if co_loi {
+                                "🤖 Hỏi AI về lỗi này"
+                            } else {
+                                "🤖 Hỏi AI"
+                            })
+                            .clicked()
+                        {
+                            let bc = loi.join("\n");
+                            let l = if co_loi { Some(bc.clone()) } else { None };
+                            self.ai.hoi_ve_loi(bc, l);
+                            self.trang = Trang::AiLocal;
+                        }
+                    });
                 });
             });
 
@@ -405,22 +541,31 @@ impl eframe::App for App {
             self.cot_phai(ctx);
         }
 
-        egui::CentralPanel::default().frame(egui::Frame::NONE.inner_margin(egui::Margin { left: 12, right: 12, top: 8, bottom: 4 })).show(ctx, |ui| {
-            egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| match self.trang {
-                Trang::DichManHinh => self.trang_dich(ui),
-                Trang::CaiDat => self.trang_cai_dat(ui),
-                Trang::PhuDePhim => self.phu_de_phim.ve(ui),
-                Trang::VietHoaGame => self.viet_hoa.ve(ui),
-                Trang::DoFile => self.viet_hoa.ve(ui),
-                Trang::TuDong => self.tu_dong.ve(ui),
-                Trang::SuaDich => self.sua_dich.ve(ui),
-                Trang::BanDo => self.ban_do.ve(ui),
-                Trang::AiLocal => self.ai.ve(ui),
-                Trang::GiongMau => self.giong_mau.ve(ui),
-                Trang::LongTieng => self.long_tieng.ve(ui),
-                Trang::CloneGiong => self.clone_giong.ve(ui),
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.inner_margin(egui::Margin {
+                left: 12,
+                right: 12,
+                top: 8,
+                bottom: 4,
+            }))
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical()
+                    .auto_shrink(false)
+                    .show(ui, |ui| match self.trang {
+                        Trang::DichManHinh => self.trang_dich(ui),
+                        Trang::CaiDat => self.trang_cai_dat(ui),
+                        Trang::PhuDePhim => self.phu_de_phim.ve(ui),
+                        Trang::VietHoaGame => self.viet_hoa.ve(ui),
+                        Trang::DoFile => self.viet_hoa.ve(ui),
+                        Trang::TuDong => self.tu_dong.ve(ui),
+                        Trang::SuaDich => self.sua_dich.ve(ui),
+                        Trang::BanDo => self.ban_do.ve(ui),
+                        Trang::AiLocal => self.ai.ve(ui),
+                        Trang::GiongMau => self.giong_mau.ve(ui),
+                        Trang::LongTieng => self.long_tieng.ve(ui),
+                        Trang::CloneGiong => self.clone_giong.ve(ui),
+                    });
             });
-        });
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
@@ -555,7 +700,8 @@ impl App {
                             if ui.button(ten_nut).clicked() {
                                 chon = Some(i);
                             }
-                            doi |= crate::kieu::cong_tac(ui, &mut v.loc_trang, "Lọc chữ trắng").changed();
+                            doi |= crate::kieu::cong_tac(ui, &mut v.loc_trang, "Lọc chữ trắng")
+                                .changed();
                             ui.label("Cỡ chữ");
                             doi |= ui
                                 .add(egui::DragValue::new(&mut v.co_chu).range(10..=48))
@@ -651,18 +797,22 @@ impl App {
                 ui.horizontal(|ui| {
                     if ch.kieu_hien == "khung" {
                         let mut v = ch.do_mo as f64;
-                        if crate::kieu::thanh_truot(ui, &mut v, 0.2..=1.0, "Độ đậm", 2).changed() {
+                        if crate::kieu::thanh_truot(ui, &mut v, 0.2..=1.0, "Độ đậm", 2).changed()
+                        {
                             ch.do_mo = v as _;
                             doi = true;
                         }
                     } else {
                         let mut v = ch.do_dam_chu as f64;
-                        if crate::kieu::thanh_truot(ui, &mut v, 0.2..=1.0, "Độ đậm chữ", 2).changed() {
+                        if crate::kieu::thanh_truot(ui, &mut v, 0.2..=1.0, "Độ đậm chữ", 2)
+                            .changed()
+                        {
                             ch.do_dam_chu = v as _;
                             doi = true;
                         }
                         let mut w = ch.vien_chu as f64;
-                        if crate::kieu::thanh_truot(ui, &mut w, 0.0..=5.0, "Viền chữ", 0).changed() {
+                        if crate::kieu::thanh_truot(ui, &mut w, 0.0..=5.0, "Viền chữ", 0).changed()
+                        {
                             ch.vien_chu = w.round() as _;
                             doi = true;
                         }
@@ -727,20 +877,43 @@ impl App {
         let cn = self.cap_nhat.clone();
         let (kiem, tai, tien, tb, loi, ban, da_thay) = {
             let t = cn.0.lock().unwrap();
-            (t.dang_kiem, t.dang_tai, t.tien, t.tb.clone(), t.loi, t.ban.clone(), t.da_thay)
+            (
+                t.dang_kiem,
+                t.dang_tai,
+                t.tien,
+                t.tb.clone(),
+                t.loi,
+                t.ban.clone(),
+                t.da_thay,
+            )
         };
         if kiem || tai {
             ui.ctx().request_repaint_after(Duration::from_millis(200));
         }
         the(ui, "CẬP NHẬT", |ui| {
-            ui.label(format!("Phiên bản đang chạy: {}  •  nguồn: github.com/{}", crate::cap_nhat::PHIEN_BAN, crate::cap_nhat::KHO));
+            ui.label(format!(
+                "Phiên bản đang chạy: {}  •  nguồn: github.com/{}",
+                crate::cap_nhat::PHIEN_BAN,
+                crate::cap_nhat::KHO
+            ));
             ui.horizontal_wrapped(|ui| {
-                if ui.add_enabled(!kiem && !tai && !da_thay, egui::Button::new("Kiểm tra bản mới")).clicked() {
+                if ui
+                    .add_enabled(
+                        !kiem && !tai && !da_thay,
+                        egui::Button::new("Kiểm tra bản mới"),
+                    )
+                    .clicked()
+                {
                     cn.kiem_tra_nen(false);
                 }
                 if let Some(b) = &ban {
                     if ui
-                        .add_enabled(!tai && !da_thay, egui::Button::new(RichText::new(format!("Cập nhật lên {}", b.ma)).strong()))
+                        .add_enabled(
+                            !tai && !da_thay,
+                            egui::Button::new(
+                                RichText::new(format!("Cập nhật lên {}", b.ma)).strong(),
+                            ),
+                        )
                         .clicked()
                     {
                         cn.cap_nhat_nen();
@@ -755,12 +928,18 @@ impl App {
                 ui.add(egui::ProgressBar::new(tien).show_percentage());
             }
             if !tb.is_empty() {
-                ui.label(if loi { RichText::new(tb).color(Color32::LIGHT_RED) } else { RichText::new(tb) });
+                ui.label(if loi {
+                    RichText::new(tb).color(Color32::LIGHT_RED)
+                } else {
+                    RichText::new(tb)
+                });
             }
             if let Some(b) = &ban {
                 if !b.ghi_chu.trim().is_empty() {
                     ui.label(RichText::new("Có gì mới:").small().weak());
-                    egui::ScrollArea::vertical().max_height(120.0).show(ui, |ui| ui.label(RichText::new(&b.ghi_chu).small()));
+                    egui::ScrollArea::vertical()
+                        .max_height(120.0)
+                        .show(ui, |ui| ui.label(RichText::new(&b.ghi_chu).small()));
                 }
             }
         });
@@ -813,7 +992,13 @@ impl App {
             if crate::kieu::cong_tac(ui, &mut b, "Hiệu ứng ánh sáng nền").changed() {
                 crate::kieu::dat_anh_sang(b);
             }
-            ui.label(RichText::new("Tắt nếu máy yếu hoặc chạy cạnh game nặng. Giao diện chỉ có bản tối.").size(14.0).color(crate::kieu::CHU_MO));
+            ui.label(
+                RichText::new(
+                    "Tắt nếu máy yếu hoặc chạy cạnh game nặng. Giao diện chỉ có bản tối.",
+                )
+                .size(14.0)
+                .color(crate::kieu::CHU_MO),
+            );
         });
         the(ui, "THƯ MỤC", |ui| {
             ui.label(format!("App:      {}", duong_dan::goc().display()));
