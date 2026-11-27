@@ -140,6 +140,39 @@ pub fn gioi_tinh(ten: &str, cau_mau: &[String]) -> Result<Option<bool>> {
     })
 }
 
+fn mang_json(r: &str, n: usize) -> Result<Vec<String>> {
+    let (a, b) = (r.find('['), r.rfind(']'));
+    let (Some(a), Some(b)) = (a, b) else { bail!("AI trả lời không đúng dạng") };
+    let v: Vec<String> = serde_json::from_str(&r[a..=b])?;
+    if v.len() != n {
+        bail!("AI trả {} câu, cần {n}", v.len());
+    }
+    Ok(v)
+}
+
+/// Soát bản dịch: cặp (tiếng Anh, bản dịch hiện có) → bản dịch đã sửa (tốt thì giữ nguyên).
+pub fn sua_dich(cap: &[(String, String)]) -> Result<Vec<String>> {
+    let vao = serde_json::to_string(&cap.iter().map(|(en, vi)| serde_json::json!({"en": en, "vi": vi})).collect::<Vec<_>>())?;
+    let r = hoi(
+        "Bạn là biên tập viên dịch game / phụ đề phim Anh-Việt. Nhận mảng JSON các đối tượng {en, vi}. Với mỗi cặp: nếu bản dịch vi đã tốt thì giữ NGUYÊN; \
+         nếu sai nghĩa, cứng, còn sót tiếng Anh hoặc chưa dịch thì sửa lại tự nhiên, ngắn gọn. Giữ nguyên tên riêng và mọi thẻ như {..}, <..>, [..], %s. \
+         Trả về DUY NHẤT một mảng JSON các chuỗi tiếng Việt, cùng số phần tử, cùng thứ tự.",
+        &vao,
+    )?;
+    mang_json(&r, cap.len())
+}
+
+/// Rút gọn các câu thuyết minh quá dài: (câu Việt, số giây được đọc) → câu ngắn hơn, giữ ý chính.
+pub fn rut_gon(cau: &[(String, f64)]) -> Result<Vec<String>> {
+    let vao = serde_json::to_string(&cau.iter().map(|(c, g)| serde_json::json!({"vi": c, "giay": (g * 10.0).round() / 10.0})).collect::<Vec<_>>())?;
+    let r = hoi(
+        "Bạn viết lời thuyết minh phim tiếng Việt. Nhận mảng JSON {vi, giay}. Mỗi câu phải đọc xong trong số giây cho phép (người đọc khoảng 13 chữ cái mỗi giây). \
+         Hãy rút gọn câu vi cho vừa, giữ ý chính và giọng văn, giữ tên riêng. Trả về DUY NHẤT một mảng JSON các chuỗi, cùng số phần tử, cùng thứ tự.",
+        &vao,
+    )?;
+    mang_json(&r, cau.len())
+}
+
 pub fn giai_thich_loi(loi: &str) -> Result<String> {
     hoi(
         "Bạn giúp người dùng không rành kỹ thuật của app Việt hóa game. Đọc thông báo lỗi và trả lời bằng tiếng Việt, \

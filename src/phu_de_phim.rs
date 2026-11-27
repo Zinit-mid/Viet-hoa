@@ -421,6 +421,22 @@ impl ViecPhim {
         bail!("không ghi được file phụ đề")
     }
 
+    /// Nhờ AI local soát bản dịch các dòng phụ đề rồi ghi lại .srt. → (số câu đã sửa, đường dẫn .srt)
+    pub fn ai_sua_phu_de(&mut self, bc: &dyn crate::viet_hoa::viec_dich::BaoCao) -> Result<(usize, PathBuf)> {
+        let mut thay: std::collections::BTreeSet<String> = Default::default();
+        let mut cap: Vec<(String, String)> = Vec::new();
+        for (_, _, en) in &self.dong {
+            if !en.chars().any(char::is_alphanumeric) || !thay.insert(en.clone()) {
+                continue;
+            }
+            if let Some(vi) = self.viec.tim(en).filter(|v| !v.is_empty()) {
+                cap.push((en.clone(), vi));
+            }
+        }
+        let n = self.viec.ai_sua(cap, bc)?;
+        Ok((n, self.xuat_srt()?))
+    }
+
     pub fn thu_muc_phim(&self) -> PathBuf {
         self.tm.clone()
     }

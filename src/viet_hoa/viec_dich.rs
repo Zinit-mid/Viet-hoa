@@ -422,6 +422,77 @@ impl ViecDich {
     }
 
     /// Các chuỗi (không trùng, giữ thứ tự) chưa có trong bộ nhớ.
+    /// Câu dịch nghi dở (chưa dịch / quá ngắn / quá dài / còn nguyên tiếng Anh) → (tiếng Anh, bản dịch), tối đa `toi_da`.
+    pub fn cau_nghi_van(&self, toi_da: usize) -> Vec<(String, String)> {
+        let co_dau = |s: &str| s.chars().any(|c| "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ".contains(c.to_ascii_lowercase()) || "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ".contains(c));
+        let bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
+        let mut ra = Vec::new();
+        for (en, vi) in bn.iter() {
+            let (ne, nv) = (en.chars().count(), vi.chars().count());
+            if ne < 12 || en.split_whitespace().count() < 3 {
+                continue;
+            }
+            let ti_le = nv as f64 / ne as f64;
+            let dang_nghi = vi.trim() == en.trim() || ti_le < 0.45 || ti_le > 2.6 || (ne > 20 && !co_dau(vi));
+            if dang_nghi {
+                ra.push((en.clone(), vi.clone()));
+                if ra.len() >= toi_da {
+                    break;
+                }
+            }
+        }
+        ra
+    }
+
+    /// Nhờ AI local soát lại các cặp (Anh, Việt); câu nào sửa được (và còn đủ thẻ) thì ghi đè vào bộ nhớ. → số câu đã sửa.
+    pub fn ai_sua(&mut self, cap: Vec<(String, String)>, bc: &dyn BaoCao) -> Result<usize> {
+        if !crate::ai_local::san_sang() {
+            return Err(anyhow!("chưa thấy Ollama – mở AI Local Studio / Ollama rồi thử lại"));
+        }
+        let tong = cap.len();
+        if tong == 0 {
+            bc.bao("Không có câu nào cần AI soát.");
+            return Ok(0);
+        }
+        self.dung.store(false, Ordering::SeqCst);
+        let (mut xong, mut sua, mut loi_lien_tiep) = (0usize, 0usize, 0usize);
+        let mut lan_luu = Instant::now();
+        for lo in cap.chunks(8) {
+            if self.dung.load(Ordering::SeqCst) {
+                break;
+            }
+            match crate::ai_local::sua_dich(lo) {
+                Ok(moi) => {
+                    loi_lien_tiep = 0;
+                    let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
+                    for ((en, cu), m) in lo.iter().zip(moi) {
+                        let m = crate::dich::ap_dung_sua(m.trim());
+                        if !m.is_empty() && m != *cu && (self.the)(en) == (self.the)(&m) && !crate::dich::the::bi_lap(en, &m) {
+                            bn.insert(en.clone(), m);
+                            sua += 1;
+                        }
+                    }
+                }
+                Err(e) => {
+                    loi_lien_tiep += 1;
+                    if xong == 0 && loi_lien_tiep >= 2 || loi_lien_tiep >= 5 {
+                        let _ = self.luu();
+                        return Err(e);
+                    }
+                }
+            }
+            xong += lo.len();
+            bc.tien_do(xong, tong, 0.0);
+            bc.bao(&format!("AI local đang soát {xong}/{tong} câu • đã sửa {sua}"));
+            if lan_luu.elapsed().as_secs() > 30 {
+                let _ = self.luu();
+                lan_luu = Instant::now();
+            }
+        }
+        self.luu()?;
+        Ok(sua)
+    }
+
     pub fn cau_can_dich<'a>(&self, ds: impl IntoIterator<Item = &'a str>) -> Vec<String> {
         let bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
         let mut da = HashSet::new();

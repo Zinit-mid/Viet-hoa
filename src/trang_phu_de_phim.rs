@@ -52,6 +52,8 @@ pub struct TrangPhuDePhim {
     nhan_nha: bool,
     cuong_do: f64,
     chi_thu: bool,
+    /// nhờ AI local rút gọn câu thuyết minh quá dài
+    ai_rut_gon: bool,
     /// bảng cách đọc tên riêng (mỗi dòng: Tên => cách viết để đọc)
     ten_doc: String,
 }
@@ -72,6 +74,7 @@ impl Default for TrangPhuDePhim {
             nhan_nha: true,
             cuong_do: 0.7,
             chi_thu: false,
+            ai_rut_gon: false,
             ten_doc: crate::thuyet_minh::doc_ten_doc().iter().map(|(a, b)| format!("{a} => {b}")).collect::<Vec<_>>().join("\n"),
         }
     }
@@ -114,6 +117,7 @@ impl TrangPhuDePhim {
             thu_dau: self.chi_thu.then_some(10),
             tu_kho: self.giong.strip_prefix("kho:").map(String::from),
         };
+        let ai_rut_gon = self.ai_rut_gon;
         let (tt, dung) = (self.tt.clone(), self.dung.clone());
         dung.store(false, Ordering::SeqCst);
         std::thread::spawn(move || {
@@ -126,7 +130,38 @@ impl TrangPhuDePhim {
                     anyhow::bail!("chưa có phụ đề – bấm Tạo phụ đề tiếng Việt trước");
                 }
                 tt.lock().unwrap().phim = Some(phim.clone());
-                let dong: Vec<(f64, f64, String)> = v.dong.iter().map(|(x, y, c)| (*x, *y, v.viec.tim(c).unwrap_or_default())).collect();
+                let mut dong: Vec<(f64, f64, String)> = v.dong.iter().map(|(x, y, c)| (*x, *y, v.viec.tim(c).unwrap_or_default())).collect();
+                if ai_rut_gon {
+                    // câu đọc không kịp (13 chữ/giây) → AI local rút gọn; xong thì nhường GPU cho VieNeu
+                    let dai: Vec<usize> = (0..dong.len())
+                        .filter(|&i| {
+                            let khung = dong.get(i + 1).map(|n| n.0 - dong[i].0 - 0.05).unwrap_or(8.0).clamp(0.6, 12.0);
+                            dong[i].2.chars().count() as f64 > khung * 13.0
+                        })
+                        .collect();
+                    if !dai.is_empty() && crate::ai_local::san_sang() {
+                        let mut xong = 0usize;
+                        for lo in dai.chunks(8) {
+                            if dung.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            let cau: Vec<(String, f64)> = lo
+                                .iter()
+                                .map(|&i| (dong[i].2.clone(), dong.get(i + 1).map(|n| n.0 - dong[i].0 - 0.05).unwrap_or(8.0).clamp(0.6, 12.0)))
+                                .collect();
+                            if let Ok(moi) = crate::ai_local::rut_gon(&cau) {
+                                for (&i, m) in lo.iter().zip(moi) {
+                                    if !m.trim().is_empty() && m.chars().count() < dong[i].2.chars().count() {
+                                        dong[i].2 = m.trim().to_string();
+                                    }
+                                }
+                            }
+                            xong += lo.len();
+                            tt.lock().unwrap().thong_bao = format!("AI local đang rút gọn câu quá dài {xong}/{}", dai.len());
+                        }
+                    }
+                }
+                let _gpu = crate::ai_local::KhoaLongTieng::vao()?;
                 crate::thuyet_minh::thuyet_minh(
                     &phim,
                     &dong,
@@ -157,6 +192,43 @@ impl TrangPhuDePhim {
                 Err(e) => (t.thong_bao, t.loi) = (format!("Không làm được: {e}"), true),
             }
             duong_dan::nhat_ky(&format!("Thuyết minh phim: {}", t.thong_bao));
+        });
+    }
+
+    fn ai_sua(&mut self) {
+        let nguon = self.nguon.trim().trim_matches('"').to_string();
+        {
+            let mut t = self.tt.lock().unwrap();
+            if t.dang_ban {
+                return;
+            }
+            if nguon.is_empty() {
+                (t.thong_bao, t.loi) = ("Dán link phim hoặc chọn file phim trước (phim đã tạo phụ đề).".into(), true);
+                return;
+            }
+            *t = Tt { dang_ban: true, thong_bao: "AI local đang soát phụ đề...".into(), ..Default::default() };
+        }
+        let (tt, dung) = (self.tt.clone(), self.dung.clone());
+        dung.store(false, Ordering::SeqCst);
+        std::thread::spawn(move || {
+            let kq = (|| -> anyhow::Result<(usize, std::path::PathBuf)> {
+                let mut v = ViecPhim::moi(&nguon)?;
+                if v.dong.is_empty() {
+                    anyhow::bail!("chưa có phụ đề – bấm Tạo phụ đề tiếng Việt trước");
+                }
+                v.viec.dung = dung.clone();
+                v.ai_sua_phu_de(&Bao(tt.clone()))
+            })();
+            let mut t = tt.lock().unwrap();
+            t.dang_ban = false;
+            match kq {
+                Ok((n, srt)) => {
+                    t.xong = true;
+                    t.thong_bao = format!("AI đã sửa {n} câu phụ đề. File: {}", srt.display());
+                    t.srt = Some(srt);
+                }
+                Err(e) => (t.thong_bao, t.loi) = (format!("Không làm được: {e}"), true),
+            }
         });
     }
 
@@ -243,6 +315,9 @@ impl TrangPhuDePhim {
             if ui.add_enabled(ban, egui::Button::new("Dừng")).clicked() {
                 self.dung.store(true, Ordering::SeqCst);
             }
+            if ui.add_enabled(!ban, egui::Button::new("AI local sửa phụ đề")).clicked() {
+                self.ai_sua();
+            }
             if ui
                 .add_enabled(phim.is_some(), egui::Button::new("Mở phim"))
                 .clicked()
@@ -303,6 +378,7 @@ impl TrangPhuDePhim {
                         crate::kieu::thanh_truot(ui, &mut self.cuong_do, 0.3..=1.0, "Độ mạnh nhấn nhá", 1);
                     });
                 }
+                crate::kieu::cong_tac(ui, &mut self.ai_rut_gon, "AI local rút gọn câu quá dài để đọc kịp (cần mở Ollama; AI tự tắt trước khi VieNeu đọc)");
                 crate::kieu::cong_tac(ui, &mut self.chi_thu, "Chỉ làm thử 10 dòng đầu (phần còn lại giữ nguyên tiếng gốc – bỏ chọn để làm cả phim)");
                 ui.label(RichText::new("Cách đọc tên riêng: tên không ghi ở đây được đọc nguyên văn tiếng Anh. Muốn đọc khác thì thêm dòng `Tên => cách viết`, vd `Jess => Giét`.").small().weak());
                 if ui.add(egui::TextEdit::multiline(&mut self.ten_doc).desired_rows(3).desired_width(f32::INFINITY).hint_text("Jess => Giét")).changed() {
@@ -358,7 +434,11 @@ fn chay(
             }
         }
     };
-    v.tai_va_nghe(None, dung, &|s| dat(s.to_string()), &tien_do)?;
+    {
+        // Whisper dùng GPU: nhường chỗ, tắt AI local trong lúc nghe
+        let _gpu = crate::ai_local::KhoaLongTieng::vao()?;
+        v.tai_va_nghe(None, dung, &|s| dat(s.to_string()), &tien_do)?;
+    }
     tt.lock().unwrap().phim = v.phim.as_ref().map(|p| p.duong_dan.clone());
     dat(format!("Đã nghe xong {} dòng – đang dịch...", v.dong.len()));
     let ds = v.cau_can_dich();

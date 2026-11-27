@@ -312,6 +312,9 @@ impl TrangVietHoa {
                     {
                         lam = Some("claude");
                     }
+                    if crate::kieu::nut_tien_do(ui, "viet_hoa", "AI local sửa câu dịch dở", "Đang soát", crate::kieu::TIM, !ban) {
+                        lam = Some("ai_sua");
+                    }
                     ui.label("Giới hạn mỗi lần:");
                     for g in [1.0, 2.0, 5.0] {
                         ui.selectable_value(&mut self.gioi_han, g, format!("{g:.0} USD"));
@@ -390,6 +393,11 @@ impl TrangVietHoa {
 
         let gioi_han = self.gioi_han;
         match lam {
+            Some("ai_sua") => self.chay_tr("AI local đang soát bản dịch", |x, bc| {
+                let cap = x.viec.cau_nghi_van(400);
+                let n = x.viec.ai_sua(cap, bc).map_err(|e| e.to_string())?;
+                Ok(format!("AI đã sửa {n} câu dịch dở. Bấm lại để soát tiếp phần còn lại, rồi Cài Việt hóa."))
+            }),
             Some("offline") => self.chay_tr("Đang dịch offline", |x, bc| {
                 let ds = x.cau_can_dich();
                 let ok = x.viec.chay_offline(ds, bc).map_err(|e| e.to_string())?;
@@ -529,6 +537,9 @@ impl TrangVietHoa {
                 {
                     lam = Some("claude");
                 }
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "AI local sửa câu dịch dở", "Đang soát", crate::kieu::TIM, !ban) {
+                    lam = Some("ai_sua");
+                }
                 ui.label("Giới hạn mỗi lần:");
                 for g in [1.0, 2.0, 5.0] {
                     ui.selectable_value(&mut self.gioi_han, g, format!("{g:.0} USD"));
@@ -579,6 +590,11 @@ impl TrangVietHoa {
         let dot = self.cd_dot;
         let gioi_han = self.gioi_han;
         match lam {
+            Some("ai_sua") => self.chay_cd("AI local đang soát bản dịch", |cd, bc| {
+                let cap = cd.viec.cau_nghi_van(400);
+                let n = cd.viec.ai_sua(cap, bc).map_err(|e| e.to_string())?;
+                Ok(format!("AI đã sửa {n} câu dịch dở. Bấm lại để soát tiếp phần còn lại, rồi Xuất gói Việt hóa."))
+            }),
             Some("offline") => self.chay_cd("Đang dịch offline", move |cd, bc| {
                 let ds = cd.cau_can_dich(dot);
                 let xong = cd.viec.chay_offline(ds, bc).map_err(|e| e.to_string())?;
@@ -1071,6 +1087,9 @@ impl TrangVietHoa {
                 {
                     lam = Some("claude");
                 }
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "AI local sửa câu dịch dở", "Đang soát", crate::kieu::TIM, !ban) {
+                    lam = Some("ai_sua");
+                }
                 ui.label("Giới hạn mỗi lần:");
                 for g in [1.0, 2.0, 5.0] {
                     ui.selectable_value(&mut self.gioi_han, g, format!("{g:.0} USD"));
@@ -1147,6 +1166,11 @@ impl TrangVietHoa {
         let khong_dau = self.khong_dau;
         let gioi_han = self.gioi_han;
         match lam {
+            Some("ai_sua") => self.chay("AI local đang soát bản dịch", |v, bc| {
+                let cap = v.viec.cau_nghi_van(400);
+                let n = v.viec.ai_sua(cap, bc).map_err(|e| e.to_string())?;
+                Ok(format!("AI đã sửa {n} câu dịch dở. Bấm lại để soát tiếp phần còn lại, rồi Ghi vào game."))
+            }),
             Some("offline") => self.chay("Đang dịch offline", |v, bc| {
                 let ds = v.viec.cau_can_dich(v.cac_cau().iter().map(String::as_str));
                 let xong = v.viec.chay_offline(ds, bc).map_err(|e| e.to_string())?;
