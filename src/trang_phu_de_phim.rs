@@ -1,5 +1,6 @@
 //! Trang Phụ đề phim: dán link / chọn file phim → AI nghe → dịch → .srt tiếng Việt → mở phim.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -40,7 +41,63 @@ impl BaoCao for Bao {
     }
 }
 
+/// Một dòng thoại để chia người nói.
+struct DongNguoi {
+    gio: f64,
+    en: String,
+    vi: String,
+    /// "" = giọng chung
+    nguoi: String,
+}
+
+#[derive(Default)]
+struct DsNguoi {
+    dong: Vec<DongNguoi>,
+    bao: String,
+    dang: bool,
+}
+
+fn giong_mac_dinh_cho(nhan: &str, so_nam: usize, chung: &str) -> String {
+    let l = nhan.to_lowercase();
+    let so = nhan.chars().find_map(|c| c.to_digit(10)).unwrap_or(1) as usize;
+    let g = &crate::thuyet_minh::GIONG;
+    if l.starts_with("nam") {
+        g[(so.max(1) - 1 + so_nam * 0) % 3].0.to_string()
+    } else if l.starts_with("nữ") || l.starts_with("nu") {
+        g[3 + (so.max(1) - 1) % 3].0.to_string()
+    } else if l.starts_with("trẻ") {
+        g[4].0.to_string()
+    } else if l.starts_with("kể") {
+        g[0].0.to_string()
+    } else {
+        chung.to_string()
+    }
+}
+
+fn chon_giong(ui: &mut egui::Ui, id: &str, hien: &mut String, kho: &[String]) {
+    let ten = match hien.strip_prefix("kho:") {
+        Some(f) => format!("{f} (giọng của bạn)"),
+        None => hien.clone(),
+    };
+    egui::ComboBox::from_id_salt(id)
+        .selected_text(ten)
+        .width(220.0)
+        .show_ui(ui, |ui| {
+            for (g, m) in crate::thuyet_minh::GIONG.iter() {
+                ui.selectable_value(hien, g.to_string(), format!("{g} ({m})"));
+            }
+            for f in kho {
+                ui.selectable_value(hien, format!("kho:{f}"), f);
+            }
+        });
+}
+
 pub struct TrangPhuDePhim {
+    /// thuyết minh nhiều giọng: người nói → giọng
+    nhieu_giong: bool,
+    nguoi: Vec<String>,
+    giong_nguoi: HashMap<String, String>,
+    ds: Arc<Mutex<DsNguoi>>,
     nguon: String,
     claude: bool,
     gioi_han: f64,
@@ -65,6 +122,10 @@ pub struct TrangPhuDePhim {
 impl Default for TrangPhuDePhim {
     fn default() -> Self {
         Self {
+            nhieu_giong: false,
+            nguoi: Vec::new(),
+            giong_nguoi: HashMap::new(),
+            ds: Arc::new(Mutex::new(DsNguoi::default())),
             nguon: String::new(),
             claude: dich::claude::co_khoa(),
             gioi_han: 1.0,
@@ -107,6 +168,106 @@ impl TrangPhuDePhim {
         );
     }
 
+    /// Nạp các dòng thoại của phim (đã tạo phụ đề) để chia người nói.
+    fn nap_dong(&self) {
+        let nguon = self.nguon.trim().trim_matches('"').to_string();
+        let ds = self.ds.clone();
+        {
+            let mut g = ds.lock().unwrap();
+            if g.dang {
+                return;
+            }
+            g.dang = true;
+            g.bao = "Đang nạp thoại phim...".into();
+        }
+        std::thread::spawn(move || {
+            let kq = (|| -> anyhow::Result<Vec<DongNguoi>> {
+                if nguon.is_empty() {
+                    anyhow::bail!("dán link phim hoặc chọn file phim trước");
+                }
+                let v = ViecPhim::moi(&nguon)?;
+                if v.dong.is_empty() {
+                    anyhow::bail!("chưa có phụ đề – bấm Tạo phụ đề tiếng Việt trước");
+                }
+                Ok(v.dong
+                    .iter()
+                    .map(|(a, _, c)| DongNguoi {
+                        gio: *a,
+                        en: c.clone(),
+                        vi: v.viec.tim(c).unwrap_or_default(),
+                        nguoi: String::new(),
+                    })
+                    .collect())
+            })();
+            let mut g = ds.lock().unwrap();
+            g.dang = false;
+            match kq {
+                Ok(d) => {
+                    g.bao = format!("Đã nạp {} dòng thoại.", d.len());
+                    g.dong = d;
+                }
+                Err(e) => g.bao = format!("Lỗi: {e}"),
+            }
+        });
+    }
+
+    /// AI local đoán người nói cho từng dòng (nhường GPU cho VieNeu: AI chạy xong mới thuyết minh).
+    fn ai_chia(&self) {
+        let ds = self.ds.clone();
+        {
+            let mut g = ds.lock().unwrap();
+            if g.dang || g.dong.is_empty() {
+                return;
+            }
+            g.dang = true;
+            g.bao = "AI đang chia người nói...".into();
+        }
+        std::thread::spawn(move || {
+            let kq = (|| -> anyhow::Result<usize> {
+                crate::ai_local::tu_mo(&|m| ds.lock().unwrap().bao = m.to_string())?;
+                let cau: Vec<(String, String)> = ds
+                    .lock()
+                    .unwrap()
+                    .dong
+                    .iter()
+                    .map(|d| (d.en.clone(), d.vi.clone()))
+                    .collect();
+                let mut nhan: Vec<String> = Vec::new();
+                for (k, lo) in cau.chunks(30).enumerate() {
+                    let ngu: Vec<(String, String)> = if k == 0 {
+                        vec![]
+                    } else {
+                        let b = k * 30;
+                        (b.saturating_sub(3)..b)
+                            .map(|i| (cau[i].1.clone(), nhan[i].clone()))
+                            .collect()
+                    };
+                    let mut da_co: Vec<String> = Vec::new();
+                    for n in &nhan {
+                        if !da_co.contains(n) {
+                            da_co.push(n.clone());
+                        }
+                    }
+                    let r = crate::ai_local::chia_nguoi(lo, &da_co, &ngu)?;
+                    nhan.extend(r.into_iter().map(|x| x.trim().to_string()));
+                    ds.lock().unwrap().bao =
+                        format!("AI đang chia người nói {}/{}", nhan.len(), cau.len());
+                }
+                let mut g = ds.lock().unwrap();
+                for (d, n) in g.dong.iter_mut().zip(&nhan) {
+                    d.nguoi = n.clone();
+                }
+                Ok(nhan.len())
+            })();
+            let mut g = ds.lock().unwrap();
+            g.dang = false;
+            g.bao = match kq {
+                Ok(n) => format!("Xong: đã chia người nói cho {n} dòng. Xem lại bên dưới, sửa người nói của từng dòng hoặc giọng của từng người nếu chưa ưng."),
+                Err(e) => format!("Lỗi: {e}"),
+            };
+        });
+    }
+
     /// Thuyết minh bằng giọng đã chọn (dùng phụ đề đã tạo; chưa có thì báo tạo phụ đề trước).
     fn thuyet_minh(&mut self) {
         let nguon = self.nguon.trim().trim_matches('"').to_string();
@@ -132,6 +293,22 @@ impl TrangPhuDePhim {
             cuong_do: self.cuong_do,
             thu_dau: self.chi_thu.then_some(10),
             tu_kho: self.giong.strip_prefix("kho:").map(String::from),
+            nguoi: if self.nhieu_giong {
+                self.ds
+                    .lock()
+                    .unwrap()
+                    .dong
+                    .iter()
+                    .map(|d| d.nguoi.clone())
+                    .collect()
+            } else {
+                Vec::new()
+            },
+            giong_nguoi: if self.nhieu_giong {
+                self.giong_nguoi.clone()
+            } else {
+                HashMap::new()
+            },
         };
         let ai_rut_gon = self.ai_rut_gon;
         let (tt, dung) = (self.tt.clone(), self.dung.clone());
@@ -202,6 +379,10 @@ impl TrangPhuDePhim {
                                 format!("AI local đang rút gọn câu quá dài {xong}/{}", dai.len());
                         }
                     }
+                }
+                let mut tuy = tuy;
+                if tuy.nguoi.len() != dong.len() {
+                    tuy.nguoi.clear();
                 }
                 let _gpu = crate::ai_local::KhoaLongTieng::vao()?;
                 crate::thuyet_minh::thuyet_minh(
@@ -472,6 +653,10 @@ impl TrangPhuDePhim {
                     }
                     self.them.nut(ui);
                 });
+                crate::kieu::cong_tac(ui, &mut self.nhieu_giong, "Nhiều giọng: mỗi nhân vật một giọng (AI chia người nói, hoặc bạn tự chọn từng dòng)");
+                if self.nhieu_giong {
+                    self.ve_nhieu_giong(ui);
+                }
                 crate::kieu::cong_tac(ui, &mut self.theo_cam_xuc, "Giọng theo cảm xúc: dùng mẫu bình thường / gấp rút / buồn của giọng này theo từng câu");
                 crate::kieu::cong_tac(ui, &mut self.nhan_nha, "Nhấn nhá theo câu: chỉnh to nhỏ, nhanh chậm, cao thấp theo dấu câu và từ khóa");
                 if self.nhan_nha {
@@ -518,6 +703,110 @@ impl TrangPhuDePhim {
                 Color32::YELLOW
             };
             ui.label(RichText::new(tb).color(m));
+        }
+    }
+}
+
+impl TrangPhuDePhim {
+    fn ve_nhieu_giong(&mut self, ui: &mut egui::Ui) {
+        let (bao, dang, so) = {
+            let g = self.ds.lock().unwrap();
+            (g.bao.clone(), g.dang, g.dong.len())
+        };
+        if dang {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(400));
+        }
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .add_enabled(!dang, egui::Button::new("1. Nạp thoại phim"))
+                .clicked()
+            {
+                self.nap_dong();
+            }
+            if ui
+                .add_enabled(!dang && so > 0, egui::Button::new("2. AI chia người nói"))
+                .clicked()
+            {
+                self.ai_chia();
+            }
+            if ui.button("+ Thêm người nói").clicked() {
+                let ten = format!("Người {}", self.nguoi.len() + 1);
+                self.giong_nguoi.insert(ten.clone(), self.giong.clone());
+                self.nguoi.push(ten);
+            }
+        });
+        if !bao.is_empty() {
+            ui.label(RichText::new(&bao).small());
+        }
+        // đồng bộ danh sách người nói với nhãn trong các dòng (AI vừa tạo nhãn mới → gán giọng mặc định theo nam / nữ)
+        {
+            let g = self.ds.lock().unwrap();
+            for d in &g.dong {
+                if !d.nguoi.is_empty() && !self.nguoi.contains(&d.nguoi) {
+                    self.nguoi.push(d.nguoi.clone());
+                    let so_nam = self.nguoi.len();
+                    self.giong_nguoi.insert(
+                        d.nguoi.clone(),
+                        giong_mac_dinh_cho(&d.nguoi, so_nam, &self.giong),
+                    );
+                }
+            }
+        }
+        if self.nguoi.is_empty() {
+            ui.label(RichText::new("Chưa có người nói nào. Bấm \"AI chia người nói\" hoặc \"+ Thêm người nói\". Dòng chưa gán người nói dùng giọng chọn ở trên.").small().weak());
+            return;
+        }
+        ui.label(RichText::new("Giọng của từng người nói:").strong());
+        let nguoi = self.nguoi.clone();
+        for (i, n) in nguoi.iter().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label(format!("{n}:"));
+                let g = self
+                    .giong_nguoi
+                    .entry(n.clone())
+                    .or_insert_with(|| self.giong.clone());
+                chon_giong(ui, &format!("gn{i}"), g, &self.kho);
+            });
+        }
+        if so > 0 {
+            ui.add_space(4.0);
+            ui.label(
+                RichText::new(format!("Người nói từng dòng ({so} dòng) – bấm để đổi:")).strong(),
+            );
+            let h = ui.text_style_height(&egui::TextStyle::Body) + 10.0;
+            let mut g = self.ds.lock().unwrap();
+            egui::ScrollArea::vertical()
+                .id_salt("ds_nguoi")
+                .max_height(300.0)
+                .auto_shrink([false, true])
+                .show_rows(ui, h, so, |ui, r| {
+                    for i in r {
+                        let d = &mut g.dong[i];
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(format!("{:>5.0}s", d.gio)).monospace().weak());
+                            egui::ComboBox::from_id_salt(("dn", i))
+                                .selected_text(if d.nguoi.is_empty() {
+                                    "(giọng chung)".to_string()
+                                } else {
+                                    d.nguoi.clone()
+                                })
+                                .width(130.0)
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut d.nguoi,
+                                        String::new(),
+                                        "(giọng chung)",
+                                    );
+                                    for n in &nguoi {
+                                        ui.selectable_value(&mut d.nguoi, n.clone(), n);
+                                    }
+                                });
+                            let t: String = d.vi.chars().take(70).collect();
+                            ui.label(t);
+                        });
+                    }
+                });
         }
     }
 }

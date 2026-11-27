@@ -282,6 +282,42 @@ pub fn rut_gon(cau: &[(String, f64)]) -> Result<Vec<String>> {
     mang_json(&r, cau.len())
 }
 
+/// Chia người nói cho từng dòng thoại phim. `cau`: (tiếng Anh nếu có, tiếng Việt). Trả nhãn mỗi dòng:
+/// "Nam 1", "Nữ 2", "Kể chuyện"... (cùng người = cùng nhãn xuyên suốt phim). `da_co`: các nhãn đã dùng ở lô trước.
+pub fn chia_nguoi(
+    cau: &[(String, String)],
+    da_co: &[String],
+    ngu_canh: &[(String, String)],
+) -> Result<Vec<String>> {
+    let mut vao = String::new();
+    if !da_co.is_empty() {
+        vao.push_str(&format!(
+            "Các nhân vật đã xuất hiện: {}\n",
+            da_co.join(", ")
+        ));
+    }
+    for (c, l) in ngu_canh {
+        vao.push_str(&format!("(trước đó) {c}  =>  {l}\n"));
+    }
+    vao.push_str("Các câu cần gán:\n");
+    for (i, (en, vi)) in cau.iter().enumerate() {
+        vao.push_str(&format!(
+            "{}. {} | {}\n",
+            i + 1,
+            en.replace('\n', " "),
+            vi.replace('\n', " ")
+        ));
+    }
+    let r = hoi(
+        "Bạn phân vai cho thoại phim để lồng tiếng. Với MỖI câu (tiếng Anh | tiếng Việt), đoán người nói dựa trên nội dung, \
+         cách xưng hô, đối đáp qua lại. Đặt nhãn dạng \"Nam 1\", \"Nam 2\", \"Nữ 1\", \"Nữ 2\", \"Trẻ em\", \"Kể chuyện\" – cùng một người \
+         phải luôn cùng nhãn (dùng lại nhãn đã có), tối đa 6 nhãn khác nhau. Không chắc thì gán người nói gần nhất hợp lý. \
+         Trả về DUY NHẤT một mảng JSON các chuỗi nhãn, cùng số phần tử, cùng thứ tự.",
+        &vao,
+    )?;
+    mang_json(&r, cau.len())
+}
+
 pub fn giai_thich_loi(loi: &str) -> Result<String> {
     hoi(
         "Bạn giúp người dùng không rành kỹ thuật của app Việt hóa game. Đọc thông báo lỗi và trả lời bằng tiếng Việt, \

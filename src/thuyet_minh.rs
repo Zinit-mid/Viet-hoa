@@ -39,6 +39,10 @@ pub struct Tuy {
     pub thu_dau: Option<usize>,
     /// giọng của bạn trong kho giọng (tên file .wav); None = giọng dựng sẵn `giong`
     pub tu_kho: Option<String>,
+    /// nhiều giọng: người nói của từng dòng (cùng thứ tự `dong`; rỗng = giọng mặc định)
+    pub nguoi: Vec<String>,
+    /// người nói → giọng ("Thiện Minh" dựng sẵn hoặc "kho:<tên file>")
+    pub giong_nguoi: std::collections::HashMap<String, String>,
 }
 
 /// Bảng "cách đọc tên riêng" của người dùng: mỗi dòng `Tên => cách viết để đọc` (vd `Jess => Giét`).
@@ -302,79 +306,110 @@ pub fn thuyet_minh(
         bail!("thiếu ffmpeg trong cong_cu");
     }
     // 1. lọc dòng có tiếng Việt, tính khung thời gian mỗi dòng (đến lúc dòng sau bắt đầu)
-    let mut dl: Vec<(f64, f64, String)> = dong
-        .iter()
-        .filter(|d| !lam_sach_loi(&d.2).is_empty())
-        .cloned()
+    let mut loc: Vec<usize> = (0..dong.len())
+        .filter(|&i| !lam_sach_loi(&dong[i].2).is_empty())
         .collect();
+    let mut dl: Vec<(f64, f64, String)> = loc.iter().map(|&i| dong[i].clone()).collect();
     let bo_qua = dong.len() - dl.len();
     if dl.is_empty() {
         bail!("chưa có dòng phụ đề tiếng Việt nào – tạo phụ đề trước");
     }
     if let Some(n) = t.thu_dau {
         dl.truncate(n);
+        loc.truncate(n);
     }
-    // 2. bộ giọng cảm xúc
-    let (bo_dir, giong_id) = if let Some(f) = &t.tu_kho {
-        let (d, sig) = bo_tu_kho(f)?;
-        (Some(d), format!("kho:{f}#{sig}"))
-    } else {
-        if t.theo_cam_xuc && !co_bo(&t.giong) {
-            bao(&format!(
-                "Tạo bộ giọng cảm xúc cho {} (lần đầu, ~1 phút)...",
-                t.giong
-            ));
-            if !tao_bo(&[&t.giong], dung, bao)? {
-                return Ok(None);
-            }
-        }
-        (
-            t.theo_cam_xuc.then(|| thu_muc_giong(&t.giong)),
-            t.giong.clone(),
-        )
-    };
+    // 2-3. giọng của từng dòng (một giọng cho cả phim, hoặc mỗi người nói một giọng) → VieNeu đọc từng nhóm giọng
     let ten_doc = doc_ten_doc();
-    // 3. VieNeu đọc từng dòng
+    let mac_dinh = match &t.tu_kho {
+        Some(f) => format!("kho:{f}"),
+        None => t.giong.clone(),
+    };
+    let giong_dong: Vec<String> = loc
+        .iter()
+        .map(|&i| {
+            t.nguoi
+                .get(i)
+                .filter(|l| !l.is_empty())
+                .and_then(|l| t.giong_nguoi.get(l))
+                .cloned()
+                .unwrap_or_else(|| mac_dinh.clone())
+        })
+        .collect();
     let wav_dir = tm.join("thuyet_minh").join("wav");
     std::fs::create_dir_all(&wav_dir)?;
-    let mut ds = Vec::new();
-    let mut ids = Vec::new();
-    for (i, (a, _, vi)) in dl.iter().enumerate() {
-        let cx = phan_loai(vi);
-        let chu = ap_ten(&lam_sach_loi(vi), &ten_doc);
-        let khung = dl
-            .get(i + 1)
-            .map(|n| n.0 - a - 0.05)
-            .unwrap_or(8.0)
-            .clamp(0.6, 12.0);
-        let id = id_dong(&giong_id, cx, &chu, t);
-        ds.push(json!({"id": id, "text": chu, "giay": khung, "cam_xuc": cx}));
-        ids.push(id);
+    let mut ids = vec![String::new(); dl.len()];
+    let mut nhom: std::collections::BTreeMap<String, Vec<usize>> = Default::default();
+    for (i, g) in giong_dong.iter().enumerate() {
+        nhom.entry(g.clone()).or_default().push(i);
     }
-    let viec = json!({
-        "che_do": "doc", "giong": t.giong, "ra": wav_dir.to_string_lossy(), "ds": ds,
-        "bo": bo_dir.map(|d| d.to_string_lossy().into_owned()),
-        "nhan_nha": t.nhan_nha, "cuong_do": t.cuong_do, "toi_da": 1.45,
-    });
     let n = dl.len();
-    bao(&format!(
-        "VieNeu đang đọc {n} dòng bằng giọng {}...",
-        t.giong
-    ));
-    if !gv::chay_kich_ban(
-        "thuyet_minh.py",
-        &viec,
-        &tm.join("thuyet_minh"),
-        "Thuyết minh: VieNeu đã đọc",
-        dung,
-        &|s| {
-            bao(s);
-            if let Some((a, b)) = s.rsplit_once(' ').and_then(|x| x.1.split_once('/')) {
-                tien(a.parse().unwrap_or(0), b.parse().unwrap_or(1));
+    let mut da_doc = 0usize;
+    for (g, chi_so) in &nhom {
+        let (tu_kho, preset) = match g.strip_prefix("kho:") {
+            Some(f) => (Some(f.to_string()), t.giong.clone()),
+            None => (None, g.clone()),
+        };
+        let (bo_dir, giong_id) = if let Some(f) = &tu_kho {
+            let (d, sig) = bo_tu_kho(f)?;
+            (Some(d), format!("kho:{f}#{sig}"))
+        } else {
+            if t.theo_cam_xuc && !co_bo(&preset) {
+                bao(&format!(
+                    "Tạo bộ giọng cảm xúc cho {preset} (lần đầu, ~1 phút)..."
+                ));
+                if !tao_bo(&[&preset], dung, bao)? {
+                    return Ok(None);
+                }
             }
-        },
-    )? {
-        return Ok(None);
+            (
+                t.theo_cam_xuc.then(|| thu_muc_giong(&preset)),
+                preset.clone(),
+            )
+        };
+        let mut ds = Vec::new();
+        for &i in chi_so {
+            let (a, _, vi) = &dl[i];
+            let cx = phan_loai(vi);
+            let chu = ap_ten(&lam_sach_loi(vi), &ten_doc);
+            let khung = dl
+                .get(i + 1)
+                .map(|n| n.0 - a - 0.05)
+                .unwrap_or(8.0)
+                .clamp(0.6, 12.0);
+            let id = id_dong(&giong_id, cx, &chu, t);
+            ds.push(json!({"id": id, "text": chu, "giay": khung, "cam_xuc": cx}));
+            ids[i] = id;
+        }
+        let viec = json!({
+            "che_do": "doc", "giong": preset, "ra": wav_dir.to_string_lossy(), "ds": ds,
+            "bo": bo_dir.map(|d| d.to_string_lossy().into_owned()),
+            "nhan_nha": t.nhan_nha, "cuong_do": t.cuong_do, "toi_da": 1.45,
+        });
+        let ten_hien = match &tu_kho {
+            Some(f) => format!("{f} (giọng của bạn)"),
+            None => preset.clone(),
+        };
+        bao(&format!(
+            "VieNeu đang đọc {} dòng bằng giọng {ten_hien}...",
+            chi_so.len()
+        ));
+        let truoc_xong = da_doc;
+        if !gv::chay_kich_ban(
+            "thuyet_minh.py",
+            &viec,
+            &tm.join("thuyet_minh"),
+            "Thuyết minh: VieNeu đã đọc",
+            dung,
+            &|s| {
+                bao(s);
+                if let Some((a, _)) = s.rsplit_once(' ').and_then(|x| x.1.split_once('/')) {
+                    tien(truoc_xong + a.parse::<usize>().unwrap_or(0), n);
+                }
+            },
+        )? {
+            return Ok(None);
+        }
+        da_doc += chi_so.len();
     }
     // 4. xếp các đoạn vào đúng thời điểm
     bao("Đang xếp giọng thuyết minh vào đúng thời điểm...");
@@ -620,6 +655,8 @@ mod test {
             cuong_do: 0.7,
             thu_dau: None,
             tu_kho: std::env::var("KHO").ok(),
+            nguoi: Vec::new(),
+            giong_nguoi: Default::default(),
         };
         let kq = thuyet_minh(
             v.phim.as_ref().map(|p| p.duong_dan.as_path()).unwrap(),

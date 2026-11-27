@@ -1,6 +1,6 @@
 [package]
 name = "viet_hoa"
-version = "0.2.9"
+version = "0.3.0"
 edition = "2021"
 description = "Việt Hóa – dịch màn hình game, Việt hóa, lồng tiếng, phụ đề phim"
 
