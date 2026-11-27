@@ -937,6 +937,13 @@ pub fn chay(chung: Arc<Chung>, nhan: Receiver<Lenh>, gui: Sender<Lenh>) {
                 _ => (String::new(), None),
             };
             let kieu = match (che_goc, che, v.vung) {
+                // Hội thoại / phụ đề: che KÍN cả vùng chữ gốc bằng nền tối (không để sót dòng tiếng Anh), bản dịch nằm trong đó
+                (true, _, Some(r)) if v.loai == "phu_de" && !chu.is_empty() => Kieu::Che {
+                    hop: [r[0] - 8, r[1] - 6, r[2] + 16, r[3] + 12],
+                    nen: [12, 12, 12],
+                    chu: [255, 255, 255],
+                    cao: (v.co_chu.max(18) * 5 / 4).clamp(18, 60),
+                },
                 (true, Some((hop, Some((nen, mau)), cao)), Some(r)) if !chu.is_empty() => {
                     Kieu::Che {
                         hop: [r[0] + hop[0] - 4, r[1] + hop[1] - 3, hop[2] + 8, hop[3] + 6],
