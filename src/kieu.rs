@@ -5,7 +5,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use eframe::egui::{self, epaint, Color32, FontFamily, FontId, Pos2, Rect, Response, RichText, Sense, Stroke, TextStyle, Ui, Vec2};
+use eframe::egui::{
+    self, epaint, Color32, FontFamily, FontId, Pos2, Rect, Response, RichText, Sense, Stroke,
+    TextStyle, Ui, Vec2,
+};
 
 // ---------------- màu ----------------
 pub const NEN: Color32 = Color32::from_rgb(12, 8, 22);
@@ -42,7 +45,10 @@ fn tep_cai_dat() -> std::path::PathBuf {
 }
 
 pub fn nap_cai_dat() {
-    if let Some(v) = std::fs::read(tep_cai_dat()).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok()) {
+    if let Some(v) = std::fs::read(tep_cai_dat())
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+    {
         ANH_SANG.store(v["anh_sang"].as_bool().unwrap_or(true), Ordering::Relaxed);
     }
 }
@@ -53,7 +59,10 @@ pub fn anh_sang_bat() -> bool {
 
 pub fn dat_anh_sang(b: bool) {
     ANH_SANG.store(b, Ordering::Relaxed);
-    let _ = std::fs::write(tep_cai_dat(), serde_json::json!({"anh_sang": b}).to_string());
+    let _ = std::fs::write(
+        tep_cai_dat(),
+        serde_json::json!({"anh_sang": b}).to_string(),
+    );
 }
 
 // ---------------- font + kiểu chung ----------------
@@ -72,14 +81,30 @@ pub fn dam(s: impl Into<String>) -> RichText {
 pub fn ap_dung(ctx: &egui::Context) {
     let mut f = egui::FontDefinitions::default();
     let nhung: [(&str, &[u8]); 5] = [
-        ("plex", include_bytes!("../assets/fonts/IBMPlexSans-Regular.ttf")),
-        ("plex_dam", include_bytes!("../assets/fonts/IBMPlexSans-SemiBold.ttf")),
-        ("plex_nhe", include_bytes!("../assets/fonts/IBMPlexSans-Light.ttf")),
-        ("plex_mono", include_bytes!("../assets/fonts/IBMPlexMono-Regular.ttf")),
-        ("viet", include_bytes!("../assets/fonts/BeVietnamPro-Regular.ttf")),
+        (
+            "plex",
+            include_bytes!("../assets/fonts/IBMPlexSans-Regular.ttf"),
+        ),
+        (
+            "plex_dam",
+            include_bytes!("../assets/fonts/IBMPlexSans-SemiBold.ttf"),
+        ),
+        (
+            "plex_nhe",
+            include_bytes!("../assets/fonts/IBMPlexSans-Light.ttf"),
+        ),
+        (
+            "plex_mono",
+            include_bytes!("../assets/fonts/IBMPlexMono-Regular.ttf"),
+        ),
+        (
+            "viet",
+            include_bytes!("../assets/fonts/BeVietnamPro-Regular.ttf"),
+        ),
     ];
     for (ten, b) in nhung {
-        f.font_data.insert(ten.into(), Arc::new(egui::FontData::from_static(b)));
+        f.font_data
+            .insert(ten.into(), Arc::new(egui::FontData::from_static(b)));
     }
     let chen = |f: &mut egui::FontDefinitions, ho: FontFamily, ds: &[&str]| {
         let e = f.families.entry(ho).or_default();
@@ -88,7 +113,11 @@ pub fn ap_dung(ctx: &egui::Context) {
         }
     };
     chen(&mut f, FontFamily::Proportional, &["plex", "viet"]);
-    chen(&mut f, FontFamily::Monospace, &["plex_mono", "plex", "viet"]);
+    chen(
+        &mut f,
+        FontFamily::Monospace,
+        &["plex_mono", "plex", "viet"],
+    );
     chen(&mut f, dam_ho(), &["plex_dam", "plex", "viet"]);
     chen(&mut f, nhe_ho(), &["plex_nhe", "plex", "viet"]);
     // font dự phòng của egui (emoji, ký hiệu) nằm sau
@@ -104,11 +133,20 @@ pub fn ap_dung(ctx: &egui::Context) {
 
     ctx.style_mut(|s| {
         // cỡ chữ ≥ 14 (mục 2 của thiết kế)
-        s.text_styles.insert(TextStyle::Body, FontId::new(16.0, FontFamily::Proportional));
-        s.text_styles.insert(TextStyle::Button, FontId::new(17.0, dam_ho()));
-        s.text_styles.insert(TextStyle::Small, FontId::new(14.0, FontFamily::Proportional));
-        s.text_styles.insert(TextStyle::Monospace, FontId::new(15.0, FontFamily::Monospace));
-        s.text_styles.insert(TextStyle::Heading, FontId::new(38.0, nhe_ho()));
+        s.text_styles
+            .insert(TextStyle::Body, FontId::new(16.0, FontFamily::Proportional));
+        s.text_styles
+            .insert(TextStyle::Button, FontId::new(17.0, dam_ho()));
+        s.text_styles.insert(
+            TextStyle::Small,
+            FontId::new(14.0, FontFamily::Proportional),
+        );
+        s.text_styles.insert(
+            TextStyle::Monospace,
+            FontId::new(15.0, FontFamily::Monospace),
+        );
+        s.text_styles
+            .insert(TextStyle::Heading, FontId::new(38.0, nhe_ho()));
         s.spacing.item_spacing = Vec2::new(10.0, 10.0);
         s.spacing.button_padding = Vec2::new(22.0, 11.0);
         s.spacing.slider_rail_height = 8.0;
@@ -201,11 +239,22 @@ pub fn nen_anh_sang(ctx: &egui::Context) {
     let tia = |a1: Pos2, a2: Pos2, al: u8| {
         p.line_segment([a1, a2], Stroke::new(1.0, rgba(190, 220, 255, al)));
     };
-    for (i, (x2, y2)) in [(1.0, 0.18), (1.0, 0.26), (0.97, 0.34), (1.0, 0.10)].iter().enumerate() {
-        tia(at(0.74 + i as f32 * 0.02, 0.0), at(*x2, *y2), 26 - i as u8 * 4);
+    for (i, (x2, y2)) in [(1.0, 0.18), (1.0, 0.26), (0.97, 0.34), (1.0, 0.10)]
+        .iter()
+        .enumerate()
+    {
+        tia(
+            at(0.74 + i as f32 * 0.02, 0.0),
+            at(*x2, *y2),
+            26 - i as u8 * 4,
+        );
     }
     for (i, x2) in [0.20f32, 0.24, 0.28].iter().enumerate() {
-        tia(at(0.17 + i as f32 * 0.015, 1.0), at(*x2, 0.80 - i as f32 * 0.02), 22);
+        tia(
+            at(0.17 + i as f32 * 0.015, 1.0),
+            at(*x2, 0.80 - i as f32 * 0.02),
+            22,
+        );
     }
 
     // bụi sao: vị trí cố định theo chỉ số (không chớp, không tốn CPU)
@@ -234,7 +283,10 @@ static MAU_VIEN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::ne
 
 /// Màu viền sáng của khối kính (theo chức năng của trang đang mở).
 pub fn dat_mau_vien(c: Color32) {
-    MAU_VIEN.store(u32::from_be_bytes([c.a(), c.r(), c.g(), c.b()]), Ordering::Relaxed);
+    MAU_VIEN.store(
+        u32::from_be_bytes([c.a(), c.r(), c.g(), c.b()]),
+        Ordering::Relaxed,
+    );
 }
 
 fn mau_vien() -> Color32 {
@@ -250,7 +302,12 @@ pub fn kinh_khung() -> egui::Frame {
         .corner_radius(egui::CornerRadius::same(24))
         .inner_margin(egui::Margin::same(20))
         // quầng sáng màu quanh khối (như viền neon của ảnh mẫu)
-        .shadow(epaint::Shadow { offset: [0, 0], blur: 22, spread: 0, color: a(m, 30) })
+        .shadow(epaint::Shadow {
+            offset: [0, 0],
+            blur: 22,
+            spread: 0,
+            color: a(m, 30),
+        })
 }
 
 /// Khối kính có tiêu đề (thẻ). Nếu thanh bên yêu cầu cuộn tới khối này thì cuộn tới.
@@ -313,19 +370,38 @@ pub fn icon_cho(nhan: &str) -> &'static str {
 fn ve_neon(p: &egui::Painter, rect: Rect, mau: Color32, cuong: f32) {
     let br = rect.height() / 2.0;
     for (e, al) in [(9.0f32, 9.0f32), (5.0, 15.0), (2.5, 26.0)] {
-        p.rect_filled(rect.expand(e), br + e, a(mau, (al * cuong).min(120.0) as u8));
+        p.rect_filled(
+            rect.expand(e),
+            br + e,
+            a(mau, (al * cuong).min(120.0) as u8),
+        );
     }
     p.rect_filled(rect, br, Color32::from_rgb(10, 6, 20));
     // ánh sáng màu ở nửa dưới
     for i in 0..7 {
         let hh = rect.height() * 0.5 * (1.0 - i as f32 / 7.0);
-        let r = Rect::from_min_max(Pos2::new(rect.left() + br * 0.55, rect.bottom() - 3.0 - hh), Pos2::new(rect.right() - br * 0.55, rect.bottom() - 3.0));
-        p.rect_filled(r, (br * 0.7).min(hh / 2.0 + 2.0), a(mau, (11.0 * cuong).min(60.0) as u8));
+        let r = Rect::from_min_max(
+            Pos2::new(rect.left() + br * 0.55, rect.bottom() - 3.0 - hh),
+            Pos2::new(rect.right() - br * 0.55, rect.bottom() - 3.0),
+        );
+        p.rect_filled(
+            r,
+            (br * 0.7).min(hh / 2.0 + 2.0),
+            a(mau, (11.0 * cuong).min(60.0) as u8),
+        );
     }
     // bóng kính phía trên + viền trong mờ
-    let g = Rect::from_min_max(Pos2::new(rect.left() + br * 0.7, rect.top() + 4.0), Pos2::new(rect.right() - br * 0.7, rect.center().y - 2.0));
+    let g = Rect::from_min_max(
+        Pos2::new(rect.left() + br * 0.7, rect.top() + 4.0),
+        Pos2::new(rect.right() - br * 0.7, rect.center().y - 2.0),
+    );
     p.rect_filled(g, 10.0, rgba(255, 255, 255, 16));
-    p.rect_stroke(rect.shrink(4.5), br - 4.5, Stroke::new(1.0, rgba(255, 255, 255, 34)), egui::StrokeKind::Inside);
+    p.rect_stroke(
+        rect.shrink(4.5),
+        br - 4.5,
+        Stroke::new(1.0, rgba(255, 255, 255, 34)),
+        egui::StrokeKind::Inside,
+    );
 }
 
 /// Màu phụ đi cùng màu chính để viền đổi màu dần (trái = phụ → phải = chính), như nút mẫu.
@@ -399,7 +475,12 @@ fn gradient_vien(p: &egui::Painter, rect: Rect, c_trai: Color32, c_phai: Color32
 
 fn ve_vien(p: &egui::Painter, rect: Rect, mau: Color32, al: u8, focus: bool) {
     if focus {
-        p.rect_stroke(rect, rect.height() / 2.0, Stroke::new(2.5, Color32::WHITE), egui::StrokeKind::Inside);
+        p.rect_stroke(
+            rect,
+            rect.height() / 2.0,
+            Stroke::new(2.5, Color32::WHITE),
+            egui::StrokeKind::Inside,
+        );
     } else {
         gradient_vien(p, rect, a(mau_phu(mau), al), a(mau, al), 2.2);
     }
@@ -411,51 +492,121 @@ fn ve_icon(p: &egui::Painter, rect: Rect, glyph: &str, mau_chu: Color32) {
     let tam = Pos2::new(rect.left() + br, rect.center().y);
     p.circle_filled(tam, br - 8.0, rgba(255, 255, 255, 14));
     p.circle_stroke(tam, br - 8.0, Stroke::new(1.2, rgba(255, 255, 255, 85)));
-    p.text(tam, egui::Align2::CENTER_CENTER, glyph, FontId::new(19.0, FontFamily::Proportional), mau_chu);
+    p.text(
+        tam,
+        egui::Align2::CENTER_CENTER,
+        glyph,
+        FontId::new(19.0, FontFamily::Proportional),
+        mau_chu,
+    );
 }
 
 fn rong_nut(ui: &Ui, nhan: &str, cao: f32, co_icon: bool) -> f32 {
-    let gal = ui.painter().layout_no_wrap(nhan.to_string(), FontId::new(17.0, dam_ho()), CHU);
+    let gal = ui
+        .painter()
+        .layout_no_wrap(nhan.to_string(), FontId::new(17.0, dam_ho()), CHU);
     (gal.size().x + 34.0 + if co_icon { cao + 4.0 } else { 18.0 }).max(150.0)
 }
 
 /// Nút kính neon có biểu tượng, viền / quầng sáng màu `mau`. Cao 52.
 pub fn pill(ui: &mut Ui, nhan: &str, mau: Color32, bat: bool) -> Response {
     let size = Vec2::new(rong_nut(ui, nhan, 52.0, true), 52.0);
-    let (rect, ph) = ui.allocate_exact_size(size, if bat { Sense::click() } else { Sense::hover() });
-    let ph = ph.on_hover_cursor(if bat { egui::CursorIcon::PointingHand } else { egui::CursorIcon::Default });
+    let (rect, ph) =
+        ui.allocate_exact_size(size, if bat { Sense::click() } else { Sense::hover() });
+    let ph = ph.on_hover_cursor(if bat {
+        egui::CursorIcon::PointingHand
+    } else {
+        egui::CursorIcon::Default
+    });
     let p = ui.painter();
-    let cuong = if !bat { 0.3 } else if ph.hovered() { 1.5 } else { 1.0 };
+    let cuong = if !bat {
+        0.3
+    } else if ph.hovered() {
+        1.5
+    } else {
+        1.0
+    };
     ve_neon(p, rect, mau, cuong);
     ve_vien(p, rect, mau, if bat { 235 } else { 80 }, ph.has_focus());
     ve_icon(p, rect, icon_cho(nhan), if bat { CHU } else { CHU_MO });
-    p.text(Pos2::new(rect.left() + 52.0 + 4.0, rect.center().y), egui::Align2::LEFT_CENTER, nhan, FontId::new(17.0, dam_ho()), if bat { CHU } else { CHU_MO });
+    p.text(
+        Pos2::new(rect.left() + 52.0 + 4.0, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        nhan,
+        FontId::new(17.0, dam_ho()),
+        if bat { CHU } else { CHU_MO },
+    );
     ph
 }
 
 /// Nút phụ: kính đen, viền mảnh tím nhạt (không quầng sáng).
 pub fn pill_phu(ui: &mut Ui, nhan: &str, bat: bool) -> Response {
-    let gal = ui.painter().layout_no_wrap(nhan.to_string(), FontId::new(16.0, dam_ho()), CHU);
+    let gal = ui
+        .painter()
+        .layout_no_wrap(nhan.to_string(), FontId::new(16.0, dam_ho()), CHU);
     let size = Vec2::new((gal.size().x + 40.0).max(96.0), 44.0);
-    let (rect, ph) = ui.allocate_exact_size(size, if bat { Sense::click() } else { Sense::hover() });
+    let (rect, ph) =
+        ui.allocate_exact_size(size, if bat { Sense::click() } else { Sense::hover() });
     let br = rect.height() / 2.0;
     let p = ui.painter();
-    p.rect_filled(rect, br, Color32::from_rgb(if ph.hovered() && bat { 22 } else { 12 }, 10, if ph.hovered() && bat { 44 } else { 30 }));
-    p.rect_stroke(rect, br, Stroke::new(1.4, a(TIM, if bat { 150 } else { 60 })), egui::StrokeKind::Inside);
-    p.rect_stroke(rect.shrink(3.5), br - 3.5, Stroke::new(1.0, rgba(255, 255, 255, 26)), egui::StrokeKind::Inside);
-    p.text(rect.center(), egui::Align2::CENTER_CENTER, nhan, FontId::new(16.0, dam_ho()), if bat { CHU } else { CHU_MO });
+    p.rect_filled(
+        rect,
+        br,
+        Color32::from_rgb(
+            if ph.hovered() && bat { 22 } else { 12 },
+            10,
+            if ph.hovered() && bat { 44 } else { 30 },
+        ),
+    );
+    p.rect_stroke(
+        rect,
+        br,
+        Stroke::new(1.4, a(TIM, if bat { 150 } else { 60 })),
+        egui::StrokeKind::Inside,
+    );
+    p.rect_stroke(
+        rect.shrink(3.5),
+        br - 3.5,
+        Stroke::new(1.0, rgba(255, 255, 255, 26)),
+        egui::StrokeKind::Inside,
+    );
+    p.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        nhan,
+        FontId::new(16.0, dam_ho()),
+        if bat { CHU } else { CHU_MO },
+    );
     ph.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 /// Nút nguy hiểm (neon đỏ).
 pub fn pill_nguy_hiem(ui: &mut Ui, nhan: &str, bat: bool) -> Response {
     let size = Vec2::new(rong_nut(ui, nhan, 48.0, true), 48.0);
-    let (rect, ph) = ui.allocate_exact_size(size, if bat { Sense::click() } else { Sense::hover() });
+    let (rect, ph) =
+        ui.allocate_exact_size(size, if bat { Sense::click() } else { Sense::hover() });
     let p = ui.painter();
-    ve_neon(p, rect, LOI, if !bat { 0.3 } else if ph.hovered() { 1.4 } else { 0.9 });
+    ve_neon(
+        p,
+        rect,
+        LOI,
+        if !bat {
+            0.3
+        } else if ph.hovered() {
+            1.4
+        } else {
+            0.9
+        },
+    );
     ve_vien(p, rect, LOI, 230, false);
     ve_icon(p, rect, "✖", LOI_CHU);
-    p.text(Pos2::new(rect.left() + 48.0 + 4.0, rect.center().y), egui::Align2::LEFT_CENTER, nhan, FontId::new(16.0, dam_ho()), LOI_CHU);
+    p.text(
+        Pos2::new(rect.left() + 48.0 + 4.0, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        nhan,
+        FontId::new(16.0, dam_ho()),
+        LOI_CHU,
+    );
     ph.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -463,7 +614,14 @@ pub fn pill_nguy_hiem(ui: &mut Ui, nhan: &str, bat: bool) -> Response {
 /// Nút việc dài (kính neon): màu đổ đầy từ trái sang phải theo % THẬT (từ thanh tiến trình toàn cục), không hiệu ứng chạy vòng.
 /// Chờ → "Đang … 37%" → "Xong 100%" (xanh lá ~2,2 s) / "Lỗi – bấm để xem". Bấm khi đang chạy = dừng.
 /// `khoa`: khóa nguồn tiến trình đã đăng ký (xem `tien_trinh::dang_ky`). → true khi người dùng bấm BẮT ĐẦU việc.
-pub fn nut_tien_do(ui: &mut Ui, khoa: &'static str, nhan: &str, dong_tu: &str, mau: Color32, bat: bool) -> bool {
+pub fn nut_tien_do(
+    ui: &mut Ui,
+    khoa: &'static str,
+    nhan: &str,
+    dong_tu: &str,
+    mau: Color32,
+    bat: bool,
+) -> bool {
     let id_nut = egui::Id::new(("nut_viec", khoa));
     let dang_cua_nut: Option<String> = ui.ctx().data(|d| d.get_temp(id_nut));
     let la_nut_nay = dang_cua_nut.as_deref() == Some(nhan);
@@ -497,7 +655,10 @@ pub fn nut_tien_do(ui: &mut Ui, khoa: &'static str, nhan: &str, dong_tu: &str, m
     let chu = match &tt {
         Tt::Cho | Tt::Khoa => nhan.to_string(),
         Tt::Chay(Some(p)) => format!("{dong_tu}… {:.0}%", p * 100.0),
-        Tt::Chay(None) => format!("{dong_tu}… {}", dung_mm(th.as_ref().map(|t| t.giay).unwrap_or(0))),
+        Tt::Chay(None) => format!(
+            "{dong_tu}… {}",
+            dung_mm(th.as_ref().map(|t| t.giay).unwrap_or(0))
+        ),
         Tt::Xong => "Xong 100%".to_string(),
         Tt::Loi => "Lỗi – bấm để xem".to_string(),
     };
@@ -507,12 +668,22 @@ pub fn nut_tien_do(ui: &mut Ui, khoa: &'static str, nhan: &str, dong_tu: &str, m
         Tt::Loi => "✖",
         _ => icon_cho(nhan),
     };
-    let size = Vec2::new(rong_nut(ui, &chu, 56.0, true).max(rong_nut(ui, nhan, 56.0, true)), 56.0);
+    let size = Vec2::new(
+        rong_nut(ui, &chu, 56.0, true).max(rong_nut(ui, nhan, 56.0, true)),
+        56.0,
+    );
     let sense = match tt {
         Tt::Khoa => Sense::hover(),
         _ => Sense::click(),
     };
-    let (rect, ph) = ui.allocate_exact_size(size, if bat || matches!(tt, Tt::Chay(_) | Tt::Loi) { sense } else { Sense::hover() });
+    let (rect, ph) = ui.allocate_exact_size(
+        size,
+        if bat || matches!(tt, Tt::Chay(_) | Tt::Loi) {
+            sense
+        } else {
+            Sense::hover()
+        },
+    );
     let ban_kinh = rect.height() / 2.0;
     let mau_hien = match tt {
         Tt::Xong => OK,
@@ -522,13 +693,30 @@ pub fn nut_tien_do(ui: &mut Ui, khoa: &'static str, nhan: &str, dong_tu: &str, m
     let sang = matches!(tt, Tt::Chay(_));
     let hoat = bat || !matches!(tt, Tt::Cho);
     let p = ui.painter();
-    ve_neon(p, rect, mau_hien, if sang || matches!(tt, Tt::Xong | Tt::Loi) { 1.5 } else if !hoat { 0.3 } else if ph.hovered() { 1.5 } else { 1.0 });
+    ve_neon(
+        p,
+        rect,
+        mau_hien,
+        if sang || matches!(tt, Tt::Xong | Tt::Loi) {
+            1.5
+        } else if !hoat {
+            0.3
+        } else if ph.hovered() {
+            1.5
+        } else {
+            1.0
+        },
+    );
 
     // phần đổ màu theo % (nằm trong viền)
     let phan = match tt {
         Tt::Chay(Some(x)) => x.clamp(0.0, 1.0),
         Tt::Xong => 1.0,
-        Tt::Loi => th.as_ref().and_then(|t| t.tien).unwrap_or(0.0).clamp(0.0, 1.0),
+        Tt::Loi => th
+            .as_ref()
+            .and_then(|t| t.tien)
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0),
         _ => 0.0,
     };
     if phan > 0.0 {
@@ -567,10 +755,28 @@ pub fn nut_tien_do(ui: &mut Ui, khoa: &'static str, nhan: &str, dong_tu: &str, m
         }
         p.add(epaint::Shape::mesh(m));
         if phan < 0.999 {
-            p.line_segment([Pos2::new(r2.right(), trong.top() + 6.0), Pos2::new(r2.right(), trong.bottom() - 6.0)], Stroke::new(2.0, mau_hien));
+            p.line_segment(
+                [
+                    Pos2::new(r2.right(), trong.top() + 6.0),
+                    Pos2::new(r2.right(), trong.bottom() - 6.0),
+                ],
+                Stroke::new(2.0, mau_hien),
+            );
         }
     }
-    ve_vien(p, rect, mau_hien, if sang || matches!(tt, Tt::Xong | Tt::Loi) { 255 } else if hoat { 235 } else { 80 }, ph.has_focus());
+    ve_vien(
+        p,
+        rect,
+        mau_hien,
+        if sang || matches!(tt, Tt::Xong | Tt::Loi) {
+            255
+        } else if hoat {
+            235
+        } else {
+            80
+        },
+        ph.has_focus(),
+    );
     ve_icon(p, rect, glyph, if hoat { CHU } else { CHU_MO });
     p.text(
         Pos2::new(rect.left() + rect.height() + 4.0, rect.center().y),
@@ -587,7 +793,8 @@ pub fn nut_tien_do(ui: &mut Ui, khoa: &'static str, nhan: &str, dong_tu: &str, m
             Tt::Chay(_) => crate::tien_trinh::dung_viec(khoa),
             Tt::Khoa => {}
             _ if bat => {
-                ui.ctx().data_mut(|d| d.insert_temp(id_nut, nhan.to_string()));
+                ui.ctx()
+                    .data_mut(|d| d.insert_temp(id_nut, nhan.to_string()));
                 bam = true;
             }
             _ => {}
@@ -601,7 +808,12 @@ pub fn nut_tien_do(ui: &mut Ui, khoa: &'static str, nhan: &str, dong_tu: &str, m
 
 fn lerp_mau(a1: Color32, a2: Color32, t: f32) -> Color32 {
     let l = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t) as u8;
-    rgba(l(a1.r(), a2.r()), l(a1.g(), a2.g()), l(a1.b(), a2.b()), l(a1.a(), a2.a()))
+    rgba(
+        l(a1.r(), a2.r()),
+        l(a1.g(), a2.g()),
+        l(a1.b(), a2.b()),
+        l(a1.a(), a2.a()),
+    )
 }
 
 pub fn dung_mm(giay: u64) -> String {
@@ -617,9 +829,19 @@ pub fn cong_tac(ui: &mut Ui, bat: &mut bool, nhan: &str) -> Response {
     let font = FontId::new(16.0, FontFamily::Proportional);
     // cắt nhãn quá dài bằng "…" cho vừa hàng
     let mut chu = nhan.to_string();
-    let rong_chu = |s: &str| ui.painter().layout_no_wrap(s.to_string(), font.clone(), CHU).size().x;
+    let rong_chu = |s: &str| {
+        ui.painter()
+            .layout_no_wrap(s.to_string(), font.clone(), CHU)
+            .size()
+            .x
+    };
     while rong_chu(&chu) + khung_khac > toi_da && chu.chars().count() > 8 {
-        chu = chu.chars().take(chu.chars().count() - 2).collect::<String>().trim_end().to_string();
+        chu = chu
+            .chars()
+            .take(chu.chars().count() - 2)
+            .collect::<String>()
+            .trim_end()
+            .to_string();
         if !chu.ends_with('…') {
             chu.push('…');
         } else {
@@ -640,21 +862,63 @@ pub fn cong_tac(ui: &mut Ui, bat: &mut bool, nhan: &str) -> Response {
     ph.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, *bat, nhan));
     let t = ui.ctx().animate_bool_with_time(ph.id, *bat, 0.12);
     let p = ui.painter();
-    ve_neon(p, rect, TIM, if *bat { 1.2 } else if ph.hovered() { 0.7 } else { 0.4 });
+    ve_neon(
+        p,
+        rect,
+        TIM,
+        if *bat {
+            1.2
+        } else if ph.hovered() {
+            0.7
+        } else {
+            0.4
+        },
+    );
     ve_vien(p, rect, TIM, if *bat { 235 } else { 110 }, ph.has_focus());
-    ve_icon(p, rect, if *bat { "✔" } else { "○" }, if *bat { CHU } else { CHU_PHU });
-    p.text(Pos2::new(rect.left() + cao + 4.0, rect.center().y), egui::Align2::LEFT_CENTER, chu, font, CHU);
+    ve_icon(
+        p,
+        rect,
+        if *bat { "✔" } else { "○" },
+        if *bat { CHU } else { CHU_PHU },
+    );
+    p.text(
+        Pos2::new(rect.left() + cao + 4.0, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        chu,
+        font,
+        CHU,
+    );
     // gạt
-    let g = Rect::from_min_size(Pos2::new(rect.right() - 16.0 - 64.0, rect.center().y - 15.0), Vec2::new(64.0, 30.0));
+    let g = Rect::from_min_size(
+        Pos2::new(rect.right() - 16.0 - 64.0, rect.center().y - 15.0),
+        Vec2::new(64.0, 30.0),
+    );
     if *bat {
         p.rect_filled(g, 15.0, Color32::from_rgb(40, 40, 150));
-        p.rect_filled(Rect::from_min_size(g.min + Vec2::new(32.0, 0.0), Vec2::new(32.0, 30.0)), 15.0, Color32::from_rgb(120, 74, 238));
-        p.rect_filled(Rect::from_min_max(g.min + Vec2::new(15.0, 0.0), g.max - Vec2::new(15.0, 0.0)), 0.0, Color32::from_rgb(78, 56, 195));
+        p.rect_filled(
+            Rect::from_min_size(g.min + Vec2::new(32.0, 0.0), Vec2::new(32.0, 30.0)),
+            15.0,
+            Color32::from_rgb(120, 74, 238),
+        );
+        p.rect_filled(
+            Rect::from_min_max(g.min + Vec2::new(15.0, 0.0), g.max - Vec2::new(15.0, 0.0)),
+            0.0,
+            Color32::from_rgb(78, 56, 195),
+        );
     } else {
         p.rect_filled(g, 15.0, Color32::from_rgb(24, 16, 52));
     }
-    p.rect_stroke(g, 15.0, Stroke::new(1.2, rgba(255, 255, 255, 70)), egui::StrokeKind::Inside);
-    p.circle_filled(Pos2::new(g.left() + 15.0 + t * 34.0, g.center().y), 12.0, Color32::WHITE);
+    p.rect_stroke(
+        g,
+        15.0,
+        Stroke::new(1.2, rgba(255, 255, 255, 70)),
+        egui::StrokeKind::Inside,
+    );
+    p.circle_filled(
+        Pos2::new(g.left() + 15.0 + t * 34.0, g.center().y),
+        12.0,
+        Color32::WHITE,
+    );
     ph.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -666,7 +930,18 @@ pub fn cong_tac_nho(ui: &mut Ui, bat: &mut bool, nhan: &str) -> Response {
 // ---------------- chip ----------------
 /// Chip chọn: được chọn = kính neon viền tím + chữ đậm; chưa chọn = kính đen viền mờ.
 pub fn chip(ui: &mut Ui, chon: bool, nhan: &str) -> Response {
-    let gal = ui.painter().layout_no_wrap(nhan.to_string(), FontId::new(16.0, if chon { dam_ho() } else { FontFamily::Proportional }), CHU);
+    let gal = ui.painter().layout_no_wrap(
+        nhan.to_string(),
+        FontId::new(
+            16.0,
+            if chon {
+                dam_ho()
+            } else {
+                FontFamily::Proportional
+            },
+        ),
+        CHU,
+    );
     let size = Vec2::new((gal.size().x + 40.0).max(76.0), 44.0);
     let (rect, ph) = ui.allocate_exact_size(size, Sense::click());
     let p = ui.painter();
@@ -675,10 +950,36 @@ pub fn chip(ui: &mut Ui, chon: bool, nhan: &str) -> Response {
         ve_neon(p, rect, TIM, 1.0);
         ve_vien(p, rect, TIM, 240, false);
     } else {
-        p.rect_filled(rect, br, Color32::from_rgb(if ph.hovered() { 26 } else { 14 }, 10, if ph.hovered() { 50 } else { 32 }));
-        p.rect_stroke(rect, br, Stroke::new(1.2, a(TIM, if ph.hovered() { 130 } else { 70 })), egui::StrokeKind::Inside);
+        p.rect_filled(
+            rect,
+            br,
+            Color32::from_rgb(
+                if ph.hovered() { 26 } else { 14 },
+                10,
+                if ph.hovered() { 50 } else { 32 },
+            ),
+        );
+        p.rect_stroke(
+            rect,
+            br,
+            Stroke::new(1.2, a(TIM, if ph.hovered() { 130 } else { 70 })),
+            egui::StrokeKind::Inside,
+        );
     }
-    p.text(rect.center(), egui::Align2::CENTER_CENTER, nhan, FontId::new(16.0, if chon { dam_ho() } else { FontFamily::Proportional }), CHU);
+    p.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        nhan,
+        FontId::new(
+            16.0,
+            if chon {
+                dam_ho()
+            } else {
+                FontFamily::Proportional
+            },
+        ),
+        CHU,
+    );
     ph.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -700,7 +1001,8 @@ pub fn chip_chon<T: PartialEq + Clone>(ui: &mut Ui, gia_tri: &mut T, ds: &[(T, &
 pub fn thanh_nho(ui: &mut Ui, tien: Option<f32>, mau: Color32) {
     let w = ui.available_width();
     ui.horizontal(|ui| {
-        let (rect, _) = ui.allocate_exact_size(Vec2::new((w - 56.0).max(40.0), 8.0), Sense::hover());
+        let (rect, _) =
+            ui.allocate_exact_size(Vec2::new((w - 56.0).max(40.0), 8.0), Sense::hover());
         ui.painter().rect_filled(rect, 4.0, rgba(255, 255, 255, 30));
         if let Some(t) = tien {
             let r = Rect::from_min_size(rect.min, Vec2::new(rect.width() * t.clamp(0.0, 1.0), 8.0));
@@ -723,10 +1025,15 @@ pub fn rgba(r: u8, g: u8, b: u8, al: u8) -> Color32 {
     Color32::from_rgba_premultiplied(f(r), f(g), f(b), al)
 }
 
-
 /// Thanh trượt dạng viên kính neon (như "Brightness" của ảnh mẫu): nhãn + giá trị ở trên, rãnh + núm trắng ở dưới.
 /// `dp`: số chữ số thập phân hiển thị. → Response (changed khi kéo).
-pub fn thanh_truot(ui: &mut Ui, gia_tri: &mut f64, khoang: std::ops::RangeInclusive<f64>, nhan: &str, dp: usize) -> Response {
+pub fn thanh_truot(
+    ui: &mut Ui,
+    gia_tri: &mut f64,
+    khoang: std::ops::RangeInclusive<f64>,
+    nhan: &str,
+    dp: usize,
+) -> Response {
     let rong = ui.available_width().clamp(260.0, 460.0);
     let cao = 68.0;
     let (rect, mut ph) = ui.allocate_exact_size(Vec2::new(rong, cao), Sense::click_and_drag());
@@ -745,11 +1052,35 @@ pub fn thanh_truot(ui: &mut Ui, gia_tri: &mut f64, khoang: std::ops::RangeInclus
     }
     let t = ((*gia_tri - lo) / (hi - lo)).clamp(0.0, 1.0) as f32;
     let p = ui.painter();
-    ve_neon(p, rect, TIM, if ph.hovered() || ph.dragged() { 1.2 } else { 0.8 });
+    ve_neon(
+        p,
+        rect,
+        TIM,
+        if ph.hovered() || ph.dragged() {
+            1.2
+        } else {
+            0.8
+        },
+    );
     ve_vien(p, rect, TIM, 230, false);
-    p.text(Pos2::new(rect.left() + 28.0, rect.top() + 22.0), egui::Align2::LEFT_CENTER, nhan, FontId::new(16.0, dam_ho()), CHU);
-    p.text(Pos2::new(rect.right() - 28.0, rect.top() + 22.0), egui::Align2::RIGHT_CENTER, format!("{:.*}", dp, gia_tri), FontId::new(16.0, FontFamily::Monospace), CHU_PHU);
-    let rail = Rect::from_min_max(Pos2::new(rail_l, rail_y - 4.0), Pos2::new(rail_r, rail_y + 4.0));
+    p.text(
+        Pos2::new(rect.left() + 28.0, rect.top() + 22.0),
+        egui::Align2::LEFT_CENTER,
+        nhan,
+        FontId::new(16.0, dam_ho()),
+        CHU,
+    );
+    p.text(
+        Pos2::new(rect.right() - 28.0, rect.top() + 22.0),
+        egui::Align2::RIGHT_CENTER,
+        format!("{:.*}", dp, gia_tri),
+        FontId::new(16.0, FontFamily::Monospace),
+        CHU_PHU,
+    );
+    let rail = Rect::from_min_max(
+        Pos2::new(rail_l, rail_y - 4.0),
+        Pos2::new(rail_r, rail_y + 4.0),
+    );
     p.rect_filled(rail, 4.0, rgba(255, 255, 255, 36));
     let xn = rail_l + (rail_r - rail_l) * t;
     let day = Rect::from_min_max(rail.min, Pos2::new(xn.max(rail_l + 8.0), rail.max.y));

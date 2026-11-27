@@ -40,7 +40,11 @@ pub struct KetQuaCd {
 pub fn nhom_giong(ten: &str) -> String {
     let t: Vec<&str> = ten.split('_').collect();
     if t[0] == "unique" && t.len() > 2 {
-        return if t[1] == "shop" { t[..3].join("_") } else { t[..2].join("_") };
+        return if t[1] == "shop" {
+            t[..3].join("_")
+        } else {
+            t[..2].join("_")
+        };
     }
     for (i, x) in t.iter().take(6).enumerate() {
         if !x.is_empty() && x.chars().all(|c| c.is_ascii_digit()) {
@@ -66,7 +70,8 @@ pub fn lam_sach_loi(s: &str) -> String {
     let s = r[1].replace_all(&s, " ");
     let s = r[2].replace_all(s.trim(), "$1");
     let s = r[3].replace_all(&s, "$1");
-    s.trim_matches(|c| c == ' ' || c == ',' || c == ';' || c == ':').to_string()
+    s.trim_matches(|c| c == ' ' || c == ',' || c == ';' || c == ':')
+        .to_string()
 }
 
 /// Thời lượng (giây) từ phần đầu file .wem (RIFF Wwise).
@@ -114,11 +119,16 @@ fn rms(x: &[f32]) -> f64 {
 }
 
 pub fn vgmstream() -> Result<PathBuf> {
-    let p = duong_dan::cong_cu().join("vgmstream").join("vgmstream-cli.exe");
+    let p = duong_dan::cong_cu()
+        .join("vgmstream")
+        .join("vgmstream-cli.exe");
     if p.is_file() {
         Ok(p)
     } else {
-        Err(anyhow!("thiếu {} – chạy scripts\\tai_cong_cu.ps1 để tải vgmstream", p.display()))
+        Err(anyhow!(
+            "thiếu {} – chạy scripts\\tai_cong_cu.ps1 để tải vgmstream",
+            p.display()
+        ))
     }
 }
 
@@ -126,7 +136,11 @@ pub fn vgmstream() -> Result<PathBuf> {
 fn giai_ma_wem(vgm: &Path, wem: &Path, ra: &Path) -> bool {
     let _ = std::fs::remove_file(ra);
     let mut l = Command::new(vgm);
-    l.arg("-o").arg(ra).arg(wem).stdout(Stdio::null()).stderr(Stdio::null());
+    l.arg("-o")
+        .arg(ra)
+        .arg(wem)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -150,7 +164,6 @@ fn con_trong(thu_muc: &Path) -> Option<u64> {
     Some(trong)
 }
 
-
 /// Cao độ giọng (Hz, trung vị) của mảng mono; None nếu không đo được. Khung 40 ms, tự tương quan.
 pub fn cao_do(x: &[f32], sr: u32) -> Option<f64> {
     let fr = (0.04 * sr as f64) as usize;
@@ -171,7 +184,11 @@ pub fn cao_do(x: &[f32], sr: u32) -> Option<f64> {
         let c0: f64 = y.iter().map(|v| (*v as f64).powi(2)).sum();
         let (mut tot, mut k) = (f64::MIN, lo);
         for lag in lo..hi {
-            let c: f64 = y[..fr - lag].iter().zip(&y[lag..]).map(|(a, b)| *a as f64 * *b as f64).sum();
+            let c: f64 = y[..fr - lag]
+                .iter()
+                .zip(&y[lag..])
+                .map(|(a, b)| *a as f64 * *b as f64)
+                .sum();
             if c > tot {
                 (tot, k) = (c, lag);
             }
@@ -185,11 +202,23 @@ pub fn cao_do(x: &[f32], sr: u32) -> Option<f64> {
     }
     r.sort_by(f64::total_cmp);
     let n = r.len();
-    Some(if n % 2 == 1 { r[n / 2] } else { (r[n / 2 - 1] + r[n / 2]) / 2.0 })
+    Some(if n % 2 == 1 {
+        r[n / 2]
+    } else {
+        (r[n / 2 - 1] + r[n / 2]) / 2.0
+    })
 }
 
 /// Giọng riêng KHÔNG dùng để xoay vòng (giọng đặc biệt: phù thủy, người già, trẻ em, nhân vật chính).
-const KHONG_XOAY: [&str; 7] = ["phu_thuy", "gia", "be_", "nam_chinh.wav", "giong_nam_chinh", "giong_nu_chinh", "nam_am"];
+const KHONG_XOAY: [&str; 7] = [
+    "phu_thuy",
+    "gia",
+    "be_",
+    "nam_chinh.wav",
+    "giong_nam_chinh",
+    "giong_nu_chinh",
+    "nam_am",
+];
 
 fn la_nu(f: Option<f64>) -> bool {
     f.is_some_and(|f| f >= 175.0)
@@ -231,11 +260,24 @@ impl CrimsonDesert {
             let t: Vec<String> = ten.to_lowercase().split('_').map(String::from).collect();
             let en = (1..t.len()).find_map(|j| {
                 let duoi = t[j..].join("_");
-                (co_chu.is_match(&duoi)).then(|| khoa.get(&duoi).map(|v| v.to_string())).flatten()
+                (co_chu.is_match(&duoi))
+                    .then(|| khoa.get(&duoi).map(|v| v.to_string()))
+                    .flatten()
             });
-            let vi = en.as_ref().and_then(|e| self.viec.tim(e)).filter(|v| Some(v) != en.as_ref());
-            let giay = doc_dau(&nhom_am, f).map(|d| giay_wem(&d, f.goc)).unwrap_or(0.0);
-            kq.entry(giong).or_default().push(CauGiong { f: f.clone(), ten, en, vi, giay });
+            let vi = en
+                .as_ref()
+                .and_then(|e| self.viec.tim(e))
+                .filter(|v| Some(v) != en.as_ref());
+            let giay = doc_dau(&nhom_am, f)
+                .map(|d| giay_wem(&d, f.goc))
+                .unwrap_or(0.0);
+            kq.entry(giong).or_default().push(CauGiong {
+                f: f.clone(),
+                ten,
+                en,
+                vi,
+                giay,
+            });
             if i % 3000 == 0 {
                 bao(&format!("Đang đọc danh sách giọng nói... {i}/{}", ds.len()));
             }
@@ -251,7 +293,10 @@ impl CrimsonDesert {
         }
         let tam = thu_ra.join("mau_tam");
         std::fs::create_dir_all(&tam)?;
-        let mut uu: Vec<&CauGiong> = cau.iter().filter(|c| (3.0..=9.0).contains(&c.giay)).collect();
+        let mut uu: Vec<&CauGiong> = cau
+            .iter()
+            .filter(|c| (3.0..=9.0).contains(&c.giay))
+            .collect();
         uu.sort_by(|a, b| b.giay.total_cmp(&a.giay));
         let mut phu: Vec<&CauGiong> = cau
             .iter()
@@ -263,12 +308,18 @@ impl CrimsonDesert {
         let (mut phan, mut tong) = (Vec::<Vec<f32>>::new(), 0.0f64);
         for c in uu.into_iter().take(16) {
             let (wem, ra) = (tam.join("x.wem"), tam.join("x.wav"));
-            let Ok(b) = cd::doc_tep(&nhom_am, &c.f) else { continue };
+            let Ok(b) = cd::doc_tep(&nhom_am, &c.f) else {
+                continue;
+            };
             if std::fs::write(&wem, b).is_err() || !giai_ma_wem(vgm, &wem, &ra) {
                 continue;
             }
-            let Ok(raw) = std::fs::read(&ra) else { continue };
-            let Ok((x, ts)) = wwise::doc_wav(&raw) else { continue };
+            let Ok(raw) = std::fs::read(&ra) else {
+                continue;
+            };
+            let Ok((x, ts)) = wwise::doc_wav(&raw) else {
+                continue;
+            };
             let x = wwise::chuan_hoa(&x, ts, 0.0);
             if x.len() < 48000 || rms(&x) < 0.01 {
                 continue;
@@ -284,7 +335,10 @@ impl CrimsonDesert {
             return Ok(None);
         }
         let lang = vec![0f32; 14400];
-        let mut y: Vec<f32> = phan.iter().flat_map(|p| p.iter().chain(lang.iter()).copied()).collect();
+        let mut y: Vec<f32> = phan
+            .iter()
+            .flat_map(|p| p.iter().chain(lang.iter()).copied())
+            .collect();
         y.truncate(15 * 48000);
         wwise::ghi_wav16(&mau, &y, 48000)?;
         Ok(Some(mau))
@@ -301,7 +355,9 @@ impl CrimsonDesert {
             .and_then(|j| j.get(phan.to_string())?.get(g)?.as_str().map(String::from));
         let xoa_cu = || {
             let _ = std::fs::remove_dir_all(thu.join("wav"));
-            let Ok(rd) = std::fs::read_dir(thu_muc_lv.join(phan.to_string())) else { return };
+            let Ok(rd) = std::fs::read_dir(thu_muc_lv.join(phan.to_string())) else {
+                return;
+            };
             for e in rd.flatten() {
                 let n = e.file_name().to_string_lossy().into_owned();
                 if n.starts_with("_wem_") && n.ends_with("db") {
@@ -311,7 +367,13 @@ impl CrimsonDesert {
                 }
             }
         };
-        let ten = ten.map(|t| if t.to_lowercase().ends_with(".wav") { t } else { format!("{t}.wav") });
+        let ten = ten.map(|t| {
+            if t.to_lowercase().ends_with(".wav") {
+                t
+            } else {
+                format!("{t}.wav")
+            }
+        });
         let Some(ten) = ten.filter(|t| goc.join(t).is_file()) else {
             if ghi.is_file() {
                 // người dùng bỏ gán giọng riêng → xóa mẫu + câu cũ để nhái lại giọng gốc
@@ -348,26 +410,42 @@ impl CrimsonDesert {
         use serde_json::{json, Value};
         let goc = thu_muc_lv.join("giong_rieng");
         let tep = goc.join("phan_bo.json");
-        let Ok(b) = std::fs::read(&tep) else { return Ok(vec![]) };
+        let Ok(b) = std::fs::read(&tep) else {
+            return Ok(vec![]);
+        };
         let mut pb: Value = serde_json::from_slice(&b)?;
         let ph = phan.to_string();
-        let Some(mut gan) = pb.get(&ph).and_then(Value::as_object).cloned().filter(|o| !o.is_empty()) else {
+        let Some(mut gan) = pb
+            .get(&ph)
+            .and_then(Value::as_object)
+            .cloned()
+            .filter(|o| !o.is_empty())
+        else {
             return Ok(vec![]);
         };
         // cao độ các giọng riêng
         let mut cd_giong: BTreeMap<String, Option<f64>> = BTreeMap::new();
         for ten in gan.values().filter_map(Value::as_str) {
-            let f0 = std::fs::read(goc.join(ten)).ok().and_then(|b| wwise::doc_wav(&b).ok()).and_then(|(x, sr)| cao_do(&x, sr));
+            let f0 = std::fs::read(goc.join(ten))
+                .ok()
+                .and_then(|b| wwise::doc_wav(&b).ok())
+                .and_then(|(x, sr)| cao_do(&x, sr));
             cd_giong.insert(ten.to_string(), f0);
         }
         let xoay = |dk: fn(Option<f64>) -> bool| -> Vec<String> {
-            cd_giong.iter().filter(|(t, f)| dk(**f) && !KHONG_XOAY.iter().any(|k| t.contains(k))).map(|(t, _)| t.clone()).collect()
+            cd_giong
+                .iter()
+                .filter(|(t, f)| dk(**f) && !KHONG_XOAY.iter().any(|k| t.contains(k)))
+                .map(|(t, _)| t.clone())
+                .collect()
         };
         let (nu, nam) = (xoay(la_nu), xoay(la_nam));
         // cao độ giọng gốc từng nhân vật (lưu đệm)
         let dem_tep = thu_muc_lv.join(&ph).join("_cao_do_goc.json");
-        let mut dem: BTreeMap<String, Option<f64>> =
-            std::fs::read(&dem_tep).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let mut dem: BTreeMap<String, Option<f64>> = std::fs::read(&dem_tep)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
         let tam = thu_muc_lv.join(&ph).join("_do_cao_do");
         let nhom_am = self.thu_muc_game.join("0006");
         let ten_gan: Vec<String> = {
@@ -379,22 +457,41 @@ impl CrimsonDesert {
             if dem.contains_key(g) || !nhom.contains_key(g) {
                 continue;
             }
-            bao(&format!("Đang kiểm tra giới tính giọng gốc {}/{}: {g}", i + 1, ten_gan.len()));
+            bao(&format!(
+                "Đang kiểm tra giới tính giọng gốc {}/{}: {g}",
+                i + 1,
+                ten_gan.len()
+            ));
             std::fs::create_dir_all(&tam)?;
-            let mut cau: Vec<&CauGiong> = nhom[g].iter().filter(|c| (1.5..=9.0).contains(&c.giay)).collect();
+            let mut cau: Vec<&CauGiong> = nhom[g]
+                .iter()
+                .filter(|c| (1.5..=9.0).contains(&c.giay))
+                .collect();
             cau.sort_by(|a, b| b.giay.total_cmp(&a.giay));
             let mut phan_am: Vec<f32> = Vec::new();
             for c in cau.into_iter().take(4) {
                 let (wem, ra) = (tam.join("x.wem"), tam.join("x.wav"));
-                let Ok(d) = cd::doc_tep(&nhom_am, &c.f) else { continue };
+                let Ok(d) = cd::doc_tep(&nhom_am, &c.f) else {
+                    continue;
+                };
                 if std::fs::write(&wem, d).is_err() || !giai_ma_wem(vgm, &wem, &ra) {
                     continue;
                 }
-                if let Some((x, ts)) = std::fs::read(&ra).ok().and_then(|b| wwise::doc_wav(&b).ok()) {
+                if let Some((x, ts)) = std::fs::read(&ra)
+                    .ok()
+                    .and_then(|b| wwise::doc_wav(&b).ok())
+                {
                     phan_am.extend(wwise::chuan_hoa(&x, ts, 0.0));
                 }
             }
-            dem.insert(g.clone(), if phan_am.is_empty() { None } else { cao_do(&phan_am, 48000) });
+            dem.insert(
+                g.clone(),
+                if phan_am.is_empty() {
+                    None
+                } else {
+                    cao_do(&phan_am, 48000)
+                },
+            );
             if dung.load(Ordering::Relaxed) {
                 break;
             }
@@ -407,7 +504,11 @@ impl CrimsonDesert {
             .get("_tay")
             .and_then(|t| t.get(&ph))
             .and_then(Value::as_array)
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
         let (mut doi, mut d_nu, mut d_nam) = (Vec::new(), 0usize, 0usize);
         let mut thu_tu: Vec<&String> = ten_gan.iter().collect();
@@ -443,9 +544,16 @@ impl CrimsonDesert {
             std::fs::write(&t, serde_json::to_vec_pretty(&pb)?)?;
             std::fs::rename(&t, &tep)?;
             use std::io::Write;
-            let mut f = std::fs::OpenOptions::new().create(true).append(true).open(thu_muc_lv.join(format!("doi_gioi_tinh_{phan}.txt")))?;
+            let mut f = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(thu_muc_lv.join(format!("doi_gioi_tinh_{phan}.txt")))?;
             for (g, cu, m) in &doi {
-                let _ = writeln!(f, "{g}: {cu} -> {m} (giọng gốc {:.0} Hz)", dem.get(g).copied().flatten().unwrap_or(0.0));
+                let _ = writeln!(
+                    f,
+                    "{g}: {cu} -> {m} (giọng gốc {:.0} Hz)",
+                    dem.get(g).copied().flatten().unwrap_or(0.0)
+                );
             }
         }
         Ok(doi)
@@ -462,16 +570,30 @@ impl CrimsonDesert {
         bao: &dyn Fn(&str),
         tien_do: &dyn Fn(usize, usize, &str),
     ) -> Result<Option<KetQuaCd>> {
-        let wwise_exe = wwise::tim_wwise_console()
-            .ok_or_else(|| anyhow!("không tìm thấy Wwise (WwiseConsole.exe) – cài Wwise bằng Audiokinetic Launcher"))?;
+        let wwise_exe = wwise::tim_wwise_console().ok_or_else(|| {
+            anyhow!(
+                "không tìm thấy Wwise (WwiseConsole.exe) – cài Wwise bằng Audiokinetic Launcher"
+            )
+        })?;
         if gv::tim_vieneu().is_none() {
-            bail!("không tìm thấy app VieNeu (bản tăng tốc GPU) – mở VieNeu, cài 'GPU' rồi thử lại");
+            bail!(
+                "không tìm thấy app VieNeu (bản tăng tốc GPU) – mở VieNeu, cài 'GPU' rồi thử lại"
+            );
         }
         let nhom = self.ke_hoach_long_tieng(phan, bao)?;
         let can: Vec<(&String, Vec<&CauGiong>)> = {
             let mut v: Vec<_> = nhom
                 .iter()
-                .map(|(g, ds)| (g, ds.iter().filter(|c| c.vi.as_deref().is_some_and(|v| !lam_sach_loi(v).is_empty())).collect::<Vec<_>>()))
+                .map(|(g, ds)| {
+                    (
+                        g,
+                        ds.iter()
+                            .filter(|c| {
+                                c.vi.as_deref().is_some_and(|v| !lam_sach_loi(v).is_empty())
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                })
                 .filter(|(_, ds)| !ds.is_empty())
                 .collect();
             v.sort_by_key(|(_, d)| std::cmp::Reverse(d.len()));
@@ -486,7 +608,10 @@ impl CrimsonDesert {
         if let Some(t) = con_trong(thu_muc_lv) {
             let t = t as f64 / 1e9;
             if t < can_gb * 1.2 + 2.0 {
-                bail!("ổ đĩa chỉ còn {t:.0} GB, cần khoảng {:.0} GB trống", can_gb * 1.2 + 2.0);
+                bail!(
+                    "ổ đĩa chỉ còn {t:.0} GB, cần khoảng {:.0} GB trống",
+                    can_gb * 1.2 + 2.0
+                );
             }
         }
         let vgm = vgmstream()?;
@@ -496,7 +621,11 @@ impl CrimsonDesert {
         let mut viec: Vec<gv::Nhom> = Vec::new();
         let mut thieu_mau = Vec::new();
         for (i, (g, ds)) in can.iter().enumerate() {
-            bao(&format!("Bước 2/4: tạo giọng mẫu {}/{}: {g}", i + 1, can.len()));
+            bao(&format!(
+                "Bước 2/4: tạo giọng mẫu {}/{}: {g}",
+                i + 1,
+                can.len()
+            ));
             let thu = thu_muc_lv.join(phan.to_string()).join(g.as_str());
             std::fs::create_dir_all(&thu)?;
             Self::dung_giong_rieng(thu_muc_lv, phan, g, &thu, &nhom[*g]);
@@ -527,7 +656,9 @@ impl CrimsonDesert {
                 return Ok(None);
             }
         }
-        if !gv::chay(&viec, &tam, 1.4, dung, &|a, b, ct| tien_do(a, b, &format!("Bước 3/4: VieNeu đã đọc{ct}")))? {
+        if !gv::chay(&viec, &tam, 1.4, dung, &|a, b, ct| {
+            tien_do(a, b, &format!("Bước 3/4: VieNeu đã đọc{ct}"))
+        })? {
             return Ok(None);
         }
 
@@ -542,7 +673,9 @@ impl CrimsonDesert {
             }
         }
         // âm lượng thay đổi thì mã hóa lại từ đầu (thư mục theo số dB)
-        let thu_wem = thu_muc_lv.join(phan.to_string()).join(format!("_wem_{}db", tang_db as i64));
+        let thu_wem = thu_muc_lv
+            .join(phan.to_string())
+            .join(format!("_wem_{}db", tang_db as i64));
         let co = wwise::ma_hoa(
             &muc,
             &wwise_exe,
@@ -563,11 +696,20 @@ impl CrimsonDesert {
             .map(|c| (c.ten.clone(), c.f.thu_muc.clone()))
             .collect();
         let ds_zip: Vec<(String, String)> = {
-            let m: std::collections::HashMap<&str, &str> = duong.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
-            muc.iter().filter_map(|(t, _)| m.get(t.as_str()).map(|d| (t.clone(), d.to_string()))).collect()
+            let m: std::collections::HashMap<&str, &str> = duong
+                .iter()
+                .map(|(a, b)| (a.as_str(), b.as_str()))
+                .collect();
+            muc.iter()
+                .filter_map(|(t, _)| m.get(t.as_str()).map(|d| (t.clone(), d.to_string())))
+                .collect()
         };
         bao("Đang đóng gói cho DMM...");
-        let ten_mod = if phan == 'A' { "LongTieng_NhanVat" } else { "LongTieng_DanThuong" };
+        let ten_mod = if phan == 'A' {
+            "LongTieng_NhanVat"
+        } else {
+            "LongTieng_DanThuong"
+        };
         let so = wwise::dong_goi_zip(zip_ra, ten_mod, &ds_zip, &co)?;
         Ok(Some(KetQuaCd {
             cau: so,
@@ -592,7 +734,10 @@ mod test {
 
     #[test]
     fn lam_sach_dung() {
-        assert_eq!(lam_sach_loi("Xin chào <br/> {Param1} , ngươi *cười*  !"), "Xin chào, ngươi cười!");
+        assert_eq!(
+            lam_sach_loi("Xin chào <br/> {Param1} , ngươi *cười*  !"),
+            "Xin chào, ngươi cười!"
+        );
     }
 
     /// Giọng mẫu thật của 1 người nói (ghi vào thư mục tạm): CD=<thư mục game> NGUOI=unique_kliff
@@ -606,10 +751,18 @@ mod test {
         let ra = std::env::temp_dir().join("vh_cd_mau");
         let _ = std::fs::remove_dir_all(&ra);
         std::fs::create_dir_all(&ra).unwrap();
-        let mau = cd.tao_mau_nhom(&k[&g], &ra, &vgmstream().unwrap()).unwrap().unwrap();
+        let mau = cd
+            .tao_mau_nhom(&k[&g], &ra, &vgmstream().unwrap())
+            .unwrap()
+            .unwrap();
         let b = std::fs::read(&mau).unwrap();
         let (x, ts) = wwise::doc_wav(&b).unwrap();
-        println!("{g}: {} câu, mẫu {:.1}s {ts}Hz rms {:.3}", k[&g].len(), x.len() as f64 / ts as f64, rms(&x));
+        println!(
+            "{g}: {} câu, mẫu {:.1}s {ts}Hz rms {:.3}",
+            k[&g].len(),
+            x.len() as f64 / ts as f64,
+            rms(&x)
+        );
         assert!(x.len() as f64 / ts as f64 > 5.0);
     }
 
@@ -651,17 +804,36 @@ mod test {
                 std::fs::copy(e.path(), lv.join("giong_rieng").join(&n)).unwrap();
             }
         }
-        std::fs::copy(cu.join("giong_rieng/phan_bo.json.truoc_sua_gioi_tinh"), lv.join("giong_rieng/phan_bo.json")).unwrap();
+        std::fs::copy(
+            cu.join("giong_rieng/phan_bo.json.truoc_sua_gioi_tinh"),
+            lv.join("giong_rieng/phan_bo.json"),
+        )
+        .unwrap();
         std::fs::copy(cu.join("A/_cao_do_goc.json"), lv.join("A/_cao_do_goc.json")).unwrap();
         let k = cd.ke_hoach_long_tieng('A', &|_| {}).unwrap();
-        let doi = cd.sua_gioi_tinh('A', &k, &lv, &vgmstream().unwrap(), &AtomicBool::new(false), &|_| {}).unwrap();
-        let mong: std::collections::BTreeSet<String> = std::fs::read_to_string(cu.join("doi_gioi_tinh_A.txt"))
-            .unwrap()
-            .lines()
-            .filter_map(|l| l.split(':').next().map(String::from))
-            .collect();
+        let doi = cd
+            .sua_gioi_tinh(
+                'A',
+                &k,
+                &lv,
+                &vgmstream().unwrap(),
+                &AtomicBool::new(false),
+                &|_| {},
+            )
+            .unwrap();
+        let mong: std::collections::BTreeSet<String> =
+            std::fs::read_to_string(cu.join("doi_gioi_tinh_A.txt"))
+                .unwrap()
+                .lines()
+                .filter_map(|l| l.split(':').next().map(String::from))
+                .collect();
         let co: std::collections::BTreeSet<String> = doi.iter().map(|d| d.0.clone()).collect();
-        println!("app cũ đổi {} người, bản Rust đổi {}; giống nhau {}", mong.len(), co.len(), mong.intersection(&co).count());
+        println!(
+            "app cũ đổi {} người, bản Rust đổi {}; giống nhau {}",
+            mong.len(),
+            co.len(),
+            mong.intersection(&co).count()
+        );
         for d in doi.iter().take(5) {
             println!("  {} : {} -> {}", d.0, d.1, d.2);
         }

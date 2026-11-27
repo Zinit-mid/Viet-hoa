@@ -57,7 +57,10 @@ fn chua_xong(dung: &AtomicBool, viec: &ViecDich) -> String {
     if dung.load(Ordering::Relaxed) {
         "Đã dừng – bấm lại để làm tiếp.".into()
     } else {
-        format!("Chưa dịch xong ({} câu lỗi) – bấm lại để dịch tiếp.", viec.loi)
+        format!(
+            "Chưa dịch xong ({} câu lỗi) – bấm lại để dịch tiếp.",
+            viec.loi
+        )
     }
 }
 
@@ -90,19 +93,28 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
                     bail!("lồng tiếng cần app VieNeu (GPU) và Wwise (WwiseConsole.exe) trên máy");
                 }
                 let lv = thu_muc_lam_viec(&game.thu_muc);
-                for (phan, ten) in [('A', "LongTieng_NhanVat.zip"), ('B', "LongTieng_DanThuong.zip")] {
+                for (phan, ten) in [
+                    ('A', "LongTieng_NhanVat.zip"),
+                    ('B', "LongTieng_DanThuong.zip"),
+                ] {
                     let zip = duong_dan::desktop().join(ten);
-                    let kq = cd.long_tieng_phan(phan, &lv, &zip, 6.0, dung, bc.bao, &|a, b, s| {
-                        (bc.tien)(a, b, 0.0);
-                        (bc.bao)(&format!("Lồng tiếng {phan}: {s} ({a}/{b})"));
-                    })?;
+                    let kq =
+                        cd.long_tieng_phan(phan, &lv, &zip, 6.0, dung, bc.bao, &|a, b, s| {
+                            (bc.tien)(a, b, 0.0);
+                            (bc.bao)(&format!("Lồng tiếng {phan}: {s} ({a}/{b})"));
+                        })?;
                     match kq {
                         None => return Ok("Đã dừng – bấm lại để làm tiếp lồng tiếng.".into()),
-                        Some(k) => ra.push(format!("Lồng tiếng {phan}: {} câu → Desktop\\{ten}", k.cau)),
+                        Some(k) => {
+                            ra.push(format!("Lồng tiếng {phan}: {} câu → Desktop\\{ten}", k.cau))
+                        }
                     }
                 }
             }
-            ra.push("Trong DMM: tắt gói cũ > Import các file .zip trên Desktop > bật > Mount Mods.".into());
+            ra.push(
+                "Trong DMM: tắt gói cũ > Import các file .zip trên Desktop > bật > Mount Mods."
+                    .into(),
+            );
             Ok(ra.join("\n"))
         }
         l @ (LoaiGame::Rise | LoaiGame::Tr2013 | LoaiGame::Shadow) => {
@@ -129,7 +141,10 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
                 })?;
                 match kq {
                     None => return Ok("Đã dừng – bấm lại để làm tiếp lồng tiếng.".into()),
-                    Some(k) => ra.push(format!("Lồng tiếng: thêm {} file • tổng {}/{} có giọng Việt", k.file, k.da_co, k.tong)),
+                    Some(k) => ra.push(format!(
+                        "Lồng tiếng: thêm {} file • tổng {}/{} có giọng Việt",
+                        k.file, k.da_co, k.tong
+                    )),
                 }
             }
             if t.cai {
@@ -137,7 +152,11 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
                 x.cai(t.khong_dau, bc.bao, dung)?;
                 ra.push(x.ket_qua_cai.clone());
             }
-            Ok(if ra.is_empty() { "Xong.".into() } else { ra.join("\n") })
+            Ok(if ra.is_empty() {
+                "Xong.".into()
+            } else {
+                ra.join("\n")
+            })
         }
         LoaiGame::Khac => {
             let mut v = ViecFile::moi(&game.thu_muc, &game.ten);
@@ -163,7 +182,9 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
             if t.cai {
                 bao("Đang ghi vào game (có sao lưu bản gốc)...");
                 let n = v.ghi_vao_game(t.khong_dau, bc.bao)?;
-                ra.push(format!("Đã ghi {n} câu tiếng Việt vào game. Gỡ: mục Việt hóa game > Trả lại bản gốc."));
+                ra.push(format!(
+                    "Đã ghi {n} câu tiếng Việt vào game. Gỡ: mục Việt hóa game > Trả lại bản gốc."
+                ));
             }
             if t.long_tieng {
                 ra.push("(Lồng tiếng cho game này chưa hỗ trợ.)".into());
@@ -197,13 +218,42 @@ mod test {
             "This potion will restore your strength.",
             "Talk to the blacksmith to upgrade your sword.",
         ];
-        let json: serde_json::Map<String, serde_json::Value> =
-            cau.iter().enumerate().map(|(i, c)| (format!("line_{i}"), (*c).into())).collect();
-        std::fs::write(tm.join("data").join("english.json"), serde_json::to_vec_pretty(&json).unwrap()).unwrap();
-        let g = Game { nguon: "tay".into(), ma: "gia".into(), ten: "Game gia".into(), thu_muc: tm.clone(), phien_ban: String::new() };
-        let t = TuyChon { claude: false, gioi_han: 1.0, dich: true, long_tieng: false, cai: true, khong_dau: false };
+        let json: serde_json::Map<String, serde_json::Value> = cau
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (format!("line_{i}"), (*c).into()))
+            .collect();
+        std::fs::write(
+            tm.join("data").join("english.json"),
+            serde_json::to_vec_pretty(&json).unwrap(),
+        )
+        .unwrap();
+        let g = Game {
+            nguon: "tay".into(),
+            ma: "gia".into(),
+            ten: "Game gia".into(),
+            thu_muc: tm.clone(),
+            phien_ban: String::new(),
+        };
+        let t = TuyChon {
+            claude: false,
+            gioi_han: 1.0,
+            dich: true,
+            long_tieng: false,
+            cai: true,
+            khong_dau: false,
+        };
         let dung = Arc::new(AtomicBool::new(false));
-        let kq = chay(&g, &t, &dung, &Bc { bao: &|s| println!("{s}"), tien: &|a, b, _| println!("{a}/{b}") }).unwrap();
+        let kq = chay(
+            &g,
+            &t,
+            &dung,
+            &Bc {
+                bao: &|s| println!("{s}"),
+                tien: &|a, b, _| println!("{a}/{b}"),
+            },
+        )
+        .unwrap();
         println!("{kq}");
         let moi = std::fs::read_to_string(tm.join("data").join("english.json")).unwrap();
         println!("{moi}");
@@ -212,6 +262,8 @@ mod test {
         if viec.starts_with(duong_dan::du_lieu()) && viec != duong_dan::du_lieu() {
             let _ = std::fs::remove_dir_all(viec);
         }
-        assert!(moi.chars().any(|c| "ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệ".contains(c)));
+        assert!(moi
+            .chars()
+            .any(|c| "ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệ".contains(c)));
     }
 }

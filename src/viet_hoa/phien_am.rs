@@ -8,42 +8,166 @@ use std::sync::OnceLock;
 use regex::Regex;
 
 const CO_DINH: &[(&str, &str)] = &[
-    ("kliff", "Cờ-líp"), ("oongka", "Un-ca"), ("yann", "Dan"), ("damian", "Đây-mi-ần"), ("nairah", "Nai-ra"),
-    ("naira", "Nai-ra"), ("greymane", "Grây-mên"), ("greymanes", "Grây-mên"), ("pywel", "Pai-oeo"),
-    ("hernand", "Hơ-nan"), ("demeniss", "Đê-mơ-nít"), ("pailune", "Pai-lun"), ("delesyia", "Đê-lê-xi-a"),
-    ("kweiden", "Quây-đần"), ("calphade", "Can-phết"), ("witch", "Phù thủy"), ("marius", "Ma-ri-út"),
-    ("dwayne", "Đuây-n"), ("andrew", "An-đru"), ("tolstein", "Tôn-xtai"), ("shay", "Sây"), ("russo", "Ru-xô"),
-    ("valgash", "Van-gát"), ("alustin", "A-lu-xtin"), ("shakatu", "Sa-ca-tu"), ("diederik", "Đi-đơ-ríc"),
-    ("azureian", "A-du-rê-an"), ("drake", "Đrây-c"), ("myurdin", "Mi-ua-đin"), ("kamu", "Ca-mu"),
-    ("matthias", "Ma-thi-át"), ("crimson", "Crim-xơn"), ("abyss", "A-bít"), ("silver", "Xin-vơ"),
+    ("kliff", "Cờ-líp"),
+    ("oongka", "Un-ca"),
+    ("yann", "Dan"),
+    ("damian", "Đây-mi-ần"),
+    ("nairah", "Nai-ra"),
+    ("naira", "Nai-ra"),
+    ("greymane", "Grây-mên"),
+    ("greymanes", "Grây-mên"),
+    ("pywel", "Pai-oeo"),
+    ("hernand", "Hơ-nan"),
+    ("demeniss", "Đê-mơ-nít"),
+    ("pailune", "Pai-lun"),
+    ("delesyia", "Đê-lê-xi-a"),
+    ("kweiden", "Quây-đần"),
+    ("calphade", "Can-phết"),
+    ("witch", "Phù thủy"),
+    ("marius", "Ma-ri-út"),
+    ("dwayne", "Đuây-n"),
+    ("andrew", "An-đru"),
+    ("tolstein", "Tôn-xtai"),
+    ("shay", "Sây"),
+    ("russo", "Ru-xô"),
+    ("valgash", "Van-gát"),
+    ("alustin", "A-lu-xtin"),
+    ("shakatu", "Sa-ca-tu"),
+    ("diederik", "Đi-đơ-ríc"),
+    ("azureian", "A-du-rê-an"),
+    ("drake", "Đrây-c"),
+    ("myurdin", "Mi-ua-đin"),
+    ("kamu", "Ca-mu"),
+    ("matthias", "Ma-thi-át"),
+    ("crimson", "Crim-xơn"),
+    ("abyss", "A-bít"),
+    ("silver", "Xin-vơ"),
     ("desert", "Đe-dợt"),
-    ("lara", "La-ra"), ("croft", "Cờ-róp"), ("jonah", "Giô-na"), ("jacob", "Gia-cốp"), ("nadia", "Na-đi-a"),
-    ("sofia", "Xô-phi-a"), ("ana", "A-na"), ("konstantin", "Côn-xtan-tin"), ("trinity", "Tri-ni-ti"),
-    ("remnant", "Rem-nần"), ("kitezh", "Ki-tét"), ("siberia", "Xi-bê-ri-a"), ("syria", "Xi-ri-a"),
-    ("baba", "Ba-ba"), ("yaga", "Gia-ga"), ("atlas", "Át-lát"), ("richard", "Ri-chát"), ("lord", "Lo"),
-    ("prophet", "Pro-phít"), ("divine", "Đi-vai"), ("source", "Xót"), ("soviet", "Xô-viết"),
-    ("gulag", "Gu-lát"), ("constantinople", "Côn-xtan-ti-nốp"), ("byzantine", "By-dăng"),
-    ("ivan", "I-van"), ("jonathan", "Giô-na-than"),
+    ("lara", "La-ra"),
+    ("croft", "Cờ-róp"),
+    ("jonah", "Giô-na"),
+    ("jacob", "Gia-cốp"),
+    ("nadia", "Na-đi-a"),
+    ("sofia", "Xô-phi-a"),
+    ("ana", "A-na"),
+    ("konstantin", "Côn-xtan-tin"),
+    ("trinity", "Tri-ni-ti"),
+    ("remnant", "Rem-nần"),
+    ("kitezh", "Ki-tét"),
+    ("siberia", "Xi-bê-ri-a"),
+    ("syria", "Xi-ri-a"),
+    ("baba", "Ba-ba"),
+    ("yaga", "Gia-ga"),
+    ("atlas", "Át-lát"),
+    ("richard", "Ri-chát"),
+    ("lord", "Lo"),
+    ("prophet", "Pro-phít"),
+    ("divine", "Đi-vai"),
+    ("source", "Xót"),
+    ("soviet", "Xô-viết"),
+    ("gulag", "Gu-lát"),
+    ("constantinople", "Côn-xtan-ti-nốp"),
+    ("byzantine", "By-dăng"),
+    ("ivan", "I-van"),
+    ("jonathan", "Giô-na-than"),
 ];
 
 const VAN: &[(&str, &str)] = &[
-    ("ee", "i"), ("ea", "i"), ("oo", "u"), ("ou", "ao"), ("ow", "ao"), ("au", "o"), ("aw", "o"),
-    ("ai", "ây"), ("ay", "ây"), ("ei", "ây"), ("ey", "ây"), ("oi", "oi"), ("oy", "oi"), ("ie", "i"),
-    ("ue", "u"), ("ui", "ui"), ("ia", "ia"), ("io", "iô"), ("eu", "iu"),
-    ("a", "a"), ("e", "e"), ("i", "i"), ("o", "ô"), ("u", "u"), ("y", "i"),
+    ("ee", "i"),
+    ("ea", "i"),
+    ("oo", "u"),
+    ("ou", "ao"),
+    ("ow", "ao"),
+    ("au", "o"),
+    ("aw", "o"),
+    ("ai", "ây"),
+    ("ay", "ây"),
+    ("ei", "ây"),
+    ("ey", "ây"),
+    ("oi", "oi"),
+    ("oy", "oi"),
+    ("ie", "i"),
+    ("ue", "u"),
+    ("ui", "ui"),
+    ("ia", "ia"),
+    ("io", "iô"),
+    ("eu", "iu"),
+    ("a", "a"),
+    ("e", "e"),
+    ("i", "i"),
+    ("o", "ô"),
+    ("u", "u"),
+    ("y", "i"),
 ];
 const DAU: &[(&str, &str)] = &[
-    ("sch", "s"), ("tch", "ch"), ("ch", "ch"), ("sh", "s"), ("th", "th"), ("ph", "ph"), ("kh", "kh"),
-    ("gh", "g"), ("wh", "u"), ("qu", "qu"), ("ck", "c"), ("b", "b"), ("c", "c"), ("d", "đ"), ("f", "ph"),
-    ("g", "g"), ("h", "h"), ("j", "gi"), ("k", "c"), ("l", "l"), ("m", "m"), ("n", "n"), ("p", "p"),
-    ("q", "c"), ("r", "r"), ("s", "x"), ("t", "t"), ("v", "v"), ("w", "u"), ("x", "x"), ("z", "d"),
+    ("sch", "s"),
+    ("tch", "ch"),
+    ("ch", "ch"),
+    ("sh", "s"),
+    ("th", "th"),
+    ("ph", "ph"),
+    ("kh", "kh"),
+    ("gh", "g"),
+    ("wh", "u"),
+    ("qu", "qu"),
+    ("ck", "c"),
+    ("b", "b"),
+    ("c", "c"),
+    ("d", "đ"),
+    ("f", "ph"),
+    ("g", "g"),
+    ("h", "h"),
+    ("j", "gi"),
+    ("k", "c"),
+    ("l", "l"),
+    ("m", "m"),
+    ("n", "n"),
+    ("p", "p"),
+    ("q", "c"),
+    ("r", "r"),
+    ("s", "x"),
+    ("t", "t"),
+    ("v", "v"),
+    ("w", "u"),
+    ("x", "x"),
+    ("z", "d"),
 ];
 const CUOI: &[(&str, &str)] = &[
-    ("c", "c"), ("k", "c"), ("ck", "c"), ("g", "c"), ("q", "c"), ("d", "t"), ("t", "t"), ("th", "t"),
-    ("b", "p"), ("p", "p"), ("f", "p"), ("ff", "p"), ("ph", "p"), ("v", "p"), ("n", "n"), ("nn", "n"),
-    ("m", "m"), ("mm", "m"), ("ng", "ng"), ("nk", "ng"), ("l", "n"), ("ll", "n"), ("r", ""), ("rr", ""),
-    ("s", ""), ("ss", "t"), ("z", ""), ("x", "c"), ("ch", "ch"), ("sh", ""), ("tch", "ch"), ("h", ""),
-    ("gh", ""), ("w", ""), ("y", ""),
+    ("c", "c"),
+    ("k", "c"),
+    ("ck", "c"),
+    ("g", "c"),
+    ("q", "c"),
+    ("d", "t"),
+    ("t", "t"),
+    ("th", "t"),
+    ("b", "p"),
+    ("p", "p"),
+    ("f", "p"),
+    ("ff", "p"),
+    ("ph", "p"),
+    ("v", "p"),
+    ("n", "n"),
+    ("nn", "n"),
+    ("m", "m"),
+    ("mm", "m"),
+    ("ng", "ng"),
+    ("nk", "ng"),
+    ("l", "n"),
+    ("ll", "n"),
+    ("r", ""),
+    ("rr", ""),
+    ("s", ""),
+    ("ss", "t"),
+    ("z", ""),
+    ("x", "c"),
+    ("ch", "ch"),
+    ("sh", ""),
+    ("tch", "ch"),
+    ("h", ""),
+    ("gh", ""),
+    ("w", ""),
+    ("y", ""),
 ];
 
 fn tra<'a>(b: &'a [(&str, &str)], k: &str) -> Option<&'a str> {
@@ -86,7 +210,10 @@ fn phu_am(s: &str) -> Vec<&'static str> {
 }
 
 fn van(s: &str) -> &'static str {
-    VAN.iter().find(|(a, _)| s.starts_with(a)).map(|x| x.1).unwrap_or("")
+    VAN.iter()
+        .find(|(a, _)| s.starts_with(a))
+        .map(|x| x.1)
+        .unwrap_or("")
 }
 
 fn gan_cuoi(mut am: String, cuoi: &str) -> String {
@@ -125,7 +252,11 @@ fn cat_khuc(s: &str) -> Vec<String> {
 
 /// Phiên âm thô bằng quy tắc: "Hernand" → "Hơ-nan".
 pub fn quy_tac(tu: &str) -> String {
-    let mut s: String = tu.to_lowercase().chars().filter(|c| c.is_ascii_lowercase()).collect();
+    let mut s: String = tu
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_ascii_lowercase())
+        .collect();
     if s.is_empty() {
         return tu.to_string();
     }
@@ -158,7 +289,11 @@ pub fn quy_tac(tu: &str) -> String {
             if cuoi.is_none() && !dau.is_empty() {
                 let (a, b) = (&dau[..1], &dau[dau.len() - 1..]);
                 cuoi = Some(
-                    tra(CUOI, a).filter(|x| !x.is_empty()).or_else(|| tra(CUOI, b)).unwrap_or("").to_string(),
+                    tra(CUOI, a)
+                        .filter(|x| !x.is_empty())
+                        .or_else(|| tra(CUOI, b))
+                        .unwrap_or("")
+                        .to_string(),
                 );
             }
             if let Some(c) = cuoi.filter(|c| !c.is_empty()) {
@@ -173,11 +308,16 @@ pub fn quy_tac(tu: &str) -> String {
         for p in pa.iter().take(pa.len().saturating_sub(1)) {
             am.push(format!("{p}ơ"));
         }
-        am.push(format!("{}{}", pa.last().copied().unwrap_or(""), van(nguyen)));
+        am.push(format!(
+            "{}{}",
+            pa.last().copied().unwrap_or(""),
+            van(nguyen)
+        ));
         if k + 1 < khuc.len() {
             let sau_pos = khuc[k + 1].find(la_nguyen_am).unwrap_or(khuc[k + 1].len());
             let sau = khuc[k + 1][..sau_pos].to_string();
-            if sau.len() >= 2 && "mnlr".contains(&sau[..1]) && !khuc[k + 1][sau.len()..].is_empty() {
+            if sau.len() >= 2 && "mnlr".contains(&sau[..1]) && !khuc[k + 1][sau.len()..].is_empty()
+            {
                 let cuoi = tra(CUOI, &sau[..1]).unwrap_or("");
                 if &sau[..1] == "r" && am.last().is_some_and(|a| a.ends_with('e')) {
                     let l = am.pop().unwrap();
@@ -195,14 +335,22 @@ pub fn quy_tac(tu: &str) -> String {
     let am: Vec<String> = am
         .into_iter()
         .filter(|a| !a.is_empty())
-        .map(|a| a.replace("cy", "ki").replace("ci", "ki").replace("ce", "ke").replace("ge", "ghe").replace("gi", "ghi"))
+        .map(|a| {
+            a.replace("cy", "ki")
+                .replace("ci", "ki")
+                .replace("ce", "ke")
+                .replace("ge", "ghe")
+                .replace("gi", "ghi")
+        })
         .collect();
     if am.is_empty() {
         return tu.to_string();
     }
     let kq = am.join("-");
     let mut c = kq.chars();
-    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or(kq)
+    c.next()
+        .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+        .unwrap_or(kq)
 }
 
 fn tu_dien_hoc() -> &'static HashMap<String, String> {
@@ -220,7 +368,10 @@ pub fn cach_doc(tu: &str) -> String {
     if let Some((_, v)) = CO_DINH.iter().find(|(a, _)| *a == k) {
         return v.to_string();
     }
-    tu_dien_hoc().get(&k).cloned().unwrap_or_else(|| quy_tac(&k))
+    tu_dien_hoc()
+        .get(&k)
+        .cloned()
+        .unwrap_or_else(|| quy_tac(&k))
 }
 
 /// Thay tên nước ngoài bằng cách đọc tiếng Việt (chỉ cho máy đọc; âm tiết cách nhau bằng khoảng trắng).

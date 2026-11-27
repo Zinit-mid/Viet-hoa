@@ -32,7 +32,11 @@ impl BaoCao for Bao {
         self.0.lock().unwrap().thong_bao = s.to_string();
     }
     fn tien_do(&self, xong: usize, tong: usize, _usd: f64) {
-        self.0.lock().unwrap().tien = if tong > 0 { xong as f32 / tong as f32 } else { 0.0 };
+        self.0.lock().unwrap().tien = if tong > 0 {
+            xong as f32 / tong as f32
+        } else {
+            0.0
+        };
     }
 }
 
@@ -75,7 +79,11 @@ impl Default for TrangPhuDePhim {
             cuong_do: 0.7,
             chi_thu: false,
             ai_rut_gon: false,
-            ten_doc: crate::thuyet_minh::doc_ten_doc().iter().map(|(a, b)| format!("{a} => {b}")).collect::<Vec<_>>().join("\n"),
+            ten_doc: crate::thuyet_minh::doc_ten_doc()
+                .iter()
+                .map(|(a, b)| format!("{a} => {b}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
         }
     }
 }
@@ -83,16 +91,20 @@ impl Default for TrangPhuDePhim {
 impl TrangPhuDePhim {
     pub fn dang_ky_tt(&self) {
         let t = self.tt.clone();
-        crate::tien_trinh::dang_ky("phu_de_phim", crate::tien_trinh::co_dinh(self.dung.clone()), move || {
-            let g = t.lock().unwrap();
-            crate::tien_trinh::Anh {
-                dang_ban: g.dang_ban,
-                ten: "Phụ đề phim".into(),
-                thong_bao: g.thong_bao.clone(),
-                tien: (g.tien > 0.0).then_some(g.tien),
-                loi: g.loi,
-            }
-        });
+        crate::tien_trinh::dang_ky(
+            "phu_de_phim",
+            crate::tien_trinh::co_dinh(self.dung.clone()),
+            move || {
+                let g = t.lock().unwrap();
+                crate::tien_trinh::Anh {
+                    dang_ban: g.dang_ban,
+                    ten: "Phụ đề phim".into(),
+                    thong_bao: g.thong_bao.clone(),
+                    tien: (g.tien > 0.0).then_some(g.tien),
+                    loi: g.loi,
+                }
+            },
+        );
     }
 
     /// Thuyết minh bằng giọng đã chọn (dùng phụ đề đã tạo; chưa có thì báo tạo phụ đề trước).
@@ -107,7 +119,11 @@ impl TrangPhuDePhim {
                 (t.thong_bao, t.loi) = ("Dán link phim hoặc chọn file phim trước.".into(), true);
                 return;
             }
-            *t = Tt { dang_ban: true, thong_bao: "Đang chuẩn bị thuyết minh...".into(), ..Default::default() };
+            *t = Tt {
+                dang_ban: true,
+                thong_bao: "Đang chuẩn bị thuyết minh...".into(),
+                ..Default::default()
+            };
         }
         let tuy = crate::thuyet_minh::Tuy {
             giong: self.giong.trim_start_matches("kho:").to_string(),
@@ -125,17 +141,32 @@ impl TrangPhuDePhim {
             let (a, b) = (tt.clone(), tt.clone());
             let kq = (|| -> anyhow::Result<Option<crate::thuyet_minh::KetQua>> {
                 let v = ViecPhim::moi(&nguon)?;
-                let phim = v.phim.as_ref().ok_or_else(|| anyhow::anyhow!("chưa có phim – bấm Tạo phụ đề tiếng Việt trước"))?.duong_dan.clone();
+                let phim = v
+                    .phim
+                    .as_ref()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("chưa có phim – bấm Tạo phụ đề tiếng Việt trước")
+                    })?
+                    .duong_dan
+                    .clone();
                 if v.dong.is_empty() {
                     anyhow::bail!("chưa có phụ đề – bấm Tạo phụ đề tiếng Việt trước");
                 }
                 tt.lock().unwrap().phim = Some(phim.clone());
-                let mut dong: Vec<(f64, f64, String)> = v.dong.iter().map(|(x, y, c)| (*x, *y, v.viec.tim(c).unwrap_or_default())).collect();
+                let mut dong: Vec<(f64, f64, String)> = v
+                    .dong
+                    .iter()
+                    .map(|(x, y, c)| (*x, *y, v.viec.tim(c).unwrap_or_default()))
+                    .collect();
                 if ai_rut_gon {
                     // câu đọc không kịp (13 chữ/giây) → AI local rút gọn; xong thì nhường GPU cho VieNeu
                     let dai: Vec<usize> = (0..dong.len())
                         .filter(|&i| {
-                            let khung = dong.get(i + 1).map(|n| n.0 - dong[i].0 - 0.05).unwrap_or(8.0).clamp(0.6, 12.0);
+                            let khung = dong
+                                .get(i + 1)
+                                .map(|n| n.0 - dong[i].0 - 0.05)
+                                .unwrap_or(8.0)
+                                .clamp(0.6, 12.0);
                             dong[i].2.chars().count() as f64 > khung * 13.0
                         })
                         .collect();
@@ -147,17 +178,28 @@ impl TrangPhuDePhim {
                             }
                             let cau: Vec<(String, f64)> = lo
                                 .iter()
-                                .map(|&i| (dong[i].2.clone(), dong.get(i + 1).map(|n| n.0 - dong[i].0 - 0.05).unwrap_or(8.0).clamp(0.6, 12.0)))
+                                .map(|&i| {
+                                    (
+                                        dong[i].2.clone(),
+                                        dong.get(i + 1)
+                                            .map(|n| n.0 - dong[i].0 - 0.05)
+                                            .unwrap_or(8.0)
+                                            .clamp(0.6, 12.0),
+                                    )
+                                })
                                 .collect();
                             if let Ok(moi) = crate::ai_local::rut_gon(&cau) {
                                 for (&i, m) in lo.iter().zip(moi) {
-                                    if !m.trim().is_empty() && m.chars().count() < dong[i].2.chars().count() {
+                                    if !m.trim().is_empty()
+                                        && m.chars().count() < dong[i].2.chars().count()
+                                    {
                                         dong[i].2 = m.trim().to_string();
                                     }
                                 }
                             }
                             xong += lo.len();
-                            tt.lock().unwrap().thong_bao = format!("AI local đang rút gọn câu quá dài {xong}/{}", dai.len());
+                            tt.lock().unwrap().thong_bao =
+                                format!("AI local đang rút gọn câu quá dài {xong}/{}", dai.len());
                         }
                     }
                 }
@@ -169,7 +211,9 @@ impl TrangPhuDePhim {
                     &tuy,
                     &dung,
                     &move |s| a.lock().unwrap().thong_bao = s.to_string(),
-                    &move |x, y| b.lock().unwrap().tien = if y > 0 { x as f32 / y as f32 } else { 0.0 },
+                    &move |x, y| {
+                        b.lock().unwrap().tien = if y > 0 { x as f32 / y as f32 } else { 0.0 }
+                    },
                 )
             })();
             let mut t = tt.lock().unwrap();
@@ -203,10 +247,17 @@ impl TrangPhuDePhim {
                 return;
             }
             if nguon.is_empty() {
-                (t.thong_bao, t.loi) = ("Dán link phim hoặc chọn file phim trước (phim đã tạo phụ đề).".into(), true);
+                (t.thong_bao, t.loi) = (
+                    "Dán link phim hoặc chọn file phim trước (phim đã tạo phụ đề).".into(),
+                    true,
+                );
                 return;
             }
-            *t = Tt { dang_ban: true, thong_bao: "AI local đang soát phụ đề...".into(), ..Default::default() };
+            *t = Tt {
+                dang_ban: true,
+                thong_bao: "AI local đang soát phụ đề...".into(),
+                ..Default::default()
+            };
         }
         let (tt, dung) = (self.tt.clone(), self.dung.clone());
         dung.store(false, Ordering::SeqCst);
@@ -247,9 +298,18 @@ impl TrangPhuDePhim {
                 (t.thong_bao, t.loi) = ("Không thấy file phim này.".into(), true);
                 return;
             }
-            *t = Tt { dang_ban: true, thong_bao: "Đang bắt đầu...".into(), ..Default::default() };
+            *t = Tt {
+                dang_ban: true,
+                thong_bao: "Đang bắt đầu...".into(),
+                ..Default::default()
+            };
         }
-        let (tt, dung, claude, gioi_han) = (self.tt.clone(), self.dung.clone(), self.claude, self.gioi_han);
+        let (tt, dung, claude, gioi_han) = (
+            self.tt.clone(),
+            self.dung.clone(),
+            self.claude,
+            self.gioi_han,
+        );
         dung.store(false, Ordering::SeqCst);
         std::thread::spawn(move || {
             let _thuc = duong_dan::GiuMayThuc::moi();
@@ -270,22 +330,41 @@ impl TrangPhuDePhim {
         ui.add_space(8.0);
         let (ban, tb, loi, xong, tien, phim, srt, thu_muc, phim_tm) = {
             let t = self.tt.lock().unwrap();
-            (t.dang_ban, t.thong_bao.clone(), t.loi, t.xong, t.tien, t.phim.clone(), t.srt.clone(), t.thu_muc.clone(), t.phim_tm.clone())
+            (
+                t.dang_ban,
+                t.thong_bao.clone(),
+                t.loi,
+                t.xong,
+                t.tien,
+                t.phim.clone(),
+                t.srt.clone(),
+                t.thu_muc.clone(),
+                t.phim_tm.clone(),
+            )
         };
         if ban {
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(300));
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(300));
         }
         ui.horizontal(|ui| {
             ui.add_enabled(
                 !ban,
-                egui::TextEdit::singleline(&mut self.nguon).desired_width(560.0).hint_text("link phim hoặc đường dẫn file..."),
+                egui::TextEdit::singleline(&mut self.nguon)
+                    .desired_width(560.0)
+                    .hint_text("link phim hoặc đường dẫn file..."),
             );
             if ui
                 .add_enabled(!ban, egui::Button::new("Chọn file phim"))
                 .clicked()
             {
                 if let Some(p) = rfd::FileDialog::new()
-                    .add_filter("Phim", &["mp4", "mkv", "avi", "mov", "webm", "m4v", "ts", "flv", "wmv", "mp3", "m4a", "wav"])
+                    .add_filter(
+                        "Phim",
+                        &[
+                            "mp4", "mkv", "avi", "mov", "webm", "m4v", "ts", "flv", "wmv", "mp3",
+                            "m4a", "wav",
+                        ],
+                    )
                     .pick_file()
                 {
                     self.nguon = p.to_string_lossy().into_owned();
@@ -304,18 +383,30 @@ impl TrangPhuDePhim {
             }
         });
         if self.claude && !dich::claude::co_khoa() {
-            ui.label(RichText::new("Chưa có mã Claude – lưu mã trong Cài đặt, hoặc chọn Offline.").color(Color32::YELLOW));
+            ui.label(
+                RichText::new("Chưa có mã Claude – lưu mã trong Cài đặt, hoặc chọn Offline.")
+                    .color(Color32::YELLOW),
+            );
         }
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            if crate::kieu::nut_tien_do(ui, "phu_de_phim", "Tạo phụ đề tiếng Việt", "Đang tạo", crate::kieu::VANG, !ban)
-            {
+            if crate::kieu::nut_tien_do(
+                ui,
+                "phu_de_phim",
+                "Tạo phụ đề tiếng Việt",
+                "Đang tạo",
+                crate::kieu::VANG,
+                !ban,
+            ) {
                 self.bat_dau();
             }
             if ui.add_enabled(ban, egui::Button::new("Dừng")).clicked() {
                 self.dung.store(true, Ordering::SeqCst);
             }
-            if ui.add_enabled(!ban, egui::Button::new("AI local sửa phụ đề")).clicked() {
+            if ui
+                .add_enabled(!ban, egui::Button::new("AI local sửa phụ đề"))
+                .clicked()
+            {
                 self.ai_sua();
             }
             if ui
@@ -327,7 +418,10 @@ impl TrangPhuDePhim {
                 }
             }
             if ui
-                .add_enabled(phim.is_some() || thu_muc.is_some(), egui::Button::new("Mở thư mục"))
+                .add_enabled(
+                    phim.is_some() || thu_muc.is_some(),
+                    egui::Button::new("Mở thư mục"),
+                )
                 .clicked()
             {
                 if let Some(p) = phim.as_ref().or(thu_muc.as_ref()) {
@@ -336,12 +430,19 @@ impl TrangPhuDePhim {
             }
         });
         if ban {
-            ui.add(egui::ProgressBar::new(tien).show_percentage().animate(tien == 0.0));
+            ui.add(
+                egui::ProgressBar::new(tien)
+                    .show_percentage()
+                    .animate(tien == 0.0),
+            );
         }
         ui.add_space(8.0);
-        crate::kieu::khoi(ui, "THUYẾT MINH TIẾNG VIỆT (giọng đọc có cảm xúc)", |ui| {
-            ui.label(RichText::new("Dùng phụ đề tiếng Việt đã tạo ở trên: đọc từng dòng bằng một giọng chuẩn, đặt đúng thời điểm, hạ tiếng gốc khi thuyết minh nói, xuất phim mới.").small().weak());
-            ui.add_enabled_ui(!ban, |ui| {
+        crate::kieu::khoi(
+            ui,
+            "THUYẾT MINH TIẾNG VIỆT (giọng đọc có cảm xúc)",
+            |ui| {
+                ui.label(RichText::new("Dùng phụ đề tiếng Việt đã tạo ở trên: đọc từng dòng bằng một giọng chuẩn, đặt đúng thời điểm, hạ tiếng gốc khi thuyết minh nói, xuất phim mới.").small().weak());
+                ui.add_enabled_ui(!ban, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.label("Giọng:");
                     let hien = match self.giong.strip_prefix("kho:") {
@@ -385,17 +486,28 @@ impl TrangPhuDePhim {
                     let _ = std::fs::write(crate::thuyet_minh::tep_ten_doc(), &self.ten_doc);
                 }
             });
-            ui.horizontal(|ui| {
-                if crate::kieu::nut_tien_do(ui, "phu_de_phim", "Tạo thuyết minh", "Đang tạo", crate::kieu::VANG, !ban) {
-                    self.thuyet_minh();
-                }
-                if ui.add_enabled(phim_tm.is_some(), egui::Button::new("Mở phim thuyết minh")).clicked() {
-                    if let Some(p) = &phim_tm {
-                        pdp::mo_phim(p, None);
+                ui.horizontal(|ui| {
+                    if crate::kieu::nut_tien_do(
+                        ui,
+                        "phu_de_phim",
+                        "Tạo thuyết minh",
+                        "Đang tạo",
+                        crate::kieu::VANG,
+                        !ban,
+                    ) {
+                        self.thuyet_minh();
                     }
-                }
-            });
-        });
+                    if ui
+                        .add_enabled(phim_tm.is_some(), egui::Button::new("Mở phim thuyết minh"))
+                        .clicked()
+                    {
+                        if let Some(p) = &phim_tm {
+                            pdp::mo_phim(p, None);
+                        }
+                    }
+                });
+            },
+        );
         if !tb.is_empty() {
             ui.add_space(6.0);
             let m = if loi {
@@ -428,9 +540,21 @@ fn chay(
         match buoc {
             "tai" => t.thong_bao = format!("Đang tải phim: {a:.0}%"),
             _ => {
-                let con = if a > 30.0 { bat_dau.elapsed().as_secs_f64() / a * (b - a) } else { 0.0 };
-                t.thong_bao = format!("AI đang nghe lời thoại: {:.0}/{:.0} phút phim{}", a / 60.0, b / 60.0,
-                    if con > 0.0 { format!(" • còn khoảng {:.0} phút", con / 60.0) } else { String::new() });
+                let con = if a > 30.0 {
+                    bat_dau.elapsed().as_secs_f64() / a * (b - a)
+                } else {
+                    0.0
+                };
+                t.thong_bao = format!(
+                    "AI đang nghe lời thoại: {:.0}/{:.0} phút phim{}",
+                    a / 60.0,
+                    b / 60.0,
+                    if con > 0.0 {
+                        format!(" • còn khoảng {:.0} phút", con / 60.0)
+                    } else {
+                        String::new()
+                    }
+                );
             }
         }
     };

@@ -81,7 +81,12 @@ fn chia_dong(doan: &[Doan]) -> Vec<Dong> {
         let mut cur: Vec<&Tu> = Vec::new();
         for (i, w) in d.tu.iter().enumerate() {
             cur.push(w);
-            let chu: String = cur.iter().map(|x| x.2.as_str()).collect::<String>().trim().to_string();
+            let chu: String = cur
+                .iter()
+                .map(|x| x.2.as_str())
+                .collect::<String>()
+                .trim()
+                .to_string();
             let n = chu.chars().count();
             let dai = cur.last().unwrap().1 - cur[0].0;
             let t = w.2.trim();
@@ -113,7 +118,13 @@ fn chia_dong(doan: &[Doan]) -> Vec<Dong> {
 
 fn gio(s: f64) -> String {
     let ms = (s.max(0.0) * 1000.0).round() as u64;
-    format!("{:02}:{:02}:{:02},{:03}", ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000)
+    format!(
+        "{:02}:{:02}:{:02},{:03}",
+        ms / 3_600_000,
+        ms / 60_000 % 60,
+        ms / 1000 % 60,
+        ms % 1000
+    )
 }
 
 /// Ngắt dòng dài làm 2 dòng ở khoảng trắng gần giữa.
@@ -123,7 +134,12 @@ fn xuong_dong(chu: &str) -> String {
         return chu.to_string();
     }
     let giua = n / 2;
-    let vt: Vec<usize> = chu.chars().enumerate().filter(|(_, c)| *c == ' ').map(|(i, _)| i).collect();
+    let vt: Vec<usize> = chu
+        .chars()
+        .enumerate()
+        .filter(|(_, c)| *c == ' ')
+        .map(|(i, _)| i)
+        .collect();
     let Some(&i) = vt.iter().min_by_key(|&&x| (x as i64 - giua as i64).abs()) else {
         return chu.to_string();
     };
@@ -138,7 +154,13 @@ pub fn noi_dung_srt(dong: &[Dong]) -> Vec<u8> {
         let nxt = dong.get(i + 1).map(|d| d.0 - 0.05).unwrap_or(f64::INFINITY);
         // hiện lâu thêm chút, không đè lên dòng sau
         let b2 = (b + 0.4).min(nxt).max((a + 0.8).min(nxt)).max(a + 0.2);
-        s += &format!("{}\n{} --> {}\n{}\n\n", i + 1, gio(*a), gio(b2), xuong_dong(c));
+        s += &format!(
+            "{}\n{} --> {}\n{}\n\n",
+            i + 1,
+            gio(*a),
+            gio(b2),
+            xuong_dong(c)
+        );
     }
     let mut v = vec![0xEF, 0xBB, 0xBF];
     v.extend(s.trim_end_matches('\n').as_bytes());
@@ -151,7 +173,12 @@ pub fn mo_phim(phim: &Path, srt: Option<&Path>) {
     let mut ung: Vec<PathBuf> = vec![duong_dan::cong_cu().join("vlc").join("vlc.exe")];
     for k in ["ProgramFiles", "ProgramFiles(x86)"] {
         if let Some(g) = std::env::var_os(k) {
-            ung.push(PathBuf::from(g).join("VideoLAN").join("VLC").join("vlc.exe"));
+            ung.push(
+                PathBuf::from(g)
+                    .join("VideoLAN")
+                    .join("VLC")
+                    .join("vlc.exe"),
+            );
         }
     }
     if let Some(vlc) = ung.into_iter().find(|p| p.is_file()) {
@@ -164,7 +191,10 @@ pub fn mo_phim(phim: &Path, srt: Option<&Path>) {
             return;
         }
     }
-    let _ = Command::new("cmd").args(["/c", "start", ""]).arg(phim).spawn();
+    let _ = Command::new("cmd")
+        .args(["/c", "start", ""])
+        .arg(phim)
+        .spawn();
 }
 
 pub struct ViecPhim {
@@ -189,12 +219,19 @@ impl ViecPhim {
         if !la_link(&nguon) && Path::new(&nguon).is_file() {
             phim = Some(Phim {
                 duong_dan: PathBuf::from(&nguon),
-                ten: Path::new(&nguon).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+                ten: Path::new(&nguon)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
             });
         }
         let mut v = Self {
             nguon,
-            viec: ViecDich::moi(tm.clone(), HUONG_DAN, BangTen::tao(std::iter::empty::<&str>())),
+            viec: ViecDich::moi(
+                tm.clone(),
+                HUONG_DAN,
+                BangTen::tao(std::iter::empty::<&str>()),
+            ),
             tm,
             phim,
             dong: Vec::new(),
@@ -218,7 +255,12 @@ impl ViecPhim {
 
     /// Dòng chưa có bản dịch (không trùng).
     pub fn cau_can_dich(&self) -> Vec<String> {
-        self.viec.cau_can_dich(self.dong.iter().map(|d| d.2.as_str()).filter(|c| c.chars().any(char::is_alphanumeric)))
+        self.viec.cau_can_dich(
+            self.dong
+                .iter()
+                .map(|d| d.2.as_str())
+                .filter(|c| c.chars().any(char::is_alphanumeric)),
+        )
     }
 
     fn chay_py(
@@ -228,23 +270,42 @@ impl ViecPhim {
         bao: &dyn Fn(&str),
         tien_do: &dyn Fn(&str, f64, f64),
     ) -> Result<PyKq> {
-        let py = duong_dan::python().ok_or_else(|| anyhow!("chưa có Python riêng (Cài đặt > Tải công cụ)"))?;
-        let ffmpeg = duong_dan::cong_cu().join("ffmpeg").join("bin").join("ffmpeg.exe");
+        let py = duong_dan::python()
+            .ok_or_else(|| anyhow!("chưa có Python riêng (Cài đặt > Tải công cụ)"))?;
+        let ffmpeg = duong_dan::cong_cu()
+            .join("ffmpeg")
+            .join("bin")
+            .join("ffmpeg.exe");
         if !ffmpeg.is_file() {
             bail!("thiếu {}", ffmpeg.display());
         }
         let mo_hinh = thu_muc().join("_mo_hinh");
         std::fs::create_dir_all(&mo_hinh)?;
-        let mut dll = vec![py.parent().unwrap().join("Lib").join("site-packages").join("torch").join("lib")];
+        let mut dll = vec![py
+            .parent()
+            .unwrap()
+            .join("Lib")
+            .join("site-packages")
+            .join("torch")
+            .join("lib")];
         if let Some(l) = std::env::var_os("LOCALAPPDATA") {
             dll.push(PathBuf::from(l).join("com.vieneu.app/gpu/venv/Lib/site-packages/torch/lib"));
         }
         let mut cfg = cfg;
         let o = cfg.as_object_mut().unwrap();
         o.insert("ffmpeg".into(), ffmpeg.to_string_lossy().into());
-        o.insert("dll".into(), dll.iter().map(|d| d.to_string_lossy().into_owned()).collect::<Vec<_>>().into());
+        o.insert(
+            "dll".into(),
+            dll.iter()
+                .map(|d| d.to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .into(),
+        );
         o.insert("mo_hinh_dir".into(), mo_hinh.to_string_lossy().into());
-        o.insert("deno_tim".into(), thu_muc().join("_thu_vien312").to_string_lossy().into());
+        o.insert(
+            "deno_tim".into(),
+            thu_muc().join("_thu_vien312").to_string_lossy().into(),
+        );
         o.insert("gpu".into(), true.into());
         let vj = self.tm.join("viec.json");
         std::fs::write(&vj, serde_json::to_vec(&cfg)?)?;
@@ -282,7 +343,10 @@ impl ViecPhim {
         let xong = AtomicBool::new(false);
         let mut kq = PyKq::default();
         let mut cuoi: Vec<String> = Vec::new();
-        let mut nk = std::fs::OpenOptions::new().create(true).append(true).open(self.tm.join("nhat_ky.txt"))?;
+        let mut nk = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.tm.join("nhat_ky.txt"))?;
         let mut bi_dung = false;
         std::thread::scope(|sc| {
             // Canh nút Dừng riêng: bấm Dừng là giết tiến trình ngay, không đợi nó in thêm dòng
@@ -308,14 +372,24 @@ impl ViecPhim {
                     "CACH" => bao("Đang tải phim về..."),
                     "LOI_TAI" => bao("Cách tải này lỗi, thử cách khác..."),
                     "NAP_MO_HINH" => bao("Đang nạp AI nghe tiếng vào card màn hình..."),
-                    "TAI_MO_HINH" => bao("Lần đầu: đang tải mô hình AI nghe tiếng (~1,6 GB), chờ vài phút..."),
+                    "TAI_MO_HINH" => {
+                        bao("Lần đầu: đang tải mô hình AI nghe tiếng (~1,6 GB), chờ vài phút...")
+                    }
                     "TIEN" => {
                         let mut t = v.split_whitespace();
-                        tien_do("nghe", so(t.next().unwrap_or("0")), so(t.next().unwrap_or("0")));
+                        tien_do(
+                            "nghe",
+                            so(t.next().unwrap_or("0")),
+                            so(t.next().unwrap_or("0")),
+                        );
                     }
                     "THIET_BI" => {
                         kq.thiet_bi = Some(v.to_string());
-                        bao(if v == "cuda" { "Đang nghe tiếng bằng card màn hình..." } else { "Đang nghe tiếng bằng CPU (chậm hơn nhiều)..." });
+                        bao(if v == "cuda" {
+                            "Đang nghe tiếng bằng card màn hình..."
+                        } else {
+                            "Đang nghe tiếng bằng CPU (chậm hơn nhiều)..."
+                        });
                     }
                     "KHONG_CUDA" => kq.khong_cuda = true,
                     "GIAI_MA" => bao("Đang tách âm thanh khỏi phim..."),
@@ -349,7 +423,12 @@ impl ViecPhim {
         }
         if !st.success() {
             let l: Vec<&str> = loi.lines().rev().take(3).collect();
-            bail!("công cụ nghe tiếng bị lỗi – xem {}\n{}\n{}", self.tm.join("nhat_ky.txt").display(), cuoi.join("\n"), l.into_iter().rev().collect::<Vec<_>>().join("\n"));
+            bail!(
+                "công cụ nghe tiếng bị lỗi – xem {}\n{}\n{}",
+                self.tm.join("nhat_ky.txt").display(),
+                cuoi.join("\n"),
+                l.into_iter().rev().collect::<Vec<_>>().join("\n")
+            );
         }
         Ok(kq)
     }
@@ -366,16 +445,22 @@ impl ViecPhim {
             if !la_link(&self.nguon) {
                 bail!("không thấy file phim");
             }
-            let thu_tai = PathBuf::from(std::env::var_os("USERPROFILE").unwrap_or_default()).join("Videos").join("DichGame");
+            let thu_tai = PathBuf::from(std::env::var_os("USERPROFILE").unwrap_or_default())
+                .join("Videos")
+                .join("DichGame");
             std::fs::create_dir_all(&thu_tai)?;
             bao("Đang tải phim về...");
             let kq = self.chay_py(
                 serde_json::json!({"nguon": self.nguon, "tai": true, "chi_tai": true,
                     "thu_muc_tai": thu_tai.to_string_lossy(), "mo_hinh": "large-v3-turbo",
                     "ra": self.tm.join("chu_goc.json").to_string_lossy()}),
-                dung, bao, tien_do,
+                dung,
+                bao,
+                tien_do,
             )?;
-            let p = kq.file.ok_or_else(|| anyhow!("không tải được phim từ link này"))?;
+            let p = kq
+                .file
+                .ok_or_else(|| anyhow!("không tải được phim từ link này"))?;
             std::fs::write(self.tm.join("phim.json"), serde_json::to_vec(&p)?)?;
             self.phim = Some(p);
         }
@@ -407,9 +492,23 @@ impl ViecPhim {
         let dong: Vec<Dong> = self
             .dong
             .iter()
-            .map(|(a, b, c)| (*a, *b, self.viec.tim(c).filter(|v| !v.is_empty()).unwrap_or_else(|| c.clone())))
+            .map(|(a, b, c)| {
+                (
+                    *a,
+                    *b,
+                    self.viec
+                        .tim(c)
+                        .filter(|v| !v.is_empty())
+                        .unwrap_or_else(|| c.clone()),
+                )
+            })
             .collect();
-        let ten = phim.duong_dan.file_stem().unwrap_or_default().to_string_lossy().into_owned();
+        let ten = phim
+            .duong_dan
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
         let canh = phim.duong_dan.with_extension("srt");
         let trong = self.tm.join(format!("{ten}.srt"));
         let _ = std::fs::write(self.tm.join("goc.srt"), noi_dung_srt(&self.dong));
@@ -422,7 +521,10 @@ impl ViecPhim {
     }
 
     /// Nhờ AI local soát bản dịch các dòng phụ đề rồi ghi lại .srt. → (số câu đã sửa, đường dẫn .srt)
-    pub fn ai_sua_phu_de(&mut self, bc: &dyn crate::viet_hoa::viec_dich::BaoCao) -> Result<(usize, PathBuf)> {
+    pub fn ai_sua_phu_de(
+        &mut self,
+        bc: &dyn crate::viet_hoa::viec_dich::BaoCao,
+    ) -> Result<(usize, PathBuf)> {
         let mut thay: std::collections::BTreeSet<String> = Default::default();
         let mut cap: Vec<(String, String)> = Vec::new();
         for (_, _, en) in &self.dong {
@@ -466,15 +568,23 @@ mod test {
             b: 9.0,
             chu: String::new(),
             tu: vec![
-                tu(0.0, 0.5, " Hello"), tu(0.5, 1.0, " there."),
-                tu(1.0, 2.0, " How"), tu(2.0, 3.0, " are"), tu(3.0, 4.0, " you"), tu(4.0, 5.0, " doing"),
+                tu(0.0, 0.5, " Hello"),
+                tu(0.5, 1.0, " there."),
+                tu(1.0, 2.0, " How"),
+                tu(2.0, 3.0, " are"),
+                tu(3.0, 4.0, " you"),
+                tu(4.0, 5.0, " doing"),
                 tu(5.0, 6.0, " today?"),
             ],
         }];
         let d = chia_dong(&doan);
         assert!(!d.is_empty());
         assert_eq!(d[0].2.starts_with("Hello"), true);
-        let srt = String::from_utf8(noi_dung_srt(&[(0.0, 1.5, "Xin chào".into()), (3661.5, 3663.0, "x".into())])).unwrap();
+        let srt = String::from_utf8(noi_dung_srt(&[
+            (0.0, 1.5, "Xin chào".into()),
+            (3661.5, 3663.0, "x".into()),
+        ]))
+        .unwrap();
         assert!(srt.starts_with('\u{feff}'));
         assert!(srt.contains("00:00:00,000 --> 00:00:01,900"));
         assert!(srt.contains("01:01:01,500"));
@@ -492,7 +602,10 @@ mod test {
         let _ = std::fs::remove_file(v.tm.join("chu_goc.json"));
         v.dong.clear();
         let dung = AtomicBool::new(false);
-        v.tai_va_nghe(None, &dung, &|s| println!("{s}"), &|b, a, t| println!("{b} {a}/{t}")).unwrap();
+        v.tai_va_nghe(None, &dung, &|s| println!("{s}"), &|b, a, t| {
+            println!("{b} {a}/{t}")
+        })
+        .unwrap();
         println!("{} dòng, ngôn ngữ {:?}", v.dong.len(), v.ngon_ngu);
         for d in v.dong.iter().take(5) {
             println!("{:.1}-{:.1} {}", d.0, d.1, d.2);

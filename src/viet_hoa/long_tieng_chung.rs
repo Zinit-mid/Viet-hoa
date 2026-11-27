@@ -51,7 +51,14 @@ fn id_clip(rel: &str) -> String {
 fn do_thong_tin(p: &Path) -> Option<(f64, u32, u32)> {
     let mut c = Command::new(ffmpeg_bin("ffprobe.exe"));
     an(&mut c)
-        .args(["-v", "error", "-show_entries", "format=duration:stream=sample_rate,channels", "-of", "json"])
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration:stream=sample_rate,channels",
+            "-of",
+            "json",
+        ])
         .arg(p)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -59,13 +66,17 @@ fn do_thong_tin(p: &Path) -> Option<(f64, u32, u32)> {
     let v: serde_json::Value = serde_json::from_slice(&o.stdout).ok()?;
     let giay = v["format"]["duration"].as_str()?.parse::<f64>().ok()?;
     let s = v["streams"].get(0)?;
-    let sr = s["sample_rate"].as_str().and_then(|x| x.parse().ok()).unwrap_or(44100);
+    let sr = s["sample_rate"]
+        .as_str()
+        .and_then(|x| x.parse().ok())
+        .unwrap_or(44100);
     let kenh = s["channels"].as_u64().unwrap_or(1) as u32;
     Some((giay, sr, kenh))
 }
 
 fn duoi_hop_le(p: &Path) -> bool {
-    p.extension().is_some_and(|e| DUOI.contains(&e.to_string_lossy().to_lowercase().as_str()))
+    p.extension()
+        .is_some_and(|e| DUOI.contains(&e.to_string_lossy().to_lowercase().as_str()))
 }
 
 /// Quét file âm thanh rời của game (bỏ file < 3 KB hoặc > 40 MB: tiếng động / nhạc nền dài).
@@ -86,7 +97,10 @@ pub fn quet(thu_muc: &Path, bao: &(dyn Fn(&str) + Sync), dung: &AtomicBool) -> V
         }
     }
     ds.sort();
-    bao(&format!("Tìm thấy {} file âm thanh – đang đo thời lượng...", ds.len()));
+    bao(&format!(
+        "Tìm thấy {} file âm thanh – đang đo thời lượng...",
+        ds.len()
+    ));
     let xong = AtomicUsize::new(0);
     let kq: std::sync::Mutex<Vec<Clip>> = Default::default();
     let tiep = AtomicUsize::new(0);
@@ -98,8 +112,18 @@ pub fn quet(thu_muc: &Path, bao: &(dyn Fn(&str) + Sync), dung: &AtomicBool) -> V
                     return;
                 }
                 if let Some((giay, sr, kenh)) = do_thong_tin(&ds[i]) {
-                    let rel = ds[i].strip_prefix(thu_muc).unwrap_or(&ds[i]).to_string_lossy().replace('\\', "/");
-                    kq.lock().unwrap().push(Clip { rel, giay, sr, kenh, ..Default::default() });
+                    let rel = ds[i]
+                        .strip_prefix(thu_muc)
+                        .unwrap_or(&ds[i])
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    kq.lock().unwrap().push(Clip {
+                        rel,
+                        giay,
+                        sr,
+                        kenh,
+                        ..Default::default()
+                    });
                 }
                 let n = xong.fetch_add(1, Ordering::Relaxed) + 1;
                 if n % 500 == 0 {
@@ -122,31 +146,57 @@ fn stem(rel: &str) -> String {
 /// Tiền tố tên file (trước số / mã): "lara_0123" → "lara".
 fn tien_to(s: &str) -> String {
     let t: Vec<&str> = s.split(['_', '-', ' ']).filter(|x| !x.is_empty()).collect();
-    let i = t.iter().position(|x| x.chars().any(|c| c.is_ascii_digit())).unwrap_or(t.len());
+    let i = t
+        .iter()
+        .position(|x| x.chars().any(|c| c.is_ascii_digit()))
+        .unwrap_or(t.len());
     let k = &t[..i.min(t.len())];
-    if k.is_empty() { "khac".into() } else { k.join("_") }
+    if k.is_empty() {
+        "khac".into()
+    } else {
+        k.join("_")
+    }
 }
 
 /// Người nói: nếu thư mục chứa nhiều tiền tố tên file khác nhau thì theo tiền tố, không thì theo tên thư mục.
 fn gan_nguoi_noi(v: &mut [Clip]) {
     let mut theo_thu_muc: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, c) in v.iter().enumerate() {
-        let d = c.rel.rsplit_once('/').map(|x| x.0).unwrap_or("").to_string();
+        let d = c
+            .rel
+            .rsplit_once('/')
+            .map(|x| x.0)
+            .unwrap_or("")
+            .to_string();
         theo_thu_muc.entry(d).or_default().push(i);
     }
     for (d, ids) in theo_thu_muc {
-        let tt: std::collections::HashSet<String> = ids.iter().map(|&i| tien_to(&stem(&v[i].rel))).collect();
+        let tt: std::collections::HashSet<String> =
+            ids.iter().map(|&i| tien_to(&stem(&v[i].rel))).collect();
         let theo_tien_to = tt.len() >= 3 && tt.len() * 2 <= ids.len();
-        let ten_d = d.rsplit('/').next().filter(|x| !x.is_empty()).unwrap_or("khac").to_lowercase();
+        let ten_d = d
+            .rsplit('/')
+            .next()
+            .filter(|x| !x.is_empty())
+            .unwrap_or("khac")
+            .to_lowercase();
         for i in ids {
-            v[i].nguoi = if theo_tien_to { tien_to(&stem(&v[i].rel)) } else { ten_d.clone() };
+            v[i].nguoi = if theo_tien_to {
+                tien_to(&stem(&v[i].rel))
+            } else {
+                ten_d.clone()
+            };
         }
     }
 }
 
 /// Ghép câu: khóa chữ ↔ tên file (khớp đúng, hoặc phần đuôi tên file). `chu`: khóa → chữ Anh;
 /// `tim_viet`: tra bản dịch của câu Anh.
-pub fn ghep_chu(clips: &mut [Clip], chu: &BTreeMap<String, Vec<(String, String)>>, tim_viet: &dyn Fn(&str) -> Option<String>) -> usize {
+pub fn ghep_chu(
+    clips: &mut [Clip],
+    chu: &BTreeMap<String, Vec<(String, String)>>,
+    tim_viet: &dyn Fn(&str) -> Option<String>,
+) -> usize {
     let mut khoa: HashMap<String, &str> = HashMap::new();
     for ds in chu.values() {
         for (k, en) in ds {
@@ -178,7 +228,13 @@ pub fn xuat_csv(clips: &[Clip], p: &Path) -> Result<usize> {
     let mut w = csv::Writer::from_path(p)?;
     w.write_record(["tep", "nguoi", "giay", "tieng_anh", "tieng_viet"])?;
     for c in clips {
-        w.write_record([&c.rel, &c.nguoi, &format!("{:.2}", c.giay), c.en.as_deref().unwrap_or(""), c.vi.as_deref().unwrap_or("")])?;
+        w.write_record([
+            &c.rel,
+            &c.nguoi,
+            &format!("{:.2}", c.giay),
+            c.en.as_deref().unwrap_or(""),
+            c.vi.as_deref().unwrap_or(""),
+        ])?;
     }
     w.flush()?;
     Ok(clips.len())
@@ -186,10 +242,16 @@ pub fn xuat_csv(clips: &[Clip], p: &Path) -> Result<usize> {
 
 pub fn nap_csv(clips: &mut [Clip], p: &Path) -> Result<usize> {
     let mut r = csv::ReaderBuilder::new().flexible(true).from_path(p)?;
-    let theo_rel: HashMap<String, usize> = clips.iter().enumerate().map(|(i, c)| (c.rel.clone(), i)).collect();
+    let theo_rel: HashMap<String, usize> = clips
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.rel.clone(), i))
+        .collect();
     let mut dem = 0;
     for b in r.records().flatten() {
-        let (Some(rel), Some(i)) = (b.get(0), b.get(0).and_then(|r| theo_rel.get(r))) else { continue };
+        let (Some(rel), Some(i)) = (b.get(0), b.get(0).and_then(|r| theo_rel.get(r))) else {
+            continue;
+        };
         let _ = rel;
         let c = &mut clips[*i];
         if let Some(n) = b.get(1).filter(|x| !x.trim().is_empty()) {
@@ -231,14 +293,22 @@ fn rms(x: &[f32]) -> f64 {
 /// Giọng mẫu ~9–15 giây ghép từ chính các câu gốc của người nói (3–9 s trước, rồi 1,2–3 s / 9–14 s).
 fn mau_tu_goc(game: &Path, cau: &[&Clip], ra: &Path, tam: &Path) -> Result<bool> {
     std::fs::create_dir_all(tam)?;
-    let mut uu: Vec<&&Clip> = cau.iter().filter(|c| (3.0..=9.0).contains(&c.giay)).collect();
+    let mut uu: Vec<&&Clip> = cau
+        .iter()
+        .filter(|c| (3.0..=9.0).contains(&c.giay))
+        .collect();
     uu.sort_by(|a, b| b.giay.total_cmp(&a.giay));
-    let mut phu: Vec<&&Clip> = cau.iter().filter(|c| (1.2..3.0).contains(&c.giay) || (9.0 < c.giay && c.giay <= 14.0)).collect();
+    let mut phu: Vec<&&Clip> = cau
+        .iter()
+        .filter(|c| (1.2..3.0).contains(&c.giay) || (9.0 < c.giay && c.giay <= 14.0))
+        .collect();
     phu.sort_by(|a, b| b.giay.total_cmp(&a.giay));
     uu.extend(phu);
     let (mut y, mut tong) = (Vec::<f32>::new(), 0.0);
     for c in uu.into_iter().take(16) {
-        let Some(x) = giai_ma(&game.join(&c.rel), tam) else { continue };
+        let Some(x) = giai_ma(&game.join(&c.rel), tam) else {
+            continue;
+        };
         if x.len() < 48000 || rms(&x) < 0.01 {
             continue;
         }
@@ -276,7 +346,12 @@ fn ma_hoa_lai(wav: &Path, c: &Clip, ra: &Path) -> bool {
     an(&mut l)
         .args(["-y", "-v", "error", "-i"])
         .arg(wav)
-        .args(["-ar", &c.sr.to_string(), "-ac", &c.kenh.clamp(1, 2).to_string()])
+        .args([
+            "-ar",
+            &c.sr.to_string(),
+            "-ac",
+            &c.kenh.clamp(1, 2).to_string(),
+        ])
         .args(codec)
         .arg(&tam)
         .stdout(Stdio::null())
@@ -287,7 +362,10 @@ fn ma_hoa_lai(wav: &Path, c: &Clip, ra: &Path) -> bool {
 
 /// Thư mục làm việc / đầu ra của một game: `<lv>\Chung\<tên>`.
 pub fn thu_muc_lv(lv_goc: &Path, ten_game: &str) -> PathBuf {
-    let ten: String = ten_game.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();
+    let ten: String = ten_game
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect();
     lv_goc.join("Chung").join(ten)
 }
 
@@ -314,7 +392,10 @@ pub fn long_tieng(
     if !ffmpeg_bin("ffmpeg.exe").is_file() {
         bail!("thiếu ffmpeg trong cong_cu");
     }
-    let can: Vec<&Clip> = clips.iter().filter(|c| c.vi.as_deref().is_some_and(|v| !lam_sach_loi(v).is_empty())).collect();
+    let can: Vec<&Clip> = clips
+        .iter()
+        .filter(|c| c.vi.as_deref().is_some_and(|v| !lam_sach_loi(v).is_empty()))
+        .collect();
     if can.is_empty() {
         bail!("chưa có câu thoại nào được ghép chữ + dịch – ghép chữ (hoặc nạp CSV) trước");
     }
@@ -328,7 +409,11 @@ pub fn long_tieng(
     let mut ds_nguoi: Vec<(&String, &Vec<&Clip>)> = theo_nguoi.iter().collect();
     ds_nguoi.sort_by_key(|(_, d)| std::cmp::Reverse(d.len()));
     for (i, (ng, ds)) in ds_nguoi.iter().enumerate() {
-        bao(&format!("Bước 1/3: giọng mẫu {}/{}: {ng}", i + 1, ds_nguoi.len()));
+        bao(&format!(
+            "Bước 1/3: giọng mẫu {}/{}: {ng}",
+            i + 1,
+            ds_nguoi.len()
+        ));
         let thu = lv.join("giong").join(ng.as_str());
         std::fs::create_dir_all(&thu)?;
         let mau = thu.join("mau.wav");
@@ -342,7 +427,12 @@ pub fn long_tieng(
                 continue;
             }
         }
-        let r = std::fs::read(&mau).ok().and_then(|b| wwise::doc_wav(&b).ok()).map(|(x, _)| rms(&x)).filter(|r| *r > 0.0).unwrap_or(0.08);
+        let r = std::fs::read(&mau)
+            .ok()
+            .and_then(|b| wwise::doc_wav(&b).ok())
+            .map(|(x, _)| rms(&x))
+            .filter(|r| *r > 0.0)
+            .unwrap_or(0.08);
         viec.push(gv::Nhom {
             ten: ng.to_string(),
             mau,
@@ -350,14 +440,24 @@ pub fn long_tieng(
             rms: r.clamp(0.03, 0.2),
             ds: ds
                 .iter()
-                .map(|c| (id_clip(&c.rel), phien_am::doc_duoc(&lam_sach_loi(c.vi.as_deref().unwrap_or(""))), (c.giay * 1000.0).round() / 1000.0))
+                .map(|c| {
+                    (
+                        id_clip(&c.rel),
+                        phien_am::doc_duoc(&lam_sach_loi(c.vi.as_deref().unwrap_or(""))),
+                        (c.giay * 1000.0).round() / 1000.0,
+                    )
+                })
                 .collect(),
         });
         if dung.load(Ordering::Relaxed) {
             return Ok(None);
         }
     }
-    if !viec.is_empty() && !gv::chay(&viec, &tam, 1.4, dung, &|a, b, s| tien_do(a, b, &format!("Bước 2/3: VieNeu đã đọc{s}")))? {
+    if !viec.is_empty()
+        && !gv::chay(&viec, &tam, 1.4, dung, &|a, b, s| {
+            tien_do(a, b, &format!("Bước 2/3: VieNeu đã đọc{s}"))
+        })?
+    {
         return Ok(None);
     }
     bao("Bước 3/3: mã hóa lại đúng định dạng gốc...");
@@ -385,7 +485,8 @@ pub fn long_tieng(
                 let (c, wav) = &viec_enc[i];
                 let ra = ra_dir.join(&c.rel);
                 let moi = ra.is_file()
-                    && ra.metadata().and_then(|m| m.modified()).ok() >= wav.metadata().and_then(|m| m.modified()).ok();
+                    && ra.metadata().and_then(|m| m.modified()).ok()
+                        >= wav.metadata().and_then(|m| m.modified()).ok();
                 if moi || ma_hoa_lai(wav, c, &ra) {
                     let n = xong.fetch_add(1, Ordering::Relaxed) + 1;
                     if n % 200 == 0 {
@@ -398,7 +499,11 @@ pub fn long_tieng(
     if dung.load(Ordering::Relaxed) {
         return Ok(None);
     }
-    Ok(Some(KetQua { da_lam: xong.load(Ordering::Relaxed), nguoi: viec.len(), thieu_mau: thieu }))
+    Ok(Some(KetQua {
+        da_lam: xong.load(Ordering::Relaxed),
+        nguoi: viec.len(),
+        thieu_mau: thieu,
+    }))
 }
 
 /// Chép file lồng tiếng vào game, sao lưu bản gốc lần đầu vào `<lv>\sao_luu_goc`. → số file.
@@ -417,7 +522,10 @@ pub fn cai(game: &Path, lv: &Path) -> Result<usize> {
                 cho.push(p);
                 continue;
             }
-            let rel = p.strip_prefix(&nguon).map_err(|e| anyhow!("{e}"))?.to_path_buf();
+            let rel = p
+                .strip_prefix(&nguon)
+                .map_err(|e| anyhow!("{e}"))?
+                .to_path_buf();
             let dich = game.join(&rel);
             let s = sao.join(&rel);
             if dich.is_file() && !s.exists() {
@@ -461,17 +569,39 @@ mod test {
 
     #[test]
     fn nguoi_noi_va_ghep() {
-        let mut v: Vec<Clip> = ["vo/lara_001.ogg", "vo/lara_002.ogg", "vo/roth_001.ogg", "vo/roth_002.ogg", "vo/sam_001.ogg", "vo/sam_002.ogg", "vo/jonah_001.ogg", "vo/jonah_002.ogg", "sfx/boom_1.wav"]
-            .iter()
-            .map(|r| Clip { rel: r.to_string(), giay: 2.0, sr: 44100, kenh: 1, ..Default::default() })
-            .collect();
+        let mut v: Vec<Clip> = [
+            "vo/lara_001.ogg",
+            "vo/lara_002.ogg",
+            "vo/roth_001.ogg",
+            "vo/roth_002.ogg",
+            "vo/sam_001.ogg",
+            "vo/sam_002.ogg",
+            "vo/jonah_001.ogg",
+            "vo/jonah_002.ogg",
+            "sfx/boom_1.wav",
+        ]
+        .iter()
+        .map(|r| Clip {
+            rel: r.to_string(),
+            giay: 2.0,
+            sr: 44100,
+            kenh: 1,
+            ..Default::default()
+        })
+        .collect();
         gan_nguoi_noi(&mut v);
         assert_eq!(v[0].nguoi, "lara");
         assert_eq!(v[1].nguoi, "lara");
         assert_eq!(v[2].nguoi, "roth");
         assert_eq!(v[8].nguoi, "sfx");
         let mut chu = BTreeMap::new();
-        chu.insert("f".to_string(), vec![("lara_001".to_string(), "Hello there friend".to_string()), ("VO/roth_002".to_string(), "Run now".to_string())]);
+        chu.insert(
+            "f".to_string(),
+            vec![
+                ("lara_001".to_string(), "Hello there friend".to_string()),
+                ("VO/roth_002".to_string(), "Run now".to_string()),
+            ],
+        );
         let n = ghep_chu(&mut v, &chu, &|en| Some(format!("VI:{en}")));
         assert_eq!(n, 2);
         assert_eq!(v[0].vi.as_deref(), Some("VI:Hello there friend"));
@@ -481,7 +611,14 @@ mod test {
 
     #[test]
     fn csv_khu_hoi() {
-        let mut v = vec![Clip { rel: "a/b.ogg".into(), giay: 1.5, nguoi: "x".into(), en: Some("Hi, you".into()), vi: Some("Chào".into()), ..Default::default() }];
+        let mut v = vec![Clip {
+            rel: "a/b.ogg".into(),
+            giay: 1.5,
+            nguoi: "x".into(),
+            en: Some("Hi, you".into()),
+            vi: Some("Chào".into()),
+            ..Default::default()
+        }];
         let p = std::env::temp_dir().join("vh_lt_chung.csv");
         xuat_csv(&v, &p).unwrap();
         v[0].vi = None;
@@ -504,7 +641,11 @@ mod test {
         std::fs::create_dir_all(tm.join("vo")).unwrap();
         for i in 1..=3 {
             let mut c = Command::new(ffmpeg_bin("ffmpeg.exe"));
-            an(&mut c).args(["-y", "-v", "error", "-i"]).arg(&mau).args(["-ar", "44100", "-ac", "1", "-c:a", "libvorbis"]).arg(tm.join("vo").join(format!("kliff_00{i}.ogg")));
+            an(&mut c)
+                .args(["-y", "-v", "error", "-i"])
+                .arg(&mau)
+                .args(["-ar", "44100", "-ac", "1", "-c:a", "libvorbis"])
+                .arg(tm.join("vo").join(format!("kliff_00{i}.ogg")));
             assert!(c.status().unwrap().success());
         }
         let dung = AtomicBool::new(false);
@@ -512,34 +653,78 @@ mod test {
         assert_eq!(clips.len(), 3);
         println!("người nói: {:?}, {:.1}s", clips[0].nguoi, clips[0].giay);
         let mut chu = BTreeMap::new();
-        chu.insert("f".to_string(), vec![
-            ("kliff_001".to_string(), "Hello there, my friend.".to_string()),
-            ("kliff_002".to_string(), "We must leave now!".to_string()),
-            ("kliff_003".to_string(), "Be careful of the enemy ahead.".to_string()),
-        ]);
+        chu.insert(
+            "f".to_string(),
+            vec![
+                (
+                    "kliff_001".to_string(),
+                    "Hello there, my friend.".to_string(),
+                ),
+                ("kliff_002".to_string(), "We must leave now!".to_string()),
+                (
+                    "kliff_003".to_string(),
+                    "Be careful of the enemy ahead.".to_string(),
+                ),
+            ],
+        );
         let vi: HashMap<&str, &str> = [
             ("Hello there, my friend.", "Xin chào, bạn của tôi."),
             ("We must leave now!", "Chúng ta phải đi ngay!"),
-            ("Be careful of the enemy ahead.", "Hãy cẩn thận kẻ thù phía trước."),
-        ].into_iter().collect();
-        assert_eq!(ghep_chu(&mut clips, &chu, &|en| vi.get(en).map(|s| s.to_string())), 3);
-        let kq = long_tieng(&tm, &lv, &clips, &HashMap::new(), &dung, &|s| println!("{s}"), &|a, b, s| println!("{a}/{b}{s}")).unwrap().unwrap();
-        println!("đã làm {} file, {} người, thiếu mẫu {:?}", kq.da_lam, kq.nguoi, kq.thieu_mau);
+            (
+                "Be careful of the enemy ahead.",
+                "Hãy cẩn thận kẻ thù phía trước.",
+            ),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            ghep_chu(&mut clips, &chu, &|en| vi.get(en).map(|s| s.to_string())),
+            3
+        );
+        let kq = long_tieng(
+            &tm,
+            &lv,
+            &clips,
+            &HashMap::new(),
+            &dung,
+            &|s| println!("{s}"),
+            &|a, b, s| println!("{a}/{b}{s}"),
+        )
+        .unwrap()
+        .unwrap();
+        println!(
+            "đã làm {} file, {} người, thiếu mẫu {:?}",
+            kq.da_lam, kq.nguoi, kq.thieu_mau
+        );
         assert_eq!(kq.da_lam, 3);
-        let goc: Vec<Vec<u8>> = clips.iter().map(|c| std::fs::read(tm.join(&c.rel)).unwrap()).collect();
+        let goc: Vec<Vec<u8>> = clips
+            .iter()
+            .map(|c| std::fs::read(tm.join(&c.rel)).unwrap())
+            .collect();
         assert_eq!(cai(&tm, &lv).unwrap(), 3);
-        let moi: Vec<Vec<u8>> = clips.iter().map(|c| std::fs::read(tm.join(&c.rel)).unwrap()).collect();
-        assert!(goc.iter().zip(&moi).all(|(a, b)| a != b), "file phải đổi sau khi cài");
+        let moi: Vec<Vec<u8>> = clips
+            .iter()
+            .map(|c| std::fs::read(tm.join(&c.rel)).unwrap())
+            .collect();
+        assert!(
+            goc.iter().zip(&moi).all(|(a, b)| a != b),
+            "file phải đổi sau khi cài"
+        );
         assert_eq!(&moi[0][..4], b"OggS");
         assert_eq!(go(&tm, &lv).unwrap(), 3);
-        let lai: Vec<Vec<u8>> = clips.iter().map(|c| std::fs::read(tm.join(&c.rel)).unwrap()).collect();
+        let lai: Vec<Vec<u8>> = clips
+            .iter()
+            .map(|c| std::fs::read(tm.join(&c.rel)).unwrap())
+            .collect();
         assert_eq!(goc, lai, "gỡ phải trả lại đúng từng byte");
     }
 }
 
 /// Đếm file âm thanh đóng gói (Wwise, FMOD, CRI...) trong thư mục game để báo lý do rõ ràng.
 pub fn dem_goi_am_thanh(thu_muc: &Path) -> Vec<(String, usize)> {
-    const GOI: [&str; 12] = ["wem", "bnk", "bank", "fsb", "pck", "awb", "acb", "xwb", "xsb", "snd", "sdt", "fsp"];
+    const GOI: [&str; 12] = [
+        "wem", "bnk", "bank", "fsb", "pck", "awb", "acb", "xwb", "xsb", "snd", "sdt", "fsp",
+    ];
     let mut dem: std::collections::BTreeMap<String, usize> = Default::default();
     let mut cho = vec![thu_muc.to_path_buf()];
     let mut so = 0usize;

@@ -24,13 +24,26 @@ pub struct Ban {
 
 /// "v0.2.1" / "0.2.1" → [0,2,1]
 fn so_phien_ban(s: &str) -> Vec<u64> {
-    s.trim().trim_start_matches(['v', 'V']).split('.').map(|x| x.chars().take_while(char::is_ascii_digit).collect::<String>().parse().unwrap_or(0)).collect()
+    s.trim()
+        .trim_start_matches(['v', 'V'])
+        .split('.')
+        .map(|x| {
+            x.chars()
+                .take_while(char::is_ascii_digit)
+                .collect::<String>()
+                .parse()
+                .unwrap_or(0)
+        })
+        .collect()
 }
 
 pub fn moi_hon(a: &str, b: &str) -> bool {
     let (x, y) = (so_phien_ban(a), so_phien_ban(b));
     let n = x.len().max(y.len());
-    (0..n).map(|i| x.get(i).unwrap_or(&0).cmp(y.get(i).unwrap_or(&0))).find(|o| *o != Ordering::Equal) == Some(Ordering::Greater)
+    (0..n)
+        .map(|i| x.get(i).unwrap_or(&0).cmp(y.get(i).unwrap_or(&0)))
+        .find(|o| *o != Ordering::Equal)
+        == Some(Ordering::Greater)
 }
 
 /// Bản mới hơn bản đang chạy (None nếu đang là bản mới nhất).
@@ -46,7 +59,11 @@ pub fn kiem_tra() -> Result<Option<Ban>> {
             e => anyhow!("không kết nối được GitHub: {e}"),
         })?
         .into_json()?;
-    let ma = v["tag_name"].as_str().ok_or_else(|| anyhow!("phản hồi GitHub không có tag_name"))?.trim_start_matches(['v', 'V']).to_string();
+    let ma = v["tag_name"]
+        .as_str()
+        .ok_or_else(|| anyhow!("phản hồi GitHub không có tag_name"))?
+        .trim_start_matches(['v', 'V'])
+        .to_string();
     if !moi_hon(&ma, PHIEN_BAN) {
         return Ok(None);
     }
@@ -57,7 +74,10 @@ pub fn kiem_tra() -> Result<Option<Ban>> {
     Ok(Some(Ban {
         ma,
         ghi_chu: v["body"].as_str().unwrap_or("").to_string(),
-        url: tep["browser_download_url"].as_str().ok_or_else(|| anyhow!("thiếu đường dẫn tải"))?.to_string(),
+        url: tep["browser_download_url"]
+            .as_str()
+            .ok_or_else(|| anyhow!("thiếu đường dẫn tải"))?
+            .to_string(),
         kich: tep["size"].as_u64().unwrap_or(0),
     }))
 }
@@ -79,8 +99,15 @@ pub fn tai_va_thay(ban: &Ban, tien: &dyn Fn(u64, u64)) -> Result<()> {
     let exe = duong_exe()?;
     let moi = exe.with_extension("exe.moi");
     let cu = exe.with_extension("exe.cu");
-    let r = ureq::get(&ban.url).set("User-Agent", "VietHoa-capnhat").timeout(std::time::Duration::from_secs(600)).call().map_err(|e| anyhow!("tải lỗi: {e}"))?;
-    let tong = r.header("Content-Length").and_then(|x| x.parse().ok()).unwrap_or(ban.kich);
+    let r = ureq::get(&ban.url)
+        .set("User-Agent", "VietHoa-capnhat")
+        .timeout(std::time::Duration::from_secs(600))
+        .call()
+        .map_err(|e| anyhow!("tải lỗi: {e}"))?;
+    let tong = r
+        .header("Content-Length")
+        .and_then(|x| x.parse().ok())
+        .unwrap_or(ban.kich);
     let mut doc = r.into_reader();
     let mut f = std::fs::File::create(&moi)?;
     let (mut buf, mut da) = (vec![0u8; 1 << 16], 0u64);
@@ -117,7 +144,10 @@ pub fn mo_lai() {
     if let Ok(e) = duong_exe() {
         use std::os::windows::process::CommandExt;
         let _ = std::process::Command::new("cmd")
-            .raw_arg(format!("/c ping -n 3 127.0.0.1 >nul & start \"\" \"{}\"", e.display()))
+            .raw_arg(format!(
+                "/c ping -n 3 127.0.0.1 >nul & start \"\" \"{}\"",
+                e.display()
+            ))
             .creation_flags(0x0800_0000)
             .spawn();
     }
@@ -197,7 +227,14 @@ impl CapNhat {
                 return;
             }
             t.dang_tai = true;
-            (t.tien, t.loi, t.tb) = (0.0, false, format!("Đang tải bản {}...", t.ban.as_ref().map(|b| b.ma.as_str()).unwrap_or("")));
+            (t.tien, t.loi, t.tb) = (
+                0.0,
+                false,
+                format!(
+                    "Đang tải bản {}...",
+                    t.ban.as_ref().map(|b| b.ma.as_str()).unwrap_or("")
+                ),
+            );
             t.ban.clone()
         }) else {
             return;
@@ -214,7 +251,10 @@ impl CapNhat {
             t.dang_tai = false;
             match kq {
                 Ok(()) => {
-                    (t.tb, t.da_thay) = (format!("Đã cập nhật lên {}. Bấm Khởi động lại.", ban.ma), true);
+                    (t.tb, t.da_thay) = (
+                        format!("Đã cập nhật lên {}. Bấm Khởi động lại.", ban.ma),
+                        true,
+                    );
                     t.ban = None; // ẩn dòng "Có bản mới" ở thanh bên
                 }
                 Err(e) => (t.tb, t.loi) = (format!("Lỗi: {e}"), true),

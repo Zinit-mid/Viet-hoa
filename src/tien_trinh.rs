@@ -40,12 +40,24 @@ pub fn co_dinh(c: Arc<AtomicBool>) -> Option<Arc<Mutex<Arc<AtomicBool>>>> {
 }
 
 /// Đăng ký nguồn tiến trình. `dung`: cờ dừng hiện tại của tác vụ (nếu có).
-pub fn dang_ky(khoa: &'static str, dung: Option<Arc<Mutex<Arc<AtomicBool>>>>, lay: impl Fn() -> Anh + Send + Sync + 'static) {
+pub fn dang_ky(
+    khoa: &'static str,
+    dung: Option<Arc<Mutex<Arc<AtomicBool>>>>,
+    lay: impl Fn() -> Anh + Send + Sync + 'static,
+) {
     let mut d = DS.lock().unwrap_or_else(|e| e.into_inner());
     if d.iter().any(|m| m.khoa == khoa) {
         return;
     }
-    d.push(Muc { khoa, lay: Box::new(lay), dung, dang_ban: false, bat_dau: Instant::now(), anh: Anh::default(), xong: None });
+    d.push(Muc {
+        khoa,
+        lay: Box::new(lay),
+        dung,
+        dang_ban: false,
+        bat_dau: Instant::now(),
+        anh: Anh::default(),
+        xong: None,
+    });
 }
 
 /// Cập nhật trạng thái mọi nguồn (gọi mỗi khung hình).
@@ -62,7 +74,10 @@ pub fn cap_nhat() {
         }
         m.dang_ban = a.dang_ban;
         m.anh = a;
-        if m.xong.as_ref().is_some_and(|x| x.2.elapsed().as_secs() > 60) {
+        if m.xong
+            .as_ref()
+            .is_some_and(|x| x.2.elapsed().as_secs() > 60)
+        {
             m.xong = None;
         }
     }
@@ -93,7 +108,9 @@ pub fn dung_viec(khoa: &str) {
     let d = DS.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(m) = d.iter().find(|m| m.khoa == khoa) {
         if let Some(c) = &m.dung {
-            c.lock().unwrap_or_else(|e| e.into_inner()).store(true, Ordering::SeqCst);
+            c.lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .store(true, Ordering::SeqCst);
         }
     }
 }
@@ -101,13 +118,23 @@ pub fn dung_viec(khoa: &str) {
 /// Các việc đang chạy: (khóa, ảnh, giây đã chạy).
 pub fn dang_chay() -> Vec<(&'static str, Anh, u64)> {
     let d = DS.lock().unwrap_or_else(|e| e.into_inner());
-    d.iter().filter(|m| m.dang_ban).map(|m| (m.khoa, m.anh.clone(), m.bat_dau.elapsed().as_secs())).collect()
+    d.iter()
+        .filter(|m| m.dang_ban)
+        .map(|m| (m.khoa, m.anh.clone(), m.bat_dau.elapsed().as_secs()))
+        .collect()
 }
 
 /// Việc vừa xong gần đây (còn hiện): (khóa, thông báo, lỗi).
 pub fn vua_xong() -> Vec<(&'static str, String, bool)> {
     let d = DS.lock().unwrap_or_else(|e| e.into_inner());
-    d.iter().filter_map(|m| m.xong.as_ref().filter(|_| !m.dang_ban).map(|x| (m.khoa, x.0.clone(), x.1))).collect()
+    d.iter()
+        .filter_map(|m| {
+            m.xong
+                .as_ref()
+                .filter(|_| !m.dang_ban)
+                .map(|x| (m.khoa, x.0.clone(), x.1))
+        })
+        .collect()
 }
 
 pub fn tat_xong(khoa: &str) {
@@ -128,38 +155,52 @@ pub fn ve_dai_dau(ctx: &egui::Context) {
     if dang.is_empty() && xong.is_empty() {
         return;
     }
-    egui::TopBottomPanel::top("tac_vu").frame(egui::Frame::NONE.fill(Color32::from_rgb(20, 20, 44)).inner_margin(8.0)).show(ctx, |ui| {
-        for (k, a, giay) in &dang {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(crate::kieu::dam(if a.ten.is_empty() { "Đang làm việc" } else { &a.ten }));
-                ui.label(RichText::new(format!("• {}", dung_mm(*giay))).weak());
-                if ui.small_button("Dừng").clicked() {
-                    dung_viec(k);
+    egui::TopBottomPanel::top("tac_vu")
+        .frame(
+            egui::Frame::NONE
+                .fill(Color32::from_rgb(20, 20, 44))
+                .inner_margin(8.0),
+        )
+        .show(ctx, |ui| {
+            for (k, a, giay) in &dang {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(crate::kieu::dam(if a.ten.is_empty() {
+                        "Đang làm việc"
+                    } else {
+                        &a.ten
+                    }));
+                    ui.label(RichText::new(format!("• {}", dung_mm(*giay))).weak());
+                    if ui.small_button("Dừng").clicked() {
+                        dung_viec(k);
+                    }
+                });
+                let thanh = match a.tien {
+                    Some(t) => egui::ProgressBar::new(t.clamp(0.0, 1.0)).show_percentage(),
+                    None => egui::ProgressBar::new(0.0).text("đang chạy… (chưa biết %)"),
+                };
+                ui.add(thanh.desired_height(18.0));
+                if !a.thong_bao.is_empty() {
+                    ui.add(egui::Label::new(RichText::new(&a.thong_bao).small()).truncate());
                 }
-            });
-            let thanh = match a.tien {
-                Some(t) => egui::ProgressBar::new(t.clamp(0.0, 1.0)).show_percentage(),
-                None => egui::ProgressBar::new(0.0).text("đang chạy… (chưa biết %)"),
-            };
-            ui.add(thanh.desired_height(18.0));
-            if !a.thong_bao.is_empty() {
-                ui.add(egui::Label::new(RichText::new(&a.thong_bao).small()).truncate());
             }
-        }
-        let mut tat = Vec::new();
-        for (k, tb, loi) in &xong {
-            ui.horizontal(|ui| {
-                let m = if *loi { Color32::LIGHT_RED } else { Color32::LIGHT_GREEN };
-                ui.label(RichText::new(if *loi { "✘" } else { "✔" }).color(m));
-                ui.add(egui::Label::new(RichText::new(tb).color(m)).truncate());
-                if ui.small_button("Ẩn").clicked() {
-                    tat.push(*k);
-                }
-            });
-        }
-        for k in tat {
-            tat_xong(k);
-        }
-    });
+            let mut tat = Vec::new();
+            for (k, tb, loi) in &xong {
+                ui.horizontal(|ui| {
+                    let m = if *loi {
+                        Color32::LIGHT_RED
+                    } else {
+                        Color32::LIGHT_GREEN
+                    };
+                    ui.label(RichText::new(if *loi { "✘" } else { "✔" }).color(m));
+                    ui.add(egui::Label::new(RichText::new(tb).color(m)).truncate());
+                    if ui.small_button("Ẩn").clicked() {
+                        tat.push(*k);
+                    }
+                });
+            }
+            for k in tat {
+                tat_xong(k);
+            }
+        });
 }

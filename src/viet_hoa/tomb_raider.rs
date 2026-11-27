@@ -1735,7 +1735,13 @@ fn go_shadow(tm: &Path) -> Result<()> {
 
 /// 'Người nói' từ tên FSB: "610_by_050_230_nadia.str_0" → "nadia"; "looter_a" → "looter".
 pub fn nguoi_noi(ten_fsb: &str) -> String {
-    let goc = ten_fsb.split('.').next().unwrap_or("").split('#').next().unwrap_or("");
+    let goc = ten_fsb
+        .split('.')
+        .next()
+        .unwrap_or("")
+        .split('#')
+        .next()
+        .unwrap_or("");
     let t: Vec<&str> = goc.split('_').filter(|x| !x.is_empty()).collect();
     let j = t
         .iter()
@@ -1857,8 +1863,7 @@ impl TombRaider {
         let r = R.get_or_init(|| {
             regex::Regex::new(r"^\s*(?:\[[^\]]*\]\s*)*([A-Z][A-Za-z.'\- ]{1,24}):\s").unwrap()
         });
-        t.pd
-            .iter()
+        t.pd.iter()
             .filter(|(_, en)| !en.is_empty())
             .map(|(khung, en)| {
                 let vi = self.chuoi_viet(en, false, true);
@@ -1915,7 +1920,9 @@ impl TombRaider {
             } else {
                 format!("{ten}.wav")
             });
-            let Ok(b) = std::fs::read(&nguon) else { continue };
+            let Ok(b) = std::fs::read(&nguon) else {
+                continue;
+            };
             let dau = format!(
                 "{:x} {}",
                 md5::compute(&b),
@@ -2393,13 +2400,18 @@ mod tests {
         let dung = AtomicBool::new(false);
         let x = TombRaider::nap(&tm, loai, &|_| {}, &dung).unwrap();
         let kq = x
-            .long_tieng(true, 4.0, &dung, &|s| println!("{s}"), &|a, b, s| println!("{a}/{b} {s}"))
+            .long_tieng(true, 4.0, &dung, &|s| println!("{s}"), &|a, b, s| {
+                println!("{a}/{b} {s}")
+            })
             .unwrap();
         println!("{kq:?}");
         assert!(kq.unwrap().file > 0);
         // MP3 ghép ra phải đóng được vào FSB4 (MPEG-1 Layer III 44,1 kHz)
         let mut n = 0;
-        for e in std::fs::read_dir(x.thu_muc_giong().join("mp3")).unwrap().flatten() {
+        for e in std::fs::read_dir(x.thu_muc_giong().join("mp3"))
+            .unwrap()
+            .flatten()
+        {
             let mp3 = std::fs::read(e.path()).unwrap();
             assert!(!mul::mp3_khung(&mp3).unwrap().is_empty(), "{:?}", e.path());
             mul::tao_fsb4(&mp3, "thu", None).unwrap();

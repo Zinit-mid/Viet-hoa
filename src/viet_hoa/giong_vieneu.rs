@@ -38,15 +38,42 @@ pub fn tim_vieneu() -> Option<Vieneu> {
     for (loai, gpu) in [("gpu", true), ("dubtools", false)] {
         let venv = goc.join(loai).join("venv");
         let py = venv.join("Scripts").join("python.exe");
-        if py.is_file() && venv.join("Lib").join("site-packages").join("vieneu").is_dir() {
-            return Some(Vieneu { python: py, hf_home: goc.join(loai).join("hf"), gpu });
+        if py.is_file()
+            && venv
+                .join("Lib")
+                .join("site-packages")
+                .join("vieneu")
+                .is_dir()
+        {
+            return Some(Vieneu {
+                python: py,
+                hf_home: goc.join(loai).join("hf"),
+                gpu,
+            });
         }
     }
     // máy không có app VieNeu: dùng bản cài trong cong_cu\python (scripts\tai_cong_cu.ps1)
     let py = duong_dan::python()?;
-    if py.parent()?.join("Lib").join("site-packages").join("vieneu").is_dir() {
-        let gpu = py.parent()?.join("Lib").join("site-packages").join("torch").join("lib").join("cudart64_12.dll").is_file();
-        return Some(Vieneu { python: py, hf_home: duong_dan::du_lieu().join("hf"), gpu });
+    if py
+        .parent()?
+        .join("Lib")
+        .join("site-packages")
+        .join("vieneu")
+        .is_dir()
+    {
+        let gpu = py
+            .parent()?
+            .join("Lib")
+            .join("site-packages")
+            .join("torch")
+            .join("lib")
+            .join("cudart64_12.dll")
+            .is_file();
+        return Some(Vieneu {
+            python: py,
+            hf_home: duong_dan::du_lieu().join("hf"),
+            gpu,
+        });
     }
     None
 }
@@ -80,13 +107,19 @@ pub fn chay(
     })?;
     std::fs::create_dir_all(tam)?;
     let file_viec = tam.join("viec.json");
-    std::fs::write(&file_viec, serde_json::to_vec(&viec_json(nhom, vn.gpu, toi_da))?)?;
+    std::fs::write(
+        &file_viec,
+        serde_json::to_vec(&viec_json(nhom, vn.gpu, toi_da))?,
+    )?;
     let kich_ban = duong_dan::goc().join("scripts").join("tao_giong.py");
     if !kich_ban.is_file() {
         return Err(anyhow!("thiếu {}", kich_ban.display()));
     }
     let file_nk = tam.join("vieneu_nhat_ky.txt");
-    let mut nk = std::fs::OpenOptions::new().create(true).append(true).open(&file_nk)?;
+    let mut nk = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_nk)?;
 
     let mut lenh = Command::new(&vn.python);
     lenh.arg("-I")
@@ -107,11 +140,27 @@ pub fn chay(
         lenh.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     // stderr gộp vào nhật ký qua file riêng
-    lenh.stderr(Stdio::from(std::fs::OpenOptions::new().create(true).append(true).open(tam.join("vieneu_loi.txt"))?));
+    lenh.stderr(Stdio::from(
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(tam.join("vieneu_loi.txt"))?,
+    ));
 
-    tien_do(0, 0, if vn.gpu { "đang nạp mô hình (card màn hình)..." } else { "đang nạp mô hình (CPU – sẽ rất chậm)..." });
+    tien_do(
+        0,
+        0,
+        if vn.gpu {
+            "đang nạp mô hình (card màn hình)..."
+        } else {
+            "đang nạp mô hình (CPU – sẽ rất chậm)..."
+        },
+    );
     let mut con = lenh.spawn()?;
-    let out = con.stdout.take().ok_or_else(|| anyhow!("không đọc được đầu ra VieNeu"))?;
+    let out = con
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("không đọc được đầu ra VieNeu"))?;
     let (mut bat_dau, mut nhom_hien) = (std::time::Instant::now(), String::new());
     let mut loi_cuoi: Vec<String> = Vec::new();
     for dong in BufReader::new(out).lines() {
@@ -126,16 +175,25 @@ pub fn chay(
         match t.first().copied() {
             Some("XONG") if t.len() >= 3 => {
                 let (a, b): (usize, usize) = (t[1].parse().unwrap_or(0), t[2].parse().unwrap_or(0));
-                let con_lai = bat_dau.elapsed().as_secs_f64() / a.max(1) as f64 * b.saturating_sub(a) as f64;
-                tien_do(a, b, &format!("{nhom_hien} • còn khoảng {:.0} phút", con_lai / 60.0));
+                let con_lai =
+                    bat_dau.elapsed().as_secs_f64() / a.max(1) as f64 * b.saturating_sub(a) as f64;
+                tien_do(
+                    a,
+                    b,
+                    &format!("{nhom_hien} • còn khoảng {:.0} phút", con_lai / 60.0),
+                );
             }
-            Some("NHOM") if t.len() >= 4 => nhom_hien = format!(" • giọng {}/{}: {}", t[1], t[2], t[3]),
+            Some("NHOM") if t.len() >= 4 => {
+                nhom_hien = format!(" • giọng {}/{}: {}", t[1], t[2], t[3])
+            }
             Some("TONG") => bat_dau = std::time::Instant::now(),
             Some("HET") | None => {}
-            _ => loi_cuoi = {
-                loi_cuoi.push(d.clone());
-                loi_cuoi.split_off(loi_cuoi.len().saturating_sub(6))
-            },
+            _ => {
+                loi_cuoi = {
+                    loi_cuoi.push(d.clone());
+                    loi_cuoi.split_off(loi_cuoi.len().saturating_sub(6))
+                }
+            }
         }
     }
     let st = con.wait()?;
@@ -144,7 +202,11 @@ pub fn chay(
     }
     if !st.success() {
         let cuoi: Vec<_> = loi_cuoi.iter().rev().take(3).rev().cloned().collect();
-        return Err(anyhow!("VieNeu dừng giữa chừng – xem {}\n{}", file_nk.display(), cuoi.join("\n")));
+        return Err(anyhow!(
+            "VieNeu dừng giữa chừng – xem {}\n{}",
+            file_nk.display(),
+            cuoi.join("\n")
+        ));
     }
     Ok(true)
 }
@@ -193,7 +255,10 @@ pub fn chay_kich_ban(
             s
         })
     });
-    let out = con.stdout.take().ok_or_else(|| anyhow!("không đọc được đầu ra"))?;
+    let out = con
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("không đọc được đầu ra"))?;
     let mut cuoi: Vec<String> = Vec::new();
     for dong in BufReader::new(out).lines() {
         let d = dong.unwrap_or_default();
@@ -219,11 +284,19 @@ pub fn chay_kich_ban(
     }
     if !st.success() {
         let l: Vec<&str> = loi.lines().rev().take(3).collect();
-        return Err(anyhow!("{nhan} bị lỗi:
+        return Err(anyhow!(
+            "{nhan} bị lỗi:
 {}
-{}", cuoi.join("
-"), l.into_iter().rev().collect::<Vec<_>>().join("
-")));
+{}",
+            cuoi.join(
+                "
+"
+            ),
+            l.into_iter().rev().collect::<Vec<_>>().join(
+                "
+"
+            )
+        ));
     }
     Ok(true)
 }
@@ -261,7 +334,11 @@ mod test {
             rms: 0.08,
             ds: vec![
                 ("c1".into(), "Xin chào, tôi là người lính.".into(), 0.0),
-                ("c2".into(), "Hãy cẩn thận, phía trước có kẻ thù.".into(), 2.0),
+                (
+                    "c2".into(),
+                    "Hãy cẩn thận, phía trước có kẻ thù.".into(),
+                    2.0,
+                ),
             ],
         };
         let dung = AtomicBool::new(false);

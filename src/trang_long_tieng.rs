@@ -32,7 +32,11 @@ impl BaoCao for Bao {
         self.0.lock().unwrap().thong_bao = s.to_string();
     }
     fn tien_do(&self, xong: usize, tong: usize, _usd: f64) {
-        self.0.lock().unwrap().tien = if tong > 0 { xong as f32 / tong as f32 } else { 0.0 };
+        self.0.lock().unwrap().tien = if tong > 0 {
+            xong as f32 / tong as f32
+        } else {
+            0.0
+        };
     }
 }
 
@@ -86,20 +90,28 @@ fn the(ui: &mut egui::Ui, tieu_de: &str, noi: impl FnOnce(&mut egui::Ui)) {
 impl TrangLongTieng {
     pub fn dang_ky_tt(&self) {
         let t = self.tt.clone();
-        crate::tien_trinh::dang_ky("long_tieng", crate::tien_trinh::co_dinh(self.dung.clone()), move || {
-            let g = t.lock().unwrap();
-            crate::tien_trinh::Anh {
-                dang_ban: g.dang_ban,
-                ten: "Lồng tiếng".into(),
-                thong_bao: g.thong_bao.clone(),
-                tien: (g.tien > 0.0).then_some(g.tien),
-                loi: g.loi,
-            }
-        });
+        crate::tien_trinh::dang_ky(
+            "long_tieng",
+            crate::tien_trinh::co_dinh(self.dung.clone()),
+            move || {
+                let g = t.lock().unwrap();
+                crate::tien_trinh::Anh {
+                    dang_ban: g.dang_ban,
+                    ten: "Lồng tiếng".into(),
+                    thong_bao: g.thong_bao.clone(),
+                    tien: (g.tien > 0.0).then_some(g.tien),
+                    loi: g.loi,
+                }
+            },
+        );
     }
 
     /// Chạy việc nền; `viec` trả thông báo kết quả.
-    fn nen(&self, ten: &str, viec: impl FnOnce(&Arc<Mutex<Tt>>, &Arc<AtomicBool>) -> anyhow::Result<String> + Send + 'static) {
+    fn nen(
+        &self,
+        ten: &str,
+        viec: impl FnOnce(&Arc<Mutex<Tt>>, &Arc<AtomicBool>) -> anyhow::Result<String> + Send + 'static,
+    ) {
         {
             let mut t = self.tt.lock().unwrap();
             if t.dang_ban {
@@ -126,10 +138,20 @@ impl TrangLongTieng {
 
     fn doi_game(&mut self, g: &Game) {
         let lv = lv_cua(g);
-        let clips: Vec<lt::Clip> = std::fs::read(lv.join("clips.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
-        self.gan = std::fs::read(lv.join("gan.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let clips: Vec<lt::Clip> = std::fs::read(lv.join("clips.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        self.gan = std::fs::read(lv.join("gan.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
         let mut t = self.tt.lock().unwrap();
-        t.thong_bao = if clips.is_empty() { String::new() } else { format!("Đã nhớ {} file âm thanh từ lần trước.", clips.len()) };
+        t.thong_bao = if clips.is_empty() {
+            String::new()
+        } else {
+            format!("Đã nhớ {} file âm thanh từ lần trước.", clips.len())
+        };
         t.clips = clips;
     }
 
@@ -147,27 +169,42 @@ impl TrangLongTieng {
                     std::thread::spawn(move || *o.lock().unwrap() = Some(tim_game::tim_tat_ca()));
                 }
                 ui.label("Đang tìm game trên máy...");
-                ui.ctx().request_repaint_after(std::time::Duration::from_millis(200));
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(200));
                 return;
             }
         }
         let (ban, tb, loi, tien, so_clip) = {
             let t = self.tt.lock().unwrap();
-            (t.dang_ban, t.thong_bao.clone(), t.loi, t.tien, t.clips.len())
+            (
+                t.dang_ban,
+                t.thong_bao.clone(),
+                t.loi,
+                t.tien,
+                t.clips.len(),
+            )
         };
         if ban {
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(300));
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(300));
         }
         let games = self.games.clone().unwrap_or_default();
         ui.horizontal_wrapped(|ui| {
             ui.label("Game:");
-            let ten = self.chon.and_then(|i| games.get(i)).map(|g| g.ten.clone()).unwrap_or_else(|| "chọn game...".into());
+            let ten = self
+                .chon
+                .and_then(|i| games.get(i))
+                .map(|g| g.ten.clone())
+                .unwrap_or_else(|| "chọn game...".into());
             ui.add_enabled_ui(!ban, |ui| {
-                egui::ComboBox::from_id_salt("lt_game").selected_text(ten).width(420.0).show_ui(ui, |ui| {
-                    for (i, g) in games.iter().enumerate() {
-                        ui.selectable_value(&mut self.chon, Some(i), &g.ten);
-                    }
-                });
+                egui::ComboBox::from_id_salt("lt_game")
+                    .selected_text(ten)
+                    .width(420.0)
+                    .show_ui(ui, |ui| {
+                        for (i, g) in games.iter().enumerate() {
+                            ui.selectable_value(&mut self.chon, Some(i), &g.ten);
+                        }
+                    });
             });
         });
         if self.chon != self.chon_cu {
@@ -176,7 +213,9 @@ impl TrangLongTieng {
                 self.doi_game(g);
             }
         }
-        let Some(g) = self.chon.and_then(|i| games.get(i)).cloned() else { return };
+        let Some(g) = self.chon.and_then(|i| games.get(i)).cloned() else {
+            return;
+        };
         let lv = lv_cua(&g);
 
         the(ui, "1. QUÉT FILE ÂM THANH", |ui| {
@@ -208,7 +247,14 @@ impl TrangLongTieng {
         });
 
         the(ui, "2. GHÉP CHỮ ĐÃ DỊCH", |ui| {
-            let co_ghep = self.tt.lock().unwrap().clips.iter().filter(|c| c.vi.is_some()).count();
+            let co_ghep = self
+                .tt
+                .lock()
+                .unwrap()
+                .clips
+                .iter()
+                .filter(|c| c.vi.is_some())
+                .count();
             ui.label(format!("{co_ghep} file đã có câu tiếng Việt"));
             ui.horizontal_wrapped(|ui| {
                 if crate::kieu::nut_tien_do(ui, "long_tieng", "Ghép chữ + dịch câu còn thiếu (offline)", "Đang ghép", crate::kieu::TIM, !ban && so_clip > 0) {
@@ -273,7 +319,14 @@ impl TrangLongTieng {
         the(ui, "3. GIỌNG TỪNG NGƯỜI", |ui| {
             self.them.nut(ui);
             let mut dem: HashMap<String, usize> = HashMap::new();
-            for c in self.tt.lock().unwrap().clips.iter().filter(|c| c.vi.is_some()) {
+            for c in self
+                .tt
+                .lock()
+                .unwrap()
+                .clips
+                .iter()
+                .filter(|c| c.vi.is_some())
+            {
                 *dem.entry(c.nguoi.clone()).or_default() += 1;
             }
             let mut ds: Vec<(String, usize)> = dem.into_iter().collect();
@@ -282,29 +335,49 @@ impl TrangLongTieng {
                 ui.label(RichText::new("Chưa có người nói nào có câu tiếng Việt.").weak());
             }
             let mut doi = false;
-            egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                for (ng, k) in ds.iter().take(40) {
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{ng} ({k} câu)"));
-                        let hien = self.gan.get(ng).cloned().unwrap_or_else(|| "nhái giọng gốc".into());
-                        egui::ComboBox::from_id_salt(format!("lt_g_{ng}")).selected_text(hien).show_ui(ui, |ui| {
-                            if ui.selectable_label(!self.gan.contains_key(ng), "nhái giọng gốc").clicked() {
-                                self.gan.remove(ng);
-                                doi = true;
-                            }
-                            for f in &self.kho {
-                                if ui.selectable_label(self.gan.get(ng) == Some(f), f).clicked() {
-                                    self.gan.insert(ng.clone(), f.clone());
-                                    doi = true;
-                                }
-                            }
+            egui::ScrollArea::vertical()
+                .max_height(200.0)
+                .show(ui, |ui| {
+                    for (ng, k) in ds.iter().take(40) {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{ng} ({k} câu)"));
+                            let hien = self
+                                .gan
+                                .get(ng)
+                                .cloned()
+                                .unwrap_or_else(|| "nhái giọng gốc".into());
+                            egui::ComboBox::from_id_salt(format!("lt_g_{ng}"))
+                                .selected_text(hien)
+                                .show_ui(ui, |ui| {
+                                    if ui
+                                        .selectable_label(
+                                            !self.gan.contains_key(ng),
+                                            "nhái giọng gốc",
+                                        )
+                                        .clicked()
+                                    {
+                                        self.gan.remove(ng);
+                                        doi = true;
+                                    }
+                                    for f in &self.kho {
+                                        if ui
+                                            .selectable_label(self.gan.get(ng) == Some(f), f)
+                                            .clicked()
+                                        {
+                                            self.gan.insert(ng.clone(), f.clone());
+                                            doi = true;
+                                        }
+                                    }
+                                });
                         });
-                    });
-                }
-            });
+                    }
+                });
             if doi {
                 let _ = std::fs::create_dir_all(&lv);
-                let _ = std::fs::write(lv.join("gan.json"), serde_json::to_vec(&self.gan).unwrap_or_default());
+                let _ = std::fs::write(
+                    lv.join("gan.json"),
+                    serde_json::to_vec(&self.gan).unwrap_or_default(),
+                );
             }
             ui.label(RichText::new("Kho giọng: tạo ở mục Clone giọng. Mặc định app nhái chính giọng gốc của người đó.").small().weak());
         });
@@ -356,10 +429,18 @@ impl TrangLongTieng {
         });
 
         if ban {
-            ui.add(egui::ProgressBar::new(tien).show_percentage().animate(tien == 0.0));
+            ui.add(
+                egui::ProgressBar::new(tien)
+                    .show_percentage()
+                    .animate(tien == 0.0),
+            );
         }
         if !tb.is_empty() {
-            ui.label(RichText::new(tb).color(if loi { Color32::LIGHT_RED } else { Color32::YELLOW }));
+            ui.label(RichText::new(tb).color(if loi {
+                Color32::LIGHT_RED
+            } else {
+                Color32::YELLOW
+            }));
         }
         let _ = dich::claude::co_khoa;
     }

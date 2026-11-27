@@ -34,7 +34,14 @@ impl Default for TrangTuDong {
             games: None,
             dang_tim: Arc::new(Mutex::new(None)),
             chon: None,
-            t: TuyChon { claude: false, gioi_han: 1.0, dich: true, long_tieng: true, cai: true, khong_dau: false },
+            t: TuyChon {
+                claude: false,
+                gioi_han: 1.0,
+                dich: true,
+                long_tieng: true,
+                cai: true,
+                khong_dau: false,
+            },
             tt: Arc::new(Mutex::new(Tt::default())),
             dung: Arc::new(AtomicBool::new(false)),
             da_goi: false,
@@ -55,16 +62,20 @@ fn mo_ta(l: LoaiGame) -> &'static str {
 impl TrangTuDong {
     pub fn dang_ky_tt(&self) {
         let t = self.tt.clone();
-        crate::tien_trinh::dang_ky("tu_dong", crate::tien_trinh::co_dinh(self.dung.clone()), move || {
-            let g = t.lock().unwrap();
-            crate::tien_trinh::Anh {
-                dang_ban: g.dang_ban,
-                ten: "Làm tự động".into(),
-                thong_bao: g.thong_bao.clone(),
-                tien: (g.tien > 0.0).then_some(g.tien),
-                loi: g.loi,
-            }
-        });
+        crate::tien_trinh::dang_ky(
+            "tu_dong",
+            crate::tien_trinh::co_dinh(self.dung.clone()),
+            move || {
+                let g = t.lock().unwrap();
+                crate::tien_trinh::Anh {
+                    dang_ban: g.dang_ban,
+                    ten: "Làm tự động".into(),
+                    thong_bao: g.thong_bao.clone(),
+                    tien: (g.tien > 0.0).then_some(g.tien),
+                    loi: g.loi,
+                }
+            },
+        );
     }
 
     fn chay(&mut self, g: Game) {
@@ -73,14 +84,28 @@ impl TrangTuDong {
             if t.dang_ban {
                 return;
             }
-            *t = Tt { dang_ban: true, thong_bao: "Đang bắt đầu...".into(), ..Default::default() };
+            *t = Tt {
+                dang_ban: true,
+                thong_bao: "Đang bắt đầu...".into(),
+                ..Default::default()
+            };
         }
         let (tt, dung, tuy) = (self.tt.clone(), self.dung.clone(), self.t.clone());
         std::thread::spawn(move || {
             let (a, b) = (tt.clone(), tt.clone());
             let bao = move |s: &str| a.lock().unwrap().thong_bao = s.to_string();
-            let tien = move |x: usize, y: usize, _| b.lock().unwrap().tien = if y > 0 { x as f32 / y as f32 } else { 0.0 };
-            let kq = tu_dong::chay(&g, &tuy, &dung, &Bc { bao: &bao, tien: &tien });
+            let tien = move |x: usize, y: usize, _| {
+                b.lock().unwrap().tien = if y > 0 { x as f32 / y as f32 } else { 0.0 }
+            };
+            let kq = tu_dong::chay(
+                &g,
+                &tuy,
+                &dung,
+                &Bc {
+                    bao: &bao,
+                    tien: &tien,
+                },
+            );
             let mut t = tt.lock().unwrap();
             t.dang_ban = false;
             match kq {
@@ -105,7 +130,8 @@ impl TrangTuDong {
                     std::thread::spawn(move || *o.lock().unwrap() = Some(tim_game::tim_tat_ca()));
                 }
                 ui.label("Đang tìm game trên máy...");
-                ui.ctx().request_repaint_after(std::time::Duration::from_millis(200));
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(200));
                 return;
             }
         }
@@ -114,57 +140,87 @@ impl TrangTuDong {
             (t.dang_ban, t.thong_bao.clone(), t.loi, t.xong, t.tien)
         };
         if ban {
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(300));
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(300));
         }
         let games = self.games.clone().unwrap_or_default();
         ui.horizontal_wrapped(|ui| {
             ui.label("Game:");
-            let ten = self.chon.and_then(|i| games.get(i)).map(|g| g.ten.clone()).unwrap_or_else(|| "chọn game...".into());
+            let ten = self
+                .chon
+                .and_then(|i| games.get(i))
+                .map(|g| g.ten.clone())
+                .unwrap_or_else(|| "chọn game...".into());
             ui.add_enabled_ui(!ban, |ui| {
-                egui::ComboBox::from_id_salt("td_game").selected_text(ten).width(420.0).show_ui(ui, |ui| {
-                    for (i, g) in games.iter().enumerate() {
-                        ui.selectable_value(&mut self.chon, Some(i), &g.ten);
-                    }
-                });
+                egui::ComboBox::from_id_salt("td_game")
+                    .selected_text(ten)
+                    .width(420.0)
+                    .show_ui(ui, |ui| {
+                        for (i, g) in games.iter().enumerate() {
+                            ui.selectable_value(&mut self.chon, Some(i), &g.ten);
+                        }
+                    });
             });
             if ui.add_enabled(!ban, egui::Button::new("Tìm lại")).clicked() {
                 self.games = None;
                 self.da_goi = false;
             }
         });
-        let Some(g) = self.chon.and_then(|i| games.get(i)).cloned() else { return };
+        let Some(g) = self.chon.and_then(|i| games.get(i)).cloned() else {
+            return;
+        };
         let loai = g.loai();
         ui.label(RichText::new(mo_ta(loai)).small().weak());
         ui.add_space(6.0);
         ui.add_enabled_ui(!ban, |ui| {
             ui.horizontal_wrapped(|ui| {
                 crate::kieu::cong_tac(ui, &mut self.t.dich, "Dịch chữ");
-                if matches!(loai, LoaiGame::CrimsonDesert | LoaiGame::Rise | LoaiGame::Tr2013) {
+                if matches!(
+                    loai,
+                    LoaiGame::CrimsonDesert | LoaiGame::Rise | LoaiGame::Tr2013
+                ) {
                     crate::kieu::cong_tac(ui, &mut self.t.long_tieng, "Lồng tiếng");
                 }
                 if loai != LoaiGame::CrimsonDesert {
                     crate::kieu::cong_tac(ui, &mut self.t.cai, "Cài vào game");
-                    crate::kieu::cong_tac(ui, &mut self.t.khong_dau, "không dấu (nếu font game thiếu dấu)");
+                    crate::kieu::cong_tac(
+                        ui,
+                        &mut self.t.khong_dau,
+                        "không dấu (nếu font game thiếu dấu)",
+                    );
                 }
             });
             ui.horizontal_wrapped(|ui| {
                 ui.label("Máy dịch:");
                 ui.selectable_value(&mut self.t.claude, false, "Offline (miễn phí)");
-                ui.selectable_value(&mut self.t.claude, true, "Claude (chất lượng cao, tốn tiền)");
+                ui.selectable_value(
+                    &mut self.t.claude,
+                    true,
+                    "Claude (chất lượng cao, tốn tiền)",
+                );
                 if self.t.claude {
                     for v in [1.0, 2.0, 5.0] {
                         ui.selectable_value(&mut self.t.gioi_han, v, format!("{v:.0} USD"));
                     }
                     if !dich::claude::co_khoa() {
-                        ui.label(RichText::new("chưa có mã Claude (Cài đặt) – sẽ dịch offline").color(Color32::YELLOW));
+                        ui.label(
+                            RichText::new("chưa có mã Claude (Cài đặt) – sẽ dịch offline")
+                                .color(Color32::YELLOW),
+                        );
                     }
                 }
             });
         });
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            if crate::kieu::nut_tien_do(ui, "tu_dong", "Bắt đầu", "Đang làm", crate::kieu::TIM, !ban && (self.t.dich || self.t.long_tieng || self.t.cai))
-            {
+            if crate::kieu::nut_tien_do(
+                ui,
+                "tu_dong",
+                "Bắt đầu",
+                "Đang làm",
+                crate::kieu::TIM,
+                !ban && (self.t.dich || self.t.long_tieng || self.t.cai),
+            ) {
                 self.chay(g.clone());
             }
             if ui.add_enabled(ban, egui::Button::new("Dừng")).clicked() {
@@ -172,11 +228,21 @@ impl TrangTuDong {
             }
         });
         if ban {
-            ui.add(egui::ProgressBar::new(self.tt.lock().unwrap().tien.max(tien)).show_percentage().animate(tien == 0.0));
+            ui.add(
+                egui::ProgressBar::new(self.tt.lock().unwrap().tien.max(tien))
+                    .show_percentage()
+                    .animate(tien == 0.0),
+            );
         }
         if !tb.is_empty() {
             ui.add_space(6.0);
-            let m = if loi { Color32::LIGHT_RED } else if xong { Color32::LIGHT_GREEN } else { Color32::YELLOW };
+            let m = if loi {
+                Color32::LIGHT_RED
+            } else if xong {
+                Color32::LIGHT_GREEN
+            } else {
+                Color32::YELLOW
+            };
             ui.label(RichText::new(tb).color(m));
         }
         ui.label(RichText::new("Tắt game trước khi cài. Sửa bản dịch cho đẹp: mục Sửa bản dịch (câu đã sửa được giữ khi chạy lại).").small().weak());

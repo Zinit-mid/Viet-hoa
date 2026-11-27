@@ -424,7 +424,14 @@ impl ViecDich {
     /// Các chuỗi (không trùng, giữ thứ tự) chưa có trong bộ nhớ.
     /// Câu dịch nghi dở (chưa dịch / quá ngắn / quá dài / còn nguyên tiếng Anh) → (tiếng Anh, bản dịch), tối đa `toi_da`.
     pub fn cau_nghi_van(&self, toi_da: usize) -> Vec<(String, String)> {
-        let co_dau = |s: &str| s.chars().any(|c| "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ".contains(c.to_ascii_lowercase()) || "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ".contains(c));
+        let co_dau = |s: &str| {
+            s.chars().any(|c| {
+                "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ"
+                    .contains(c.to_ascii_lowercase())
+                    || "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ"
+                        .contains(c)
+            })
+        };
         let bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
         let mut ra = Vec::new();
         for (en, vi) in bn.iter() {
@@ -433,7 +440,8 @@ impl ViecDich {
                 continue;
             }
             let ti_le = nv as f64 / ne as f64;
-            let dang_nghi = vi.trim() == en.trim() || ti_le < 0.45 || ti_le > 2.6 || (ne > 20 && !co_dau(vi));
+            let dang_nghi =
+                vi.trim() == en.trim() || ti_le < 0.45 || ti_le > 2.6 || (ne > 20 && !co_dau(vi));
             if dang_nghi {
                 ra.push((en.clone(), vi.clone()));
                 if ra.len() >= toi_da {
@@ -447,7 +455,9 @@ impl ViecDich {
     /// Nhờ AI local soát lại các cặp (Anh, Việt); câu nào sửa được (và còn đủ thẻ) thì ghi đè vào bộ nhớ. → số câu đã sửa.
     pub fn ai_sua(&mut self, cap: Vec<(String, String)>, bc: &dyn BaoCao) -> Result<usize> {
         if !crate::ai_local::san_sang() {
-            return Err(anyhow!("chưa thấy Ollama – mở AI Local Studio / Ollama rồi thử lại"));
+            return Err(anyhow!(
+                "chưa thấy Ollama – mở AI Local Studio / Ollama rồi thử lại"
+            ));
         }
         let tong = cap.len();
         if tong == 0 {
@@ -467,7 +477,11 @@ impl ViecDich {
                     let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
                     for ((en, cu), m) in lo.iter().zip(moi) {
                         let m = crate::dich::ap_dung_sua(m.trim());
-                        if !m.is_empty() && m != *cu && (self.the)(en) == (self.the)(&m) && !crate::dich::the::bi_lap(en, &m) {
+                        if !m.is_empty()
+                            && m != *cu
+                            && (self.the)(en) == (self.the)(&m)
+                            && !crate::dich::the::bi_lap(en, &m)
+                        {
                             bn.insert(en.clone(), m);
                             sua += 1;
                         }
@@ -483,7 +497,9 @@ impl ViecDich {
             }
             xong += lo.len();
             bc.tien_do(xong, tong, 0.0);
-            bc.bao(&format!("AI local đang soát {xong}/{tong} câu • đã sửa {sua}"));
+            bc.bao(&format!(
+                "AI local đang soát {xong}/{tong} câu • đã sửa {sua}"
+            ));
             if lan_luu.elapsed().as_secs() > 30 {
                 let _ = self.luu();
                 lan_luu = Instant::now();
@@ -623,7 +639,9 @@ impl ViecDich {
         std::thread::scope(|s| {
             for _ in 0..SO_LUONG {
                 s.spawn(|| loop {
-                    if viec.dung.load(Ordering::SeqCst) || tien_truoc + chung.lock().unwrap().1 >= gioi_han_usd {
+                    if viec.dung.load(Ordering::SeqCst)
+                        || tien_truoc + chung.lock().unwrap().1 >= gioi_han_usd
+                    {
                         return;
                     }
                     let Some(lo) = hang.lock().unwrap().next() else {
@@ -696,11 +714,16 @@ impl ViecDich {
         self.tien = 0.0;
         self.loi = 0;
         let mut can = ds.clone();
-        for (vong, cau_lo, ten) in [(0, CAU_MOI_LO, "Dịch"), (1, 8, "Thử lại câu hỏng"), (2, 1, "Thử lại từng câu")] {
+        for (vong, cau_lo, ten) in [
+            (0, CAU_MOI_LO, "Dịch"),
+            (1, 8, "Thử lại câu hỏng"),
+            (2, 1, "Thử lại từng câu"),
+        ] {
             if can.is_empty() {
                 break;
             }
-            let (tien, loi_dung) = self.vong_claude(&can, gioi_han_usd, self.tien, bc, cau_lo, ten)?;
+            let (tien, loi_dung) =
+                self.vong_claude(&can, gioi_han_usd, self.tien, bc, cau_lo, ten)?;
             self.tien += tien;
             if let Some(e) = loi_dung {
                 bc.bao(&format!("Dừng: {e}"));
@@ -718,7 +741,10 @@ impl ViecDich {
             }
             can = self.cau_can_dich(ds.iter().map(String::as_str));
             if vong == 0 && !can.is_empty() {
-                duong_dan::nhat_ky(&format!("Claude: {} câu chưa qua kiểm thẻ, thử lại lô nhỏ", can.len()));
+                duong_dan::nhat_ky(&format!(
+                    "Claude: {} câu chưa qua kiểm thẻ, thử lại lô nhỏ",
+                    can.len()
+                ));
             }
         }
         let con = self.cau_can_dich(ds.iter().map(String::as_str));
@@ -732,11 +758,17 @@ impl ViecDich {
     /// Ghi các câu chưa dịch được ra cau_chua_dich.txt cạnh bộ nhớ để xem / dịch tay.
     fn ghi_cau_chua_dich(&self, con: &[String]) {
         if let Some(thu_muc) = self.duong_bo_nho.parent() {
-            let nd: String = con.iter().map(|c| format!("{}\n", c.replace('\n', "\\n"))).collect();
+            let nd: String = con
+                .iter()
+                .map(|c| format!("{}\n", c.replace('\n', "\\n")))
+                .collect();
             let _ = duong_dan::ghi_file(&thu_muc.join("cau_chua_dich.txt"), nd.as_bytes());
         }
         for c in con.iter().take(5) {
-            duong_dan::nhat_ky(&format!("Chưa dịch được: {}", c.chars().take(120).collect::<String>()));
+            duong_dan::nhat_ky(&format!(
+                "Chưa dịch được: {}",
+                c.chars().take(120).collect::<String>()
+            ));
         }
     }
 
@@ -811,19 +843,28 @@ impl ViecDich {
         }
         // Câu bị loại (sai thẻ, dịch lặp...): thử lại bằng Google (vẫn giữ thẻ qua offline_lo)
         if !hong.is_empty() && !self.dung.load(Ordering::SeqCst) {
-            bc.bao(&format!("{} câu offline dịch hỏng – thử lại bằng Google...", hong.len()));
+            bc.bao(&format!(
+                "{} câu offline dịch hỏng – thử lại bằng Google...",
+                hong.len()
+            ));
             let dich_google = |cau: &[String]| -> Result<Vec<String>> {
                 let (ra, loi) = crate::dich::google::dich_nhieu(cau);
                 if ra.iter().any(Option::is_none) {
                     return Err(anyhow!("Google lỗi: {}", loi.unwrap_or_default()));
                 }
-                Ok(ra.into_iter().zip(cau).map(|(v, en)| crate::dich::the::bo_lap_doi(en, &v.unwrap_or_default())).collect())
+                Ok(ra
+                    .into_iter()
+                    .zip(cau)
+                    .map(|(v, en)| crate::dich::the::bo_lap_doi(en, &v.unwrap_or_default()))
+                    .collect())
             };
             for lo in hong.chunks(24) {
                 if self.dung.load(Ordering::SeqCst) {
                     break;
                 }
-                let Ok(kq) = offline_lo(lo, &dich_google) else { continue };
+                let Ok(kq) = offline_lo(lo, &dich_google) else {
+                    continue;
+                };
                 let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
                 for (en, vi) in lo.iter().zip(kq) {
                     if let Some(vi) = vi {
@@ -836,18 +877,32 @@ impl ViecDich {
             }
         }
         // vẫn còn câu hỏng: nhờ AI local (nếu Ollama đang chạy và không đang lồng tiếng)
-        let con_hong: Vec<String> = self.cau_can_dich(ds.iter().map(String::as_str)).into_iter().map(|s| s.to_string()).collect();
-        if !con_hong.is_empty() && !self.dung.load(Ordering::SeqCst) && crate::ai_local::san_sang() {
-            bc.bao(&format!("{} câu còn lại – thử bằng AI local...", con_hong.len()));
+        let con_hong: Vec<String> = self
+            .cau_can_dich(ds.iter().map(String::as_str))
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+        if !con_hong.is_empty() && !self.dung.load(Ordering::SeqCst) && crate::ai_local::san_sang()
+        {
+            bc.bao(&format!(
+                "{} câu còn lại – thử bằng AI local...",
+                con_hong.len()
+            ));
             let dich_ai = |cau: &[String]| -> Result<Vec<String>> {
                 let ra = crate::ai_local::dich_lo(cau)?;
-                Ok(ra.into_iter().zip(cau).map(|(v, en)| crate::dich::the::bo_lap_doi(en, &v)).collect())
+                Ok(ra
+                    .into_iter()
+                    .zip(cau)
+                    .map(|(v, en)| crate::dich::the::bo_lap_doi(en, &v))
+                    .collect())
             };
             for lo in con_hong.chunks(12) {
                 if self.dung.load(Ordering::SeqCst) {
                     break;
                 }
-                let Ok(kq) = offline_lo(lo, &dich_ai) else { continue };
+                let Ok(kq) = offline_lo(lo, &dich_ai) else {
+                    continue;
+                };
                 let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
                 for (en, vi) in lo.iter().zip(kq) {
                     if let Some(vi) = vi {

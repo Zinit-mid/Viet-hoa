@@ -548,5 +548,6 @@ pub fn fsb_mp3(fsb: &[u8]) -> Result<&[u8]> {
         bail!("không phải FSB4");
     }
     let sh = u32::from_le_bytes(fsb[8..12].try_into().unwrap()) as usize;
-    fsb.get(0x30 + sh..).ok_or_else(|| anyhow::anyhow!("FSB4 hỏng"))
+    fsb.get(0x30 + sh..)
+        .ok_or_else(|| anyhow::anyhow!("FSB4 hỏng"))
 }

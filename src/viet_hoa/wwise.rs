@@ -27,7 +27,9 @@ pub fn tim_wwise_console() -> Option<PathBuf> {
             format!(r"{o}:\"),
         ];
         for g in goc_ds {
-            let Ok(rd) = std::fs::read_dir(&g) else { continue };
+            let Ok(rd) = std::fs::read_dir(&g) else {
+                continue;
+            };
             let mut con: Vec<PathBuf> = rd.flatten().map(|e| e.path()).collect();
             con.sort();
             con.reverse(); // bản mới nhất trước
@@ -68,17 +70,28 @@ pub fn doc_wav(b: &[u8]) -> Result<(Vec<f32>, u32)> {
         ma = u16le(24);
     }
     let x: Vec<f32> = match (ma, bit) {
-        (3, 32) => data.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect(),
-        (_, 16) => data.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).collect(),
+        (3, 32) => data
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .collect(),
+        (_, 16) => data
+            .chunks_exact(2)
+            .map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0)
+            .collect(),
         (_, 24) => data
             .chunks_exact(3)
             .map(|c| (i32::from_le_bytes([0, c[0], c[1], c[2]]) >> 8) as f32 / 8388608.0)
             .collect(),
-        (_, 32) => data.chunks_exact(4).map(|c| i32::from_le_bytes(c.try_into().unwrap()) as f32 / 2147483648.0).collect(),
+        (_, 32) => data
+            .chunks_exact(4)
+            .map(|c| i32::from_le_bytes(c.try_into().unwrap()) as f32 / 2147483648.0)
+            .collect(),
         _ => return Err(anyhow!("WAV {bit} bit chưa hỗ trợ")),
     };
     let mono = if kenh > 1 {
-        x.chunks_exact(kenh).map(|f| f.iter().sum::<f32>() / kenh as f32).collect()
+        x.chunks_exact(kenh)
+            .map(|f| f.iter().sum::<f32>() / kenh as f32)
+            .collect()
     } else {
         x
     };
@@ -105,7 +118,11 @@ pub fn chuan_hoa(x: &[f32], ts: u32, tang_db: f64) -> Vec<f32> {
         for v in y.iter_mut() {
             let s = *v * g;
             let a = s.abs();
-            *v = if a <= t { s } else { s.signum() * (t + (1.0 - t) * ((a - t) / (1.0 - t)).tanh()) };
+            *v = if a <= t {
+                s
+            } else {
+                s.signum() * (t + (1.0 - t) * ((a - t) / (1.0 - t)).tanh())
+            };
         }
     }
     y.iter_mut().for_each(|v| *v = v.clamp(-1.0, 1.0));
@@ -132,12 +149,17 @@ pub fn ghi_wav16(duong: &Path, x: &[f32], ts: u32) -> Result<()> {
 }
 
 fn xml_thoat(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 fn chay_wwise(wwise: &Path, args: &[&std::ffi::OsStr], nk: &mut impl Write) -> Result<()> {
     let mut lenh = Command::new(wwise);
-    lenh.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    lenh.args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -165,12 +187,28 @@ pub fn ma_hoa(
     let _ = std::fs::remove_dir_all(tam);
     std::fs::create_dir_all(tam)?;
     std::fs::create_dir_all(thu_ra)?;
-    let mut nk = std::fs::OpenOptions::new().create(true).append(true).open(file_nhat_ky)?;
+    let mut nk = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(file_nhat_ky)?;
     let kq = (|| -> Result<BTreeMap<String, PathBuf>> {
         let du_an = tam.join("VH").join("VH.wproj");
-        chay_wwise(wwise, &["create-new-project".as_ref(), du_an.as_os_str(), "--platform".as_ref(), "Windows".as_ref(), "--quiet".as_ref()], &mut nk)?;
+        chay_wwise(
+            wwise,
+            &[
+                "create-new-project".as_ref(),
+                du_an.as_os_str(),
+                "--platform".as_ref(),
+                "Windows".as_ref(),
+                "--quiet".as_ref(),
+            ],
+            &mut nk,
+        )?;
         if !du_an.is_file() {
-            return Err(anyhow!("Wwise không tạo được project tạm – xem {}", file_nhat_ky.display()));
+            return Err(anyhow!(
+                "Wwise không tạo được project tạm – xem {}",
+                file_nhat_ky.display()
+            ));
         }
         let mut co = BTreeMap::new();
         for e in std::fs::read_dir(thu_ra)?.flatten() {
@@ -191,8 +229,13 @@ pub fn ma_hoa(
             std::fs::create_dir_all(&nguon)?;
             let mut ds = String::new();
             for (t, w) in phan {
-                let (x, ts) = doc_wav(&std::fs::read(w)?).with_context(|| w.display().to_string())?;
-                ghi_wav16(&nguon.join(format!("{t}.wav")), &chuan_hoa(&x, ts, tang_db), TAN_SO)?;
+                let (x, ts) =
+                    doc_wav(&std::fs::read(w)?).with_context(|| w.display().to_string())?;
+                ghi_wav16(
+                    &nguon.join(format!("{t}.wav")),
+                    &chuan_hoa(&x, ts, tang_db),
+                    TAN_SO,
+                )?;
                 ds += &format!(
                     "  <Source Path=\"{0}.wav\" Conversion=\"Vorbis Quality High\" Destination=\"{0}.wem\"/>\n",
                     xml_thoat(t)
@@ -206,10 +249,27 @@ pub fn ma_hoa(
                     xml_thoat(&nguon.to_string_lossy())
                 ),
             )?;
-            bao(&format!("Wwise đang mã hóa {}/{} câu...", (i * lo + phan.len()).min(con.len()), con.len()));
+            bao(&format!(
+                "Wwise đang mã hóa {}/{} câu...",
+                (i * lo + phan.len()).min(con.len()),
+                con.len()
+            ));
             let ra = tam.join("ra");
             let _ = std::fs::remove_dir_all(&ra);
-            chay_wwise(wwise, &["convert-external-source".as_ref(), du_an.as_os_str(), "--platform".as_ref(), "Windows".as_ref(), "--source-file".as_ref(), ds_file.as_os_str(), "--output".as_ref(), ra.as_os_str()], &mut nk)?;
+            chay_wwise(
+                wwise,
+                &[
+                    "convert-external-source".as_ref(),
+                    du_an.as_os_str(),
+                    "--platform".as_ref(),
+                    "Windows".as_ref(),
+                    "--source-file".as_ref(),
+                    ds_file.as_os_str(),
+                    "--output".as_ref(),
+                    ra.as_os_str(),
+                ],
+                &mut nk,
+            )?;
             let mut cho = vec![ra.clone()];
             while let Some(d) = cho.pop() {
                 for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
@@ -242,8 +302,8 @@ pub fn dong_goi_zip(
 ) -> Result<usize> {
     let tam = zip_ra.with_extension("zip.tam");
     let mut z = zip::ZipWriter::new(std::fs::File::create(&tam)?);
-    let tuy: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let tuy: zip::write::SimpleFileOptions =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let mut so = 0;
     for (t, thu_muc) in muc {
         if let Some(p) = wem.get(t) {
@@ -294,12 +354,28 @@ mod test {
         let _ = std::fs::remove_dir_all(&ra);
         let muc = vec![("thu_1".to_string(), nguon)];
         let dung = AtomicBool::new(false);
-        let co = ma_hoa(&muc, &w, &ra, &std::env::temp_dir().join("vh_wwise_tam"), 6.0, 3000,
-            &std::env::temp_dir().join("vh_wwise_nk.txt"), &dung, &|s| eprintln!("{s}")).unwrap();
+        let co = ma_hoa(
+            &muc,
+            &w,
+            &ra,
+            &std::env::temp_dir().join("vh_wwise_tam"),
+            6.0,
+            3000,
+            &std::env::temp_dir().join("vh_wwise_nk.txt"),
+            &dung,
+            &|s| eprintln!("{s}"),
+        )
+        .unwrap();
         let wem = std::fs::read(&co["thu_1"]).unwrap();
         assert_eq!(&wem[0..4], b"RIFF");
         let zip = std::env::temp_dir().join("vh_wwise.zip");
-        let n = dong_goi_zip(&zip, "LongTieng_Thu", &[("thu_1".into(), "sound/windows/english(us)".into())], &co).unwrap();
+        let n = dong_goi_zip(
+            &zip,
+            "LongTieng_Thu",
+            &[("thu_1".into(), "sound/windows/english(us)".into())],
+            &co,
+        )
+        .unwrap();
         assert_eq!(n, 1);
     }
 }

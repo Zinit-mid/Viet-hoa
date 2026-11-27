@@ -11,12 +11,16 @@ mod dich_man_hinh;
 mod duong_dan;
 mod giao_dien;
 mod giong_doc;
+mod go_viet;
 mod khung_dich;
 mod kieu;
 mod lop_phu;
 mod ocr;
 mod phu_de_phim;
 mod quan_ly_chup;
+mod them_giong;
+mod thuyet_minh;
+mod tien_trinh;
 mod trang_ban_do;
 mod trang_clone_giong;
 mod trang_giong_mau;
@@ -24,11 +28,8 @@ mod trang_long_tieng;
 mod trang_phu_de_phim;
 mod trang_sua_dich;
 mod trang_tu_dong;
-mod them_giong;
-mod thuyet_minh;
-mod tien_trinh;
-mod tu_dong;
 mod trang_viet_hoa;
+mod tu_dong;
 #[allow(dead_code)] // các giai đoạn sau (Việt hóa từng game) sẽ dùng
 mod viet_hoa;
 
@@ -109,7 +110,11 @@ fn main() -> eframe::Result<()> {
     let tuy_chon = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Việt Hóa")
-            .with_icon(egui::IconData { rgba: include_bytes!("../assets/icon_128.rgba").to_vec(), width: 128, height: 128 })
+            .with_icon(egui::IconData {
+                rgba: include_bytes!("../assets/icon_128.rgba").to_vec(),
+                width: 128,
+                height: 128,
+            })
             .with_inner_size([1480.0, 880.0])
             .with_min_inner_size([900.0, 560.0]),
         // Không lưu vị trí cửa sổ (từng lưu nhầm lúc thu nhỏ → mở ra 118×152),

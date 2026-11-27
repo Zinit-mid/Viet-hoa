@@ -14,5 +14,5 @@ pub mod phien_am;
 pub mod tiger;
 pub mod tim_game;
 pub mod tomb_raider;
-pub mod wwise;
 pub mod viec_dich;
+pub mod wwise;

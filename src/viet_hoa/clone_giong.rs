@@ -74,9 +74,15 @@ pub fn doc_nguon(p: &Path) -> Result<(Vec<f32>, u32)> {
             return Ok(r);
         }
     }
-    let ff = duong_dan::cong_cu().join("ffmpeg").join("bin").join("ffmpeg.exe");
+    let ff = duong_dan::cong_cu()
+        .join("ffmpeg")
+        .join("bin")
+        .join("ffmpeg.exe");
     if !ff.is_file() {
-        bail!("không đọc được file (không phải WAV) và thiếu {}", ff.display());
+        bail!(
+            "không đọc được file (không phải WAV) và thiếu {}",
+            ff.display()
+        );
     }
     let tam = duong_dan::du_lieu().join("tam");
     std::fs::create_dir_all(&tam)?;
@@ -196,7 +202,11 @@ fn bo_lang(x: &[f32], sr: u32) -> Vec<f32> {
 /// Giọng mẫu sạch từ đoạn [bat_dau, ket_thuc] giây (ket_thuc <= 0 = hết file). Mono 24 kHz, tối đa 20 giây.
 pub fn chuan_bi(x: &[f32], sr: u32, bat_dau: f64, ket_thuc: f64) -> Result<Vec<f32>> {
     let a = ((bat_dau.max(0.0) * sr as f64) as usize).min(x.len());
-    let b = if ket_thuc > bat_dau { ((ket_thuc * sr as f64) as usize).min(x.len()) } else { x.len() };
+    let b = if ket_thuc > bat_dau {
+        ((ket_thuc * sr as f64) as usize).min(x.len())
+    } else {
+        x.len()
+    };
     if b <= a {
         bail!("đoạn cắt trống – kiểm tra giây bắt đầu / kết thúc");
     }
@@ -212,7 +222,11 @@ pub fn chuan_bi(x: &[f32], sr: u32, bat_dau: f64, ket_thuc: f64) -> Result<Vec<f
         let g = (RMS_DICH / r) as f32;
         for v in y.iter_mut() {
             let s = *v * g;
-            *v = if s.abs() <= 0.85 { s } else { s.signum() * (0.85 + 0.15 * ((s.abs() - 0.85) / 0.15).tanh()) };
+            *v = if s.abs() <= 0.85 {
+                s
+            } else {
+                s.signum() * (0.85 + 0.15 * ((s.abs() - 0.85) / 0.15).tanh())
+            };
         }
     }
     Ok(y)
@@ -245,7 +259,9 @@ pub fn nghe_thu(
         rms: RMS_DICH,
         ds: vec![("thu".into(), chu, 0.0)],
     };
-    let xong = gv::chay(&[nhom], &tam, 1.4, dung, &|_, _, s| bao(&format!("VieNeu đang đọc: {}", s.trim_start_matches(" • "))))?;
+    let xong = gv::chay(&[nhom], &tam, 1.4, dung, &|_, _, s| {
+        bao(&format!("VieNeu đang đọc: {}", s.trim_start_matches(" • ")))
+    })?;
     let ra = tam.join("ra").join("thu.wav");
     if !xong {
         return Ok(None);
@@ -253,7 +269,10 @@ pub fn nghe_thu(
     if ra.is_file() {
         Ok(Some(ra))
     } else {
-        Err(anyhow!("VieNeu không tạo được giọng – xem {}", tam.join("vieneu_nhat_ky.txt").display()))
+        Err(anyhow!(
+            "VieNeu không tạo được giọng – xem {}",
+            tam.join("vieneu_nhat_ky.txt").display()
+        ))
     }
 }
 
@@ -263,7 +282,13 @@ pub fn luu(ten: &str, mau: &[f32], ghi_de: bool) -> Result<PathBuf> {
         .trim()
         .trim_end_matches(".wav")
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if ten.is_empty() {
         bail!("chưa đặt tên giọng");
@@ -300,13 +325,20 @@ pub fn gan(phan: &str, nguoi: &str, file: &str) -> Result<()> {
         std::fs::copy(&tep, &sao)?;
     }
     let mut pb = doc_phan_bo();
-    let goc = pb.as_object_mut().ok_or_else(|| anyhow!("phan_bo.json hỏng"))?;
+    let goc = pb
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("phan_bo.json hỏng"))?;
     let ds = goc.entry(phan).or_insert_with(|| serde_json::json!({}));
-    ds.as_object_mut().ok_or_else(|| anyhow!("phan_bo.json hỏng"))?.insert(nguoi.into(), file.into());
+    ds.as_object_mut()
+        .ok_or_else(|| anyhow!("phan_bo.json hỏng"))?
+        .insert(nguoi.into(), file.into());
     if phan != "TR2013" {
         let tay = goc.entry("_tay").or_insert_with(|| serde_json::json!({}));
-        let l = tay.as_object_mut().ok_or_else(|| anyhow!("phan_bo.json hỏng"))?
-            .entry(phan).or_insert_with(|| serde_json::json!([]));
+        let l = tay
+            .as_object_mut()
+            .ok_or_else(|| anyhow!("phan_bo.json hỏng"))?
+            .entry(phan)
+            .or_insert_with(|| serde_json::json!([]));
         if let Some(a) = l.as_array_mut() {
             if !a.iter().any(|v| v.as_str() == Some(nguoi)) {
                 a.push(nguoi.into());
@@ -350,7 +382,10 @@ pub fn tim_am_thanh(thu_muc: &Path) -> Vec<PathBuf> {
             let p = e.path();
             if p.is_dir() {
                 cho.push(p);
-            } else if p.extension().is_some_and(|x| ["wav", "mp3", "m4a", "ogg", "flac", "aac", "opus"].contains(&x.to_string_lossy().to_lowercase().as_str())) {
+            } else if p.extension().is_some_and(|x| {
+                ["wav", "mp3", "m4a", "ogg", "flac", "aac", "opus"]
+                    .contains(&x.to_string_lossy().to_lowercase().as_str())
+            }) {
                 ra.push(p);
             }
         }
@@ -361,8 +396,14 @@ pub fn tim_am_thanh(thu_muc: &Path) -> Vec<PathBuf> {
 
 /// "Đức_Trí__2_gap_rut" → ("Đức_Trí", 2, "gap_rut"): bộ 3 mẫu cảm xúc của cùng một giọng.
 fn tach_bo(stem: &str) -> Option<(String, usize, &'static str)> {
-    for (hau, loai) in [("binh_thuong", "binh_thuong"), ("gap_rut", "gap_rut"), ("buon", "buon")] {
-        let Some(dau) = stem.strip_suffix(hau) else { continue };
+    for (hau, loai) in [
+        ("binh_thuong", "binh_thuong"),
+        ("gap_rut", "gap_rut"),
+        ("buon", "buon"),
+    ] {
+        let Some(dau) = stem.strip_suffix(hau) else {
+            continue;
+        };
         let dau = dau.trim_end_matches('_');
         let (ten, so) = dau.rsplit_once('_')?;
         let so: usize = so.parse().ok().filter(|n| (1..=3).contains(n))?;
@@ -381,12 +422,20 @@ fn xu_ly_file(p: &Path) -> Result<Vec<f32>> {
 /// - File tên dạng `<Giọng>__1_binh_thuong` / `__2_gap_rut` / `__3_buon` được gom thành MỘT giọng
 ///   (`<Giọng>.wav` + `<Giọng>_gap_rut.wav` + `<Giọng>_buon.wav`); `chinh` (1..3) là mẫu làm giọng chính.
 /// - File khác: mỗi file một giọng, tên theo tên file.
-pub fn nhap_nhieu(files: &[PathBuf], chinh: usize, ghi_de: bool, bao: &dyn Fn(&str, usize, usize)) -> KetQuaNhap {
+pub fn nhap_nhieu(
+    files: &[PathBuf],
+    chinh: usize,
+    ghi_de: bool,
+    bao: &dyn Fn(&str, usize, usize),
+) -> KetQuaNhap {
     let mut kq = KetQuaNhap::default();
     let mut bo: BTreeMap<String, BTreeMap<usize, PathBuf>> = BTreeMap::new();
     let mut le: Vec<&PathBuf> = Vec::new();
     for p in files {
-        let stem = p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let stem = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
         match tach_bo(&stem) {
             Some((ten, so, _)) => {
                 bo.entry(ten).or_default().insert(so, p.clone());
@@ -429,7 +478,10 @@ pub fn nhap_nhieu(files: &[PathBuf], chinh: usize, ghi_de: bool, bao: &dyn Fn(&s
         xong += 1;
     }
     for p in le {
-        let stem = p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let stem = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
         bao(&format!("Đang thêm giọng {stem}"), xong, tong);
         luu_mot(&stem, p, &mut kq);
         xong += 1;
@@ -442,7 +494,13 @@ fn sach_ten(ten: &str) -> String {
     ten.trim()
         .trim_end_matches(".wav")
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -457,7 +515,11 @@ pub fn xoa(file: &str) -> Result<()> {
 
 /// Thời lượng (giây) ước tính của file wav 16 bit trong kho.
 pub fn giay_cua(file: &str) -> f64 {
-    std::fs::read(kho_giong().join(file)).ok().and_then(|b| wwise::doc_wav(&b).ok()).map(|(x, ts)| x.len() as f64 / ts as f64).unwrap_or(0.0)
+    std::fs::read(kho_giong().join(file))
+        .ok()
+        .and_then(|b| wwise::doc_wav(&b).ok())
+        .map(|(x, ts)| x.len() as f64 / ts as f64)
+        .unwrap_or(0.0)
 }
 
 #[cfg(test)]
@@ -466,7 +528,10 @@ mod test {
 
     fn tieng(ts: u32, giay: f64, bien: f32) -> Vec<f32> {
         (0..(ts as f64 * giay) as usize)
-            .map(|i| bien * (i as f32 * 2.0 * std::f32::consts::PI * 200.0 / ts as f32).sin() * (1.0 + 0.5 * (i as f32 * 0.001).sin()))
+            .map(|i| {
+                bien * (i as f32 * 2.0 * std::f32::consts::PI * 200.0 / ts as f32).sin()
+                    * (1.0 + 0.5 * (i as f32 * 0.001).sin())
+            })
             .collect()
     }
 
@@ -489,9 +554,18 @@ mod test {
 
     #[test]
     fn tach_bo_mau_cam_xuc() {
-        assert_eq!(tach_bo("Đức_Trí__2_gap_rut"), Some(("Đức_Trí".into(), 2, "gap_rut")));
-        assert_eq!(tach_bo("Mỹ_Duyên__1_binh_thuong"), Some(("Mỹ_Duyên".into(), 1, "binh_thuong")));
-        assert_eq!(tach_bo("Thục_Đoan__3_buon"), Some(("Thục_Đoan".into(), 3, "buon")));
+        assert_eq!(
+            tach_bo("Đức_Trí__2_gap_rut"),
+            Some(("Đức_Trí".into(), 2, "gap_rut"))
+        );
+        assert_eq!(
+            tach_bo("Mỹ_Duyên__1_binh_thuong"),
+            Some(("Mỹ_Duyên".into(), 1, "binh_thuong"))
+        );
+        assert_eq!(
+            tach_bo("Thục_Đoan__3_buon"),
+            Some(("Thục_Đoan".into(), 3, "buon"))
+        );
         assert_eq!(tach_bo("nam_chinh"), None);
         assert_eq!(tach_bo("giong_gap_rut"), None);
     }
@@ -499,7 +573,9 @@ mod test {
     #[test]
     fn loc_cao_bo_tieng_u() {
         let mut u = tieng(24000, 1.0, 0.5);
-        let mut thap: Vec<f32> = (0..24000).map(|i| 0.5 * (i as f32 * 2.0 * std::f32::consts::PI * 20.0 / 24000.0).sin()).collect();
+        let mut thap: Vec<f32> = (0..24000)
+            .map(|i| 0.5 * (i as f32 * 2.0 * std::f32::consts::PI * 20.0 / 24000.0).sin())
+            .collect();
         loc_cao(&mut thap, 24000, 70.0);
         loc_cao(&mut u, 24000, 70.0);
         assert!(rms(&thap[4000..]) < 0.05, "{}", rms(&thap[4000..]));
@@ -514,9 +590,14 @@ mod test {
         let y = chuan_bi(&x, ts, 0.0, 0.0).unwrap();
         println!("mẫu {:?}", thong_ke(&y));
         let dung = AtomicBool::new(false);
-        let ra = nghe_thu(&y, "Xin chào, tôi là Kliff. Hãy cẩn thận phía trước.", &dung, &|s| println!("{s}"))
-            .unwrap()
-            .unwrap();
+        let ra = nghe_thu(
+            &y,
+            "Xin chào, tôi là Kliff. Hãy cẩn thận phía trước.",
+            &dung,
+            &|s| println!("{s}"),
+        )
+        .unwrap()
+        .unwrap();
         let (z, zs) = wwise::doc_wav(&std::fs::read(ra).unwrap()).unwrap();
         println!("đọc thử {:.1}s {zs}Hz", z.len() as f64 / zs as f64);
         assert!(z.len() as u32 > zs);
@@ -527,13 +608,19 @@ mod test {
     #[ignore]
     fn nhap_thu_muc_that() {
         let d = PathBuf::from(std::env::var("DIR").unwrap());
-        let chinh = std::env::var("CHINH").ok().and_then(|x| x.parse().ok()).unwrap_or(2);
+        let chinh = std::env::var("CHINH")
+            .ok()
+            .and_then(|x| x.parse().ok())
+            .unwrap_or(2);
         let files = tim_am_thanh(&d);
         println!("{} file", files.len());
         let kq = nhap_nhieu(&files, chinh, false, &|s, a, b| println!("{a}/{b} {s}"));
-        println!("thêm {:?}
+        println!(
+            "thêm {:?}
 bỏ qua {:?}
-lỗi {:?}", kq.them, kq.bo_qua, kq.loi);
+lỗi {:?}",
+            kq.them, kq.bo_qua, kq.loi
+        );
         assert!(kq.loi.is_empty());
     }
 }

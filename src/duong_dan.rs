@@ -8,12 +8,21 @@ use std::sync::OnceLock;
 static GOC: OnceLock<PathBuf> = OnceLock::new();
 
 const SCRIPTS: [(&str, &str); 6] = [
-    ("dich_offline.py", include_str!("../scripts/dich_offline.py")),
+    (
+        "dich_offline.py",
+        include_str!("../scripts/dich_offline.py"),
+    ),
     ("tao_giong.py", include_str!("../scripts/tao_giong.py")),
-    ("long_tieng_tr.py", include_str!("../scripts/long_tieng_tr.py")),
+    (
+        "long_tieng_tr.py",
+        include_str!("../scripts/long_tieng_tr.py"),
+    ),
     ("nghe_phim.py", include_str!("../scripts/nghe_phim.py")),
     ("thuyet_minh.py", include_str!("../scripts/thuyet_minh.py")),
-    ("tai_cong_cu.ps1", include_str!("../scripts/tai_cong_cu.ps1")),
+    (
+        "tai_cong_cu.ps1",
+        include_str!("../scripts/tai_cong_cu.ps1"),
+    ),
 ];
 
 /// Bản chạy độc lập (exe chép sang máy khác): chép các script nhúng trong exe ra `scripts\` cạnh exe.
@@ -27,7 +36,10 @@ pub fn chep_script_nhung() {
     let _ = fs::create_dir_all(&d);
     for (ten, nd) in SCRIPTS {
         let p = d.join(ten);
-        if fs::read_to_string(&p).map(|c| c.replace("\r\n", "\n") != nd.replace("\r\n", "\n")).unwrap_or(true) {
+        if fs::read_to_string(&p)
+            .map(|c| c.replace("\r\n", "\n") != nd.replace("\r\n", "\n"))
+            .unwrap_or(true)
+        {
             let _ = fs::write(&p, nd);
         }
     }

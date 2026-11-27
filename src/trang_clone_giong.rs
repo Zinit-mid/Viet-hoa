@@ -44,7 +44,9 @@ impl Default for TrangCloneGiong {
             nguon: String::new(),
             bat_dau: 0.0,
             ket_thuc: 0.0,
-            cau_thu: "Xin chào, tôi là một nhân vật trong game. Hãy cẩn thận, phía trước có kẻ thù.".into(),
+            cau_thu:
+                "Xin chào, tôi là một nhân vật trong game. Hãy cẩn thận, phía trước có kẻ thù."
+                    .into(),
             ten_luu: String::new(),
             ghi_de: false,
             phan: 0,
@@ -65,16 +67,20 @@ impl TrangCloneGiong {
     /// Đăng ký tiến trình toàn cục (thanh ở đáy cửa sổ).
     pub fn dang_ky_tt(&self) {
         let c = self.c.clone();
-        crate::tien_trinh::dang_ky("clone_giong", crate::tien_trinh::co_dinh(self.dung.clone()), move || {
-            let g = c.lock().unwrap();
-            crate::tien_trinh::Anh {
-                dang_ban: g.dang_ban,
-                ten: "Clone giọng".into(),
-                thong_bao: g.thong_bao.clone(),
-                tien: None,
-                loi: g.thong_bao.starts_with("Lỗi"),
-            }
-        });
+        crate::tien_trinh::dang_ky(
+            "clone_giong",
+            crate::tien_trinh::co_dinh(self.dung.clone()),
+            move || {
+                let g = c.lock().unwrap();
+                crate::tien_trinh::Anh {
+                    dang_ban: g.dang_ban,
+                    ten: "Clone giọng".into(),
+                    thong_bao: g.thong_bao.clone(),
+                    tien: None,
+                    loi: g.thong_bao.starts_with("Lỗi"),
+                }
+            },
+        );
     }
 
     fn nen(&self, viec: impl FnOnce(&Arc<Mutex<Chung>>, &Arc<AtomicBool>) + Send + 'static) {
@@ -99,18 +105,34 @@ impl TrangCloneGiong {
         ui.add_space(8.0);
         let (ban, tb, co_mau, mau_tk) = {
             let c = self.c.lock().unwrap();
-            (c.dang_ban, c.thong_bao.clone(), c.mau.is_some(), c.mau.as_ref().map(|m| cg::thong_ke(m)))
+            (
+                c.dang_ban,
+                c.thong_bao.clone(),
+                c.mau.is_some(),
+                c.mau.as_ref().map(|m| cg::thong_ke(m)),
+            )
         };
         if ban {
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(300));
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(300));
         }
 
         the(ui, "1. FILE GHI ÂM", |ui| {
             ui.horizontal(|ui| {
-                ui.add(egui::TextEdit::singleline(&mut self.nguon).desired_width(520.0).hint_text("đường dẫn file wav / mp3 / m4a / mp4..."));
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.nguon)
+                        .desired_width(520.0)
+                        .hint_text("đường dẫn file wav / mp3 / m4a / mp4..."),
+                );
                 if ui.button("Chọn file...").clicked() {
                     if let Some(p) = rfd::FileDialog::new()
-                        .add_filter("Âm thanh / video", &["wav", "mp3", "m4a", "ogg", "flac", "aac", "wma", "mp4", "mkv", "webm"])
+                        .add_filter(
+                            "Âm thanh / video",
+                            &[
+                                "wav", "mp3", "m4a", "ogg", "flac", "aac", "wma", "mp4", "mkv",
+                                "webm",
+                            ],
+                        )
                         .pick_file()
                     {
                         self.nguon = p.to_string_lossy().into_owned();
@@ -119,14 +141,34 @@ impl TrangCloneGiong {
             });
             ui.horizontal(|ui| {
                 ui.label("Từ giây");
-                ui.add(egui::DragValue::new(&mut self.bat_dau).range(0.0..=36000.0).speed(0.1).fixed_decimals(1));
+                ui.add(
+                    egui::DragValue::new(&mut self.bat_dau)
+                        .range(0.0..=36000.0)
+                        .speed(0.1)
+                        .fixed_decimals(1),
+                );
                 ui.label("đến giây");
-                ui.add(egui::DragValue::new(&mut self.ket_thuc).range(0.0..=36000.0).speed(0.1).fixed_decimals(1));
+                ui.add(
+                    egui::DragValue::new(&mut self.ket_thuc)
+                        .range(0.0..=36000.0)
+                        .speed(0.1)
+                        .fixed_decimals(1),
+                );
                 ui.label(RichText::new("(đến = 0: hết file)").small().weak());
             });
-            if crate::kieu::nut_tien_do(ui, "clone_giong", "Xử lý giọng mẫu", "Đang xử lý", crate::kieu::CAM, !ban && !self.nguon.trim().is_empty())
-            {
-                let (p, a, b) = (PathBuf::from(self.nguon.trim().trim_matches('"')), self.bat_dau, self.ket_thuc);
+            if crate::kieu::nut_tien_do(
+                ui,
+                "clone_giong",
+                "Xử lý giọng mẫu",
+                "Đang xử lý",
+                crate::kieu::CAM,
+                !ban && !self.nguon.trim().is_empty(),
+            ) {
+                let (p, a, b) = (
+                    PathBuf::from(self.nguon.trim().trim_matches('"')),
+                    self.bat_dau,
+                    self.ket_thuc,
+                );
                 self.nen(move |c, _| {
                     c.lock().unwrap().thong_bao = "Đang đọc và xử lý file...".into();
                     let kq = cg::doc_nguon(&p).and_then(|(x, ts)| cg::chuan_bi(&x, ts, a, b));
@@ -149,14 +191,22 @@ impl TrangCloneGiong {
         the(ui, "2. NGHE THỬ", |ui| {
             if let Some((s, _)) = mau_tk {
                 if !(5.0..=16.0).contains(&s) {
-                    ui.label(RichText::new(format!("Giọng mẫu dài {s:.1} giây – tốt nhất 6–15 giây.")).color(Color32::YELLOW));
+                    ui.label(
+                        RichText::new(format!("Giọng mẫu dài {s:.1} giây – tốt nhất 6–15 giây."))
+                            .color(Color32::YELLOW),
+                    );
                 }
             }
             ui.horizontal(|ui| {
-                if ui.add_enabled(co_mau, egui::Button::new("▶ Nghe mẫu đã xử lý")).clicked() {
+                if ui
+                    .add_enabled(co_mau, egui::Button::new("▶ Nghe mẫu đã xử lý"))
+                    .clicked()
+                {
                     let m = self.c.lock().unwrap().mau.clone();
                     if let Some(m) = m {
-                        let p = crate::duong_dan::du_lieu().join("tam").join("clone_nghe_mau.wav");
+                        let p = crate::duong_dan::du_lieu()
+                            .join("tam")
+                            .join("clone_nghe_mau.wav");
                         let _ = std::fs::create_dir_all(p.parent().unwrap());
                         if crate::viet_hoa::wwise::ghi_wav16(&p, &m, cg::TAN_SO).is_ok() {
                             giong_doc::phat_wav(&p);
@@ -164,15 +214,28 @@ impl TrangCloneGiong {
                     }
                 }
             });
-            ui.add(egui::TextEdit::multiline(&mut self.cau_thu).desired_rows(2).desired_width(f32::INFINITY));
+            ui.add(
+                egui::TextEdit::multiline(&mut self.cau_thu)
+                    .desired_rows(2)
+                    .desired_width(f32::INFINITY),
+            );
             if ui
-                .add_enabled(!ban && co_mau && crate::viet_hoa::giong_vieneu::tim_vieneu().is_some(), egui::Button::new("▶ VieNeu đọc câu này bằng giọng mẫu"))
+                .add_enabled(
+                    !ban && co_mau && crate::viet_hoa::giong_vieneu::tim_vieneu().is_some(),
+                    egui::Button::new("▶ VieNeu đọc câu này bằng giọng mẫu"),
+                )
                 .clicked()
             {
-                let (m, chu) = (self.c.lock().unwrap().mau.clone().unwrap_or_default(), self.cau_thu.clone());
+                let (m, chu) = (
+                    self.c.lock().unwrap().mau.clone().unwrap_or_default(),
+                    self.cau_thu.clone(),
+                );
                 self.nen(move |c, d| {
-                    c.lock().unwrap().thong_bao = "VieNeu đang nạp mô hình và đọc (~15–30 giây)...".into();
-                    let kq = cg::nghe_thu(&m, &chu, d, &|s| c.lock().unwrap().thong_bao = s.to_string());
+                    c.lock().unwrap().thong_bao =
+                        "VieNeu đang nạp mô hình và đọc (~15–30 giây)...".into();
+                    let kq = cg::nghe_thu(&m, &chu, d, &|s| {
+                        c.lock().unwrap().thong_bao = s.to_string()
+                    });
                     let mut g = c.lock().unwrap();
                     match kq {
                         Ok(Some(p)) => {
@@ -185,16 +248,29 @@ impl TrangCloneGiong {
                 });
             }
             if crate::viet_hoa::giong_vieneu::tim_vieneu().is_none() {
-                ui.label(RichText::new("Không thấy app VieNeu (bản GPU) – cần để nghe thử.").color(Color32::YELLOW));
+                ui.label(
+                    RichText::new("Không thấy app VieNeu (bản GPU) – cần để nghe thử.")
+                        .color(Color32::YELLOW),
+                );
             }
         });
 
         the(ui, "3. LƯU VÀO KHO GIỌNG", |ui| {
             ui.horizontal(|ui| {
                 ui.label("Tên giọng:");
-                ui.add(egui::TextEdit::singleline(&mut self.ten_luu).desired_width(220.0).hint_text("vd nam_tre_2"));
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.ten_luu)
+                        .desired_width(220.0)
+                        .hint_text("vd nam_tre_2"),
+                );
                 crate::kieu::cong_tac(ui, &mut self.ghi_de, "ghi đè nếu trùng tên");
-                if ui.add_enabled(co_mau && !self.ten_luu.trim().is_empty(), egui::Button::new("Lưu")).clicked() {
+                if ui
+                    .add_enabled(
+                        co_mau && !self.ten_luu.trim().is_empty(),
+                        egui::Button::new("Lưu"),
+                    )
+                    .clicked()
+                {
                     let m = self.c.lock().unwrap().mau.clone().unwrap_or_default();
                     let tb = match cg::luu(&self.ten_luu, &m, self.ghi_de) {
                         Ok(p) => format!("Đã lưu {}", p.display()),
@@ -204,7 +280,11 @@ impl TrangCloneGiong {
                     self.kho = cg::liet_ke();
                 }
             });
-            ui.label(RichText::new(format!("Kho: {}", cg::kho_giong().display())).small().weak());
+            ui.label(
+                RichText::new(format!("Kho: {}", cg::kho_giong().display()))
+                    .small()
+                    .weak(),
+            );
         });
 
         the(ui, "4. GÁN GIỌNG CHO NHÂN VẬT", |ui| {
@@ -218,7 +298,11 @@ impl TrangCloneGiong {
                         }
                     });
                 ui.label("Người nói:");
-                ui.add(egui::TextEdit::singleline(&mut self.nguoi).desired_width(200.0).hint_text("vd unique_kliff"));
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.nguoi)
+                        .desired_width(200.0)
+                        .hint_text("vd unique_kliff"),
+                );
                 egui::ComboBox::from_id_salt("clone_nguoi")
                     .selected_text("chọn có sẵn")
                     .show_ui(ui, |ui| {
@@ -229,26 +313,46 @@ impl TrangCloneGiong {
                         }
                     });
             });
-            ui.label(RichText::new("Giọng trong kho (bấm chọn, ▶ để nghe):").small().weak());
-            egui::ScrollArea::vertical().max_height(180.0).show(ui, |ui| {
-                for n in self.kho.clone() {
-                    ui.horizontal(|ui| {
-                        if ui.small_button("▶").clicked() {
-                            giong_doc::phat_wav(&cg::kho_giong().join(&n));
-                        }
-                        if ui.selectable_label(self.chon.as_deref() == Some(&n), &n).clicked() {
-                            self.chon = Some(n.clone());
-                        }
-                    });
-                }
-            });
+            ui.label(
+                RichText::new("Giọng trong kho (bấm chọn, ▶ để nghe):")
+                    .small()
+                    .weak(),
+            );
+            egui::ScrollArea::vertical()
+                .max_height(180.0)
+                .show(ui, |ui| {
+                    for n in self.kho.clone() {
+                        ui.horizontal(|ui| {
+                            if ui.small_button("▶").clicked() {
+                                giong_doc::phat_wav(&cg::kho_giong().join(&n));
+                            }
+                            if ui
+                                .selectable_label(self.chon.as_deref() == Some(&n), &n)
+                                .clicked()
+                            {
+                                self.chon = Some(n.clone());
+                            }
+                        });
+                    }
+                });
             ui.horizontal(|ui| {
                 if ui
-                    .add_enabled(self.chon.is_some() && !self.nguoi.trim().is_empty(), egui::Button::new(RichText::new("Gán giọng đã chọn").strong()))
+                    .add_enabled(
+                        self.chon.is_some() && !self.nguoi.trim().is_empty(),
+                        egui::Button::new(RichText::new("Gán giọng đã chọn").strong()),
+                    )
                     .clicked()
                 {
-                    let tb = match cg::gan(PHAN[self.phan].0, &self.nguoi, self.chon.as_deref().unwrap_or("")) {
-                        Ok(()) => format!("Đã gán {} cho {} – lần lồng tiếng sau sẽ dùng giọng này.", self.chon.clone().unwrap_or_default(), self.nguoi.trim()),
+                    let tb = match cg::gan(
+                        PHAN[self.phan].0,
+                        &self.nguoi,
+                        self.chon.as_deref().unwrap_or(""),
+                    ) {
+                        Ok(()) => format!(
+                            "Đã gán {} cho {} – lần lồng tiếng sau sẽ dùng giọng này.",
+                            self.chon.clone().unwrap_or_default(),
+                            self.nguoi.trim()
+                        ),
                         Err(e) => format!("Lỗi: {e}"),
                     };
                     self.c.lock().unwrap().thong_bao = tb;
@@ -261,7 +365,11 @@ impl TrangCloneGiong {
         });
 
         if !tb.is_empty() {
-            ui.label(if tb.starts_with("Lỗi") { RichText::new(tb).color(Color32::LIGHT_RED) } else { RichText::new(tb) });
+            ui.label(if tb.starts_with("Lỗi") {
+                RichText::new(tb).color(Color32::LIGHT_RED)
+            } else {
+                RichText::new(tb)
+            });
         }
     }
 }

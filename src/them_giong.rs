@@ -61,21 +61,33 @@ impl Default for ThemGiong {
 impl ThemGiong {
     /// Nút "+ Thêm giọng mẫu"; bấm thì mở cửa sổ.
     pub fn nut(&mut self, ui: &mut egui::Ui) {
-        if ui.button("+ Thêm giọng mẫu").on_hover_text("Thêm giọng từ file ghi âm vào kho giọng").clicked() {
+        if ui
+            .button("+ Thêm giọng mẫu")
+            .on_hover_text("Thêm giọng từ file ghi âm vào kho giọng")
+            .clicked()
+        {
             self.mo = true;
         }
         self.cua_so(ui.ctx());
     }
 
     fn xu_ly(&self) {
-        let (p, a, b) = (PathBuf::from(self.nguon.trim().trim_matches('"')), self.tu, self.den);
+        let (p, a, b) = (
+            PathBuf::from(self.nguon.trim().trim_matches('"')),
+            self.tu,
+            self.den,
+        );
         let tt = self.tt.clone();
         {
             let mut t = tt.lock().unwrap();
             if t.ban {
                 return;
             }
-            *t = Tt { ban: true, tb: "Đang đọc và xử lý file...".into(), ..Default::default() };
+            *t = Tt {
+                ban: true,
+                tb: "Đang đọc và xử lý file...".into(),
+                ..Default::default()
+            };
         }
         std::thread::spawn(move || {
             let kq = cg::doc_nguon(&p).and_then(|(x, ts)| cg::chuan_bi(&x, ts, a, b));
