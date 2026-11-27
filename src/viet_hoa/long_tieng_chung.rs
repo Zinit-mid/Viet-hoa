@@ -536,3 +536,28 @@ mod test {
         assert_eq!(goc, lai, "gỡ phải trả lại đúng từng byte");
     }
 }
+
+/// Đếm file âm thanh đóng gói (Wwise, FMOD, CRI...) trong thư mục game để báo lý do rõ ràng.
+pub fn dem_goi_am_thanh(thu_muc: &Path) -> Vec<(String, usize)> {
+    const GOI: [&str; 12] = ["wem", "bnk", "bank", "fsb", "pck", "awb", "acb", "xwb", "xsb", "snd", "sdt", "fsp"];
+    let mut dem: std::collections::BTreeMap<String, usize> = Default::default();
+    let mut cho = vec![thu_muc.to_path_buf()];
+    let mut so = 0usize;
+    while let Some(d) = cho.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                cho.push(p);
+            } else if let Some(x) = p.extension().map(|x| x.to_string_lossy().to_lowercase()) {
+                if GOI.contains(&x.as_str()) {
+                    *dem.entry(x).or_default() += 1;
+                }
+            }
+            so += 1;
+            if so > 400_000 {
+                return dem.into_iter().collect();
+            }
+        }
+    }
+    dem.into_iter().collect()
+}

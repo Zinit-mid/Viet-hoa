@@ -187,7 +187,12 @@ impl TrangLongTieng {
                         let t2 = tt.clone();
                         let clips = lt::quet(&dir, &move |s| t2.lock().unwrap().thong_bao = s.to_string(), dung);
                         if clips.is_empty() {
-                            anyhow::bail!("không thấy file âm thanh rời nào (có thể game đóng thoại trong gói riêng)");
+                            let goi = lt::dem_goi_am_thanh(&dir);
+                            if goi.is_empty() {
+                                anyhow::bail!("không thấy file âm thanh rời nào trong thư mục game (wav/ogg/mp3/flac/opus). Thoại có thể nằm trong gói .pak/.arc riêng, mục này chưa đọc được");
+                            }
+                            let ds: Vec<String> = goi.iter().map(|(x, n)| format!(".{x} ×{n}")).collect();
+                            anyhow::bail!("game này đóng âm thanh trong gói riêng ({}), không có file rời – mục này chưa làm được cho loại gói đó", ds.join(", "));
                         }
                         luu(&lv2, &clips);
                         let n = clips.len();
