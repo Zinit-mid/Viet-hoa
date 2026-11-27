@@ -144,10 +144,10 @@ impl TrangBanDo {
                 ui.label("Không có mục nào khớp.");
             }
         });
-        crate::kieu::khoi(ui, "XUẤT BẢNG THÚ CƯỠI (LÀM MOD BẮT NGỰA)", |ui| {
-            ui.label("Chỉ ĐỌC game, không sửa gì. Xuất bảng thú cưỡi, kịch bản và giao diện minigame bắt ngựa ra thư mục BangThuCuoi_CrimsonDesert trên Desktop. Có thư mục đó rồi, nhắn Claude để làm mod \"dễ bắt ngựa\" cho đúng bản game của bạn.");
+        crate::kieu::khoi(ui, "XUẤT BẢNG THÚ CƯỠI + RƯƠNG (LÀM MOD)", |ui| {
+            ui.label("Chỉ ĐỌC game, không sửa gì. Xuất bảng thú cưỡi, giao diện minigame bắt ngựa và bảng rương / biểu tượng bản đồ ra thư mục BangThuCuoi_CrimsonDesert trên Desktop. Có thư mục đó rồi, nhắn Claude để làm mod \"dễ bắt ngựa\" và mod rương cho đúng bản game của bạn.");
             let ban = *self.dang_xuat.lock().unwrap();
-            if ui.add_enabled(!ban, egui::Button::new(if ban { "Đang xuất..." } else { "Xuất bảng thú cưỡi" })).clicked() {
+            if ui.add_enabled(!ban, egui::Button::new(if ban { "Đang xuất..." } else { "Xuất bảng thú cưỡi + rương" })).clicked() {
                 let (tb, dx) = (self.tb.clone(), self.dang_xuat.clone());
                 *dx.lock().unwrap() = true;
                 *tb.lock().unwrap() = "Đang tìm game và xuất...".into();

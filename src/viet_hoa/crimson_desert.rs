@@ -479,6 +479,20 @@ pub fn xuat_bang_thu_cuoi(thu_muc_game: &Path, thu_ra: &Path, bao: &dyn Fn(&str)
         }
         Err(e) => bao(&format!("(bỏ qua giao diện rodeo: {e})")),
     }
+    // bảng rương / biểu tượng bản đồ (làm mod kiểu TreasureSeeker): tìm ở mọi nhóm
+    if let Ok(rd) = std::fs::read_dir(thu_muc_game) {
+        let mut nhom: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| p.join("0.pamt").is_file()).collect();
+        nhom.sort();
+        for n in nhom {
+            let Ok(ds) = cd::doc_pamt(&n.join("0.pamt")) else { continue };
+            for f in ds {
+                let co = f.ten == "levelgimmicksceneobjectinfo" || f.ten == "uimaptextureinfo";
+                if co && (f.duoi == ".pabgb" || f.duoi == ".pabgh") {
+                    ghi(&n, &f, "ruong_", &mut ra)?;
+                }
+            }
+        }
+    }
     if ra.is_empty() {
         return Err(anyhow!("không thấy bảng thú cưỡi trong nhóm 0008"));
     }
