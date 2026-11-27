@@ -74,8 +74,56 @@ fn vi_tri_dau(w: &[char]) -> Option<usize> {
     })
 }
 
-/// `truoc`: văn bản trước khi gõ, `c`: ký tự vừa gõ. Trả về văn bản mới nếu có biến đổi Telex.
-pub fn them_ky_tu(truoc: &str, c: char) -> Option<String> {
+#[derive(Clone, Copy, PartialEq)]
+pub enum Kieu {
+    Telex,
+    Vni,
+    Tat,
+}
+
+enum Lenh {
+    Thanh(usize),
+    /// ơ ư ă; chuỗi = các nguyên âm gốc được phép
+    Moc(&'static str),
+    /// â ê ô; Some(c) = (Telex) nguyên âm phải đứng ngay cuối từ
+    Mu(Option<char>),
+    D,
+}
+
+fn lenh(kieu: Kieu, c: char) -> Option<Lenh> {
+    let lc = c.to_lowercase().next()?;
+    match kieu {
+        Kieu::Telex => Some(match lc {
+            's' => Lenh::Thanh(2),
+            'f' => Lenh::Thanh(1),
+            'r' => Lenh::Thanh(3),
+            'x' => Lenh::Thanh(4),
+            'j' => Lenh::Thanh(5),
+            'z' => Lenh::Thanh(0),
+            'w' => Lenh::Moc("aou"),
+            'a' | 'e' | 'o' => Lenh::Mu(Some(lc)),
+            'd' => Lenh::D,
+            _ => return None,
+        }),
+        Kieu::Vni => Some(match lc {
+            '1' => Lenh::Thanh(2),
+            '2' => Lenh::Thanh(1),
+            '3' => Lenh::Thanh(3),
+            '4' => Lenh::Thanh(4),
+            '5' => Lenh::Thanh(5),
+            '0' => Lenh::Thanh(0),
+            '6' => Lenh::Mu(None),
+            '7' => Lenh::Moc("ou"),
+            '8' => Lenh::Moc("a"),
+            '9' => Lenh::D,
+            _ => return None,
+        }),
+        Kieu::Tat => None,
+    }
+}
+
+/// `truoc`: văn bản trước khi gõ, `c`: ký tự vừa gõ. Trả về văn bản mới nếu có biến đổi.
+pub fn them_ky_tu(truoc: &str, c: char, kieu: Kieu) -> Option<String> {
     let chars: Vec<char> = truoc.chars().collect();
     let dau = chars
         .iter()
@@ -83,46 +131,36 @@ pub fn them_ky_tu(truoc: &str, c: char) -> Option<String> {
         .map(|i| i + 1)
         .unwrap_or(0);
     let mut w: Vec<char> = chars[dau..].to_vec();
-    let lc = c.to_lowercase().next()?;
     let ra = |w: &[char]| -> String { chars[..dau].iter().chain(w.iter()).collect() };
-    let thanh = match lc {
-        's' => Some(2),
-        'f' => Some(1),
-        'r' => Some(3),
-        'x' => Some(4),
-        'j' => Some(5),
-        'z' => Some(0),
-        _ => None,
-    };
-    if let Some(t) = thanh {
-        let p = vi_tri_dau(&w)?;
-        let (h, cu) = giai(w[p])?;
-        if cu == t && t != 0 {
-            w[p] = ghep(w[p], h, 0);
-            w.push(c);
-        } else if t == 0 && cu == 0 {
-            return None;
-        } else {
-            w[p] = ghep(w[p], h, t);
+    match lenh(kieu, c)? {
+        Lenh::Thanh(t) => {
+            let p = vi_tri_dau(&w)?;
+            let (h, cu) = giai(w[p])?;
+            if cu == t && t != 0 {
+                w[p] = ghep(w[p], h, 0);
+                w.push(c);
+            } else if t == 0 && cu == 0 {
+                return None;
+            } else {
+                w[p] = ghep(w[p], h, t);
+            }
+            Some(ra(&w))
         }
-        return Some(ra(&w));
-    }
-    match lc {
-        'w' => {
+        Lenh::Moc(cho_phep) => {
             if w.is_empty() {
-                return Some(ra(&['ư'
-                    .to_uppercase()
-                    .next()
-                    .filter(|_| c.is_uppercase())
-                    .unwrap_or('ư')]));
+                return if kieu == Kieu::Telex {
+                    Some(ra(&[if c.is_uppercase() { 'Ư' } else { 'ư' }]))
+                } else {
+                    None
+                };
             }
             let p = (0..w.len())
                 .rev()
-                .find(|&i| giai(w[i]).is_some_and(|(h, _)| matches!(HANG[h].1, 'a' | 'o' | 'u')))?;
+                .find(|&i| giai(w[i]).is_some_and(|(h, _)| cho_phep.contains(HANG[h].1)))?;
             let (h, t) = giai(w[p])?;
             let base = HANG[h].1;
             if HANG[h].2 != 0 {
-                // đã có dấu mũ/móc → gõ w lần nữa là hủy
+                // đã có dấu mũ/móc → gõ lần nữa là hủy
                 let h0 = HANG.iter().position(|x| x.1 == base && x.2 == 0)?;
                 w[p] = ghep(w[p], h0, t);
                 w.push(c);
@@ -132,7 +170,7 @@ pub fn them_ky_tu(truoc: &str, c: char) -> Option<String> {
                 .iter()
                 .position(|x| x.1 == base && x.2 == if base == 'a' { 2 } else { 3 })?;
             w[p] = ghep(w[p], moi, t);
-            // "uo" + w → "ươ"
+            // "uo" + móc → "ươ"
             if base == 'o' && p > 0 && la_ban(&w, p - 1, 'u') {
                 if let Some((hu, tu)) = giai(w[p - 1]) {
                     if HANG[hu].2 == 0 {
@@ -143,15 +181,21 @@ pub fn them_ky_tu(truoc: &str, c: char) -> Option<String> {
             }
             Some(ra(&w))
         }
-        'a' | 'e' | 'o' => {
-            let p = w.len().checked_sub(1)?;
+        Lenh::Mu(yeu_cau) => {
+            let p = match yeu_cau {
+                Some(_) => w.len().checked_sub(1)?,
+                None => (0..w.len()).rev().find(|&i| {
+                    giai(w[i]).is_some_and(|(h, _)| matches!(HANG[h].1, 'a' | 'e' | 'o'))
+                })?,
+            };
             let (h, t) = giai(w[p])?;
-            if HANG[h].1 != lc {
+            let base = HANG[h].1;
+            if !matches!(base, 'a' | 'e' | 'o') || yeu_cau.is_some_and(|q| q != base) {
                 return None;
             }
             let (loai, moi) = match HANG[h].2 {
-                0 => (true, HANG.iter().position(|x| x.1 == lc && x.2 == 1)?),
-                1 => (false, HANG.iter().position(|x| x.1 == lc && x.2 == 0)?),
+                0 => (true, HANG.iter().position(|x| x.1 == base && x.2 == 1)?),
+                1 => (false, HANG.iter().position(|x| x.1 == base && x.2 == 0)?),
                 _ => return None,
             };
             w[p] = ghep(w[p], moi, t);
@@ -160,7 +204,7 @@ pub fn them_ky_tu(truoc: &str, c: char) -> Option<String> {
             }
             Some(ra(&w))
         }
-        'd' => {
+        Lenh::D => {
             let p = w.len().checked_sub(1)?;
             match w[p] {
                 'd' | 'D' => {
@@ -175,19 +219,18 @@ pub fn them_ky_tu(truoc: &str, c: char) -> Option<String> {
                 _ => None,
             }
         }
-        _ => None,
     }
 }
 
-/// Gọi sau mỗi lần ô nhập đổi: nếu chỉ gõ thêm đúng 1 ký tự ở cuối thì áp Telex. `truoc` luôn được cập nhật.
-pub fn ap_dung(text: &mut String, truoc: &mut String) {
+/// Gọi sau mỗi lần ô nhập đổi: nếu chỉ gõ thêm đúng 1 ký tự ở cuối thì áp bộ gõ. `truoc` luôn được cập nhật.
+pub fn ap_dung(text: &mut String, truoc: &mut String, kieu: Kieu) {
     if *text != *truoc {
         if let Some(c) = text
             .strip_prefix(truoc.as_str())
             .filter(|r| r.chars().count() == 1)
             .and_then(|r| r.chars().next())
         {
-            if let Some(moi) = them_ky_tu(truoc, c) {
+            if let Some(moi) = them_ky_tu(truoc, c, kieu) {
                 *text = moi;
             }
         }
@@ -199,12 +242,15 @@ pub fn ap_dung(text: &mut String, truoc: &mut String) {
 mod tests {
     use super::*;
     fn go(s: &str) -> String {
+        go_k(s, Kieu::Telex)
+    }
+    fn go_k(s: &str, k: Kieu) -> String {
         let mut t = String::new();
         for c in s.chars() {
             let mut n = t.clone();
             n.push(c);
             let mut p = t.clone();
-            ap_dung(&mut n, &mut p);
+            ap_dung(&mut n, &mut p, k);
             t = n;
         }
         t
@@ -222,5 +268,18 @@ mod tests {
         assert_eq!(go("looix"), "lỗi");
         assert_eq!(go("khoong"), "không");
         assert_eq!(go("ass"), "as");
+    }
+    #[test]
+    fn vni() {
+        let v = |s: &str| go_k(s, Kieu::Vni);
+        assert_eq!(v("tie6ng1 Vie6t5"), "tiếng Việt");
+        assert_eq!(v("ngu7o7i2"), "người");
+        assert_eq!(v("d9u7o7c5"), "được");
+        assert_eq!(v("hoa2"), "hòa");
+        assert_eq!(v("to6i"), "tôi");
+        assert_eq!(v("a8"), "ă");
+        assert_eq!(v("khong6"), "không");
+        assert_eq!(v("thuong7"), "thương");
+        assert_eq!(v("a11"), "a1");
     }
 }
