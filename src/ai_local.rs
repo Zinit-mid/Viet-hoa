@@ -262,6 +262,8 @@ pub struct TrangAi {
     loi_dan: String,
     chat: Arc<Mutex<Chat>>,
     o_nhap: String,
+    o_truoc: String,
+    telex: bool,
 }
 
 impl Default for TrangAi {
@@ -276,6 +278,8 @@ impl Default for TrangAi {
             loi_dan: String::new(),
             chat: Arc::new(Mutex::new(Chat::default())),
             o_nhap: String::new(),
+            o_truoc: String::new(),
+            telex: true,
         }
     }
 }
@@ -558,12 +562,25 @@ impl TrangAi {
                     }
                 });
             ui.add_space(6.0);
-            ui.add(
+            let r = ui.add(
                 egui::TextEdit::multiline(&mut self.o_nhap)
                     .desired_rows(3)
                     .desired_width(f32::INFINITY)
                     .hint_text("Nhập câu hỏi, Ctrl+Enter để gửi"),
             );
+            if r.changed() && self.telex {
+                crate::go_viet::ap_dung(&mut self.o_nhap, &mut self.o_truoc);
+                if let Some(mut st) = egui::TextEdit::load_state(ui.ctx(), r.id) {
+                    let n = self.o_nhap.chars().count();
+                    st.cursor.set_char_range(Some(egui::text::CCursorRange::one(
+                        egui::text::CCursor::new(n),
+                    )));
+                    st.store(ui.ctx(), r.id);
+                }
+            } else {
+                self.o_truoc = self.o_nhap.clone();
+            }
+            ui.checkbox(&mut self.telex, "Gõ tiếng Việt kiểu Telex ngay trong ô này (aa=â, ow=ơ, dd=đ, s/f/r/x/j = dấu). Tắt nếu bạn đã gõ được bằng Unikey.");
             let phim = ui.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::Enter));
             ui.horizontal(|ui| {
                 let gui = ui
