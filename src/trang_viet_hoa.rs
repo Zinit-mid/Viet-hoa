@@ -437,6 +437,7 @@ impl TrangVietHoa {
                     if thu { "Đang lồng thử" } else { "Đang lồng tiếng" },
                     move |x, bc| {
                         let _thuc = duong_dan::GiuMayThuc::moi();
+                        let _ai = crate::ai_local::KhoaLongTieng::vao().map_err(|e| e.to_string())?;
                         let dung = x.viec.dung.clone();
                         dung.store(false, Ordering::SeqCst);
                         let kq = x
@@ -607,6 +608,7 @@ impl TrangVietHoa {
                 let phan = if k == "long_a" { 'A' } else { 'B' };
                 self.chay_cd("Đang lồng tiếng", move |cd, bc| {
                     let _thuc = duong_dan::GiuMayThuc::moi();
+                    let _ai = crate::ai_local::KhoaLongTieng::vao().map_err(|e| e.to_string())?;
                     let dung = cd.viec.dung.clone();
                     dung.store(false, Ordering::SeqCst);
                     let lv = crate::viet_hoa::tomb_raider::thu_muc_lam_viec(&cd.thu_muc_game);

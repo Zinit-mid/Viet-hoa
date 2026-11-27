@@ -85,6 +85,7 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
                 ra.push(format!("Gói chữ ({n} câu) ra Desktop: {}", vcd::TEN_GOI));
             }
             if t.long_tieng {
+                let _ai = crate::ai_local::KhoaLongTieng::vao()?;
                 if giong_vieneu::tim_vieneu().is_none() || wwise::tim_wwise_console().is_none() {
                     bail!("lồng tiếng cần app VieNeu (GPU) và Wwise (WwiseConsole.exe) trên máy");
                 }
@@ -121,6 +122,7 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
                 }
             }
             if t.long_tieng && loai != LoaiTr::Shadow {
+                let _ai = crate::ai_local::KhoaLongTieng::vao()?;
                 let kq = x.long_tieng(false, 4.0, dung, bc.bao, &|a, b, s| {
                     (bc.tien)(a, b, 0.0);
                     (bc.bao)(&format!("{s} ({a}/{b})"));

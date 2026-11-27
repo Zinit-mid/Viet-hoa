@@ -764,6 +764,30 @@ impl ViecDich {
                 }
             }
         }
+        // vẫn còn câu hỏng: nhờ AI local (nếu Ollama đang chạy và không đang lồng tiếng)
+        let con_hong: Vec<String> = self.cau_can_dich(ds.iter().map(String::as_str)).into_iter().map(|s| s.to_string()).collect();
+        if !con_hong.is_empty() && !self.dung.load(Ordering::SeqCst) && crate::ai_local::san_sang() {
+            bc.bao(&format!("{} câu còn lại – thử bằng AI local...", con_hong.len()));
+            let dich_ai = |cau: &[String]| -> Result<Vec<String>> {
+                let ra = crate::ai_local::dich_lo(cau)?;
+                Ok(ra.into_iter().zip(cau).map(|(v, en)| crate::dich::the::bo_lap_doi(en, &v)).collect())
+            };
+            for lo in con_hong.chunks(12) {
+                if self.dung.load(Ordering::SeqCst) {
+                    break;
+                }
+                let Ok(kq) = offline_lo(lo, &dich_ai) else { continue };
+                let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
+                for (en, vi) in lo.iter().zip(kq) {
+                    if let Some(vi) = vi {
+                        if (self.the)(en) == (self.the)(&vi) && !crate::dich::the::bi_lap(en, &vi) {
+                            bn.insert(en.clone(), crate::dich::ap_dung_sua(&vi));
+                            self.da_doi += 1;
+                        }
+                    }
+                }
+            }
+        }
         self.luu()?;
         let con = self.cau_can_dich(ds.iter().map(String::as_str));
         self.loi = con.len();

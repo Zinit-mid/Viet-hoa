@@ -318,6 +318,7 @@ impl TrangLongTieng {
                     let (dir, lv2, gan) = (g.thu_muc.clone(), lv.clone(), self.gan.clone());
                     let gan: HashMap<String, PathBuf> = gan.into_iter().map(|(k, v)| (k, clone_giong::kho_giong().join(v))).collect();
                     self.nen("Đang lồng tiếng", move |tt, dung| {
+                        let _ai = crate::ai_local::KhoaLongTieng::vao()?;
                         let clips = tt.lock().unwrap().clips.clone();
                         let (t1, t2) = (tt.clone(), tt.clone());
                         let kq = lt::long_tieng(

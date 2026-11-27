@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 //! Việt Hóa – dịch màn hình game Anh→Việt, Việt hóa file game, lồng tiếng, phụ đề phim.
 
+mod ai_local;
 mod cap_nhat;
 mod cau_hinh;
 mod che_mau;
