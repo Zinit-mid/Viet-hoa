@@ -9,9 +9,21 @@ use eframe::egui::{self, Color32, RichText};
 use crate::viet_hoa::tim_game::{self, LoaiGame};
 
 const BAN_DO_ONLINE: &[(&str, &str, &str)] = &[
-    ("Bản đồ MapMaster", "Lọc rương, thú cưỡi, trang bị", "https://mapmaster.io/games/crimson-desert/maps/crimson-desert"),
-    ("Bản đồ th.gl", "Có app overlay đè lên game", "https://crimsondesert.th.gl/"),
-    ("Danh sách rương", "Rương + két sắt và phần thưởng", "https://thegameswiki.com/crimson-desert/wiki/treasure-chest-locations"),
+    (
+        "Bản đồ MapMaster",
+        "Lọc rương, thú cưỡi, trang bị",
+        "https://mapmaster.io/games/crimson-desert/maps/crimson-desert",
+    ),
+    (
+        "Bản đồ th.gl",
+        "Có app overlay đè lên game",
+        "https://crimsondesert.th.gl/",
+    ),
+    (
+        "Danh sách rương",
+        "Rương + két sắt và phần thưởng",
+        "https://thegameswiki.com/crimson-desert/wiki/treasure-chest-locations",
+    ),
 ];
 
 const NHOM: &[(&str, &str)] = &[
@@ -82,12 +94,19 @@ pub struct TrangBanDo {
 
 impl Default for TrangBanDo {
     fn default() -> Self {
-        Self { nhom: "tat_ca", tim: String::new(), tb: Arc::new(Mutex::new(String::new())), dang_xuat: Arc::new(Mutex::new(false)) }
+        Self {
+            nhom: "tat_ca",
+            tim: String::new(),
+            tb: Arc::new(Mutex::new(String::new())),
+            dang_xuat: Arc::new(Mutex::new(false)),
+        }
     }
 }
 
 fn mo_web(url: &str) {
-    let _ = std::process::Command::new("cmd").args(["/c", "start", "", url]).spawn();
+    let _ = std::process::Command::new("cmd")
+        .args(["/c", "start", "", url])
+        .spawn();
 }
 
 impl TrangBanDo {
@@ -115,7 +134,11 @@ impl TrangBanDo {
             });
             ui.horizontal(|ui| {
                 ui.label("Tìm:");
-                ui.add(egui::TextEdit::singleline(&mut self.tim).desired_width(260.0).hint_text("tên, vùng, vị trí..."));
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.tim)
+                        .desired_width(260.0)
+                        .hint_text("tên, vùng, vị trí..."),
+                );
             });
             ui.add_space(6.0);
             let tim = self.tim.trim().to_lowercase();
@@ -124,7 +147,11 @@ impl TrangBanDo {
                 if self.nhom != "tat_ca" && self.nhom != *nhom {
                     continue;
                 }
-                if !tim.is_empty() && ![ten, vung, vi_tri, cach].iter().any(|s| s.to_lowercase().contains(&tim)) {
+                if !tim.is_empty()
+                    && ![ten, vung, vi_tri, cach]
+                        .iter()
+                        .any(|s| s.to_lowercase().contains(&tim))
+                {
                     continue;
                 }
                 dem += 1;
@@ -136,7 +163,9 @@ impl TrangBanDo {
                     }
                     ui.label(format!("Vị trí: {vi_tri}"));
                     if !cach.is_empty() {
-                        ui.label(RichText::new(format!("Cách lấy: {cach}")).color(crate::kieu::CHU_MO));
+                        ui.label(
+                            RichText::new(format!("Cách lấy: {cach}")).color(crate::kieu::CHU_MO),
+                        );
                     }
                 });
             }
@@ -144,10 +173,62 @@ impl TrangBanDo {
                 ui.label("Không có mục nào khớp.");
             }
         });
+        crate::kieu::khoi(ui, "MOD HIỆN RƯƠNG TRÊN BẢN ĐỒ", |ui| {
+            ui.label("Tạo mod cho đúng bản game đang cài (game cập nhật thì bấm tạo lại). Ra thư mục Mod_HienRuong trên Desktop gồm 9 mức 15…3000 m: chép cả thư mục vào mods của DMM, bật MỘT mức, tắt TreasureSeeker, thoát game rồi Mount Mods.");
+            let ban = *self.dang_xuat.lock().unwrap();
+            if ui
+                .add_enabled(
+                    !ban,
+                    egui::Button::new(if ban {
+                        "Đang tạo..."
+                    } else {
+                        "Tạo mod hiện rương"
+                    }),
+                )
+                .clicked()
+            {
+                let (tb, dx) = (self.tb.clone(), self.dang_xuat.clone());
+                *dx.lock().unwrap() = true;
+                *tb.lock().unwrap() = "Đang đọc game...".into();
+                std::thread::spawn(move || {
+                    let kq = (|| -> anyhow::Result<String> {
+                        let game = tim_game::tim_tat_ca()
+                            .into_iter()
+                            .find(|g| g.loai() == LoaiGame::CrimsonDesert)
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "không tìm thấy Crimson Desert (thêm game trong Thư viện game)"
+                                )
+                            })?;
+                        let ra = crate::duong_dan::desktop().join("Mod_HienRuong");
+                        let bc =
+                            crate::viet_hoa::crimson_desert::tao_mod_ruong(&game.thu_muc, &ra)?;
+                        crate::duong_dan::mo_explorer(&ra);
+                        Ok(format!(
+                            "Đã tạo 9 mod ở {}\n{}",
+                            ra.display(),
+                            bc.join("\n")
+                        ))
+                    })();
+                    *tb.lock().unwrap() = kq.unwrap_or_else(|e| format!("Lỗi: {e}"));
+                    *dx.lock().unwrap() = false;
+                });
+            }
+        });
         crate::kieu::khoi(ui, "XUẤT BẢNG THÚ CƯỠI + RƯƠNG (LÀM MOD)", |ui| {
             ui.label("Chỉ ĐỌC game, không sửa gì. Xuất bảng thú cưỡi, giao diện minigame bắt ngựa và bảng rương / biểu tượng bản đồ ra thư mục BangThuCuoi_CrimsonDesert trên Desktop. Có thư mục đó rồi, nhắn Claude để làm mod \"dễ bắt ngựa\" và mod rương cho đúng bản game của bạn.");
             let ban = *self.dang_xuat.lock().unwrap();
-            if ui.add_enabled(!ban, egui::Button::new(if ban { "Đang xuất..." } else { "Xuất bảng thú cưỡi + rương" })).clicked() {
+            if ui
+                .add_enabled(
+                    !ban,
+                    egui::Button::new(if ban {
+                        "Đang xuất..."
+                    } else {
+                        "Xuất bảng thú cưỡi + rương"
+                    }),
+                )
+                .clicked()
+            {
                 let (tb, dx) = (self.tb.clone(), self.dang_xuat.clone());
                 *dx.lock().unwrap() = true;
                 *tb.lock().unwrap() = "Đang tìm game và xuất...".into();
@@ -156,10 +237,18 @@ impl TrangBanDo {
                         let game = tim_game::tim_tat_ca()
                             .into_iter()
                             .find(|g| g.loai() == LoaiGame::CrimsonDesert)
-                            .ok_or_else(|| anyhow::anyhow!("không tìm thấy Crimson Desert (thêm game trong Thư viện game)"))?;
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "không tìm thấy Crimson Desert (thêm game trong Thư viện game)"
+                                )
+                            })?;
                         let ra = crate::duong_dan::desktop().join("BangThuCuoi_CrimsonDesert");
                         let tb2 = tb.clone();
-                        let ds = crate::viet_hoa::crimson_desert::xuat_bang_thu_cuoi(&game.thu_muc, &ra, &|s| *tb2.lock().unwrap() = s.to_string())?;
+                        let ds = crate::viet_hoa::crimson_desert::xuat_bang_thu_cuoi(
+                            &game.thu_muc,
+                            &ra,
+                            &|s| *tb2.lock().unwrap() = s.to_string(),
+                        )?;
                         Ok(format!("Đã xuất {} file ra {}", ds.len(), ra.display()))
                     })();
                     *tb.lock().unwrap() = kq.unwrap_or_else(|e| format!("Lỗi: {e}"));

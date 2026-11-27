@@ -285,6 +285,133 @@ impl CrimsonDesert {
     }
 }
 
+/// Bảng chỉ mục của file .staticinfoheader: (tên bản ghi, vị trí, cỡ). Thử các độ rộng số đếm / mã khác nhau
+/// (mỗi bảng một kiểu) và nhận kiểu khớp đúng hết file.
+fn doc_chi_muc(h: &[u8]) -> Option<Vec<(String, usize, usize)>> {
+    let rd = |o: usize, n: usize| -> Option<usize> {
+        let s = h.get(o..o + n)?;
+        Some(
+            s.iter()
+                .enumerate()
+                .fold(0usize, |v, (i, b)| v | ((*b as usize) << (8 * i))),
+        )
+    };
+    for cw in [2usize, 4] {
+        for kw in [2usize, 4] {
+            let Some(n) = rd(0, cw) else { continue };
+            let (mut p, mut ra, mut ok) = (cw, Vec::new(), true);
+            for _ in 0..n {
+                let Some(l) = rd(p + kw, 4).filter(|l| *l < 300) else {
+                    ok = false;
+                    break;
+                };
+                let (Some(nm), Some(o), Some(sz)) = (
+                    h.get(p + kw + 4..p + kw + 4 + l),
+                    rd(p + kw + 4 + l, 4),
+                    rd(p + kw + 8 + l, 4),
+                ) else {
+                    ok = false;
+                    break;
+                };
+                ra.push((String::from_utf8_lossy(nm).into_owned(), o, sz));
+                p += kw + 12 + l;
+            }
+            if ok && p == h.len() {
+                return Some(ra);
+            }
+        }
+    }
+    None
+}
+
+/// Tạo mod "hiện rương trên bản đồ" cho đúng bản game đang cài (9 mức: 15…3000 m), JSON vá byte cho DMM.
+/// Tìm bản ghi theo TÊN nên game cập nhật chỉ cần bấm tạo lại. Bật MỘT mức duy nhất trong DMM.
+pub fn tao_mod_ruong(thu_muc_game: &Path, thu_ra: &Path) -> Result<Vec<String>> {
+    let nhom = thu_muc_game.join("0008");
+    let ds = cd::doc_pamt(&nhom.join("0.pamt"))?;
+    let doc = |ten: &str| -> Result<(Vec<u8>, Vec<(String, usize, usize)>)> {
+        let tim = |duoi: &str| {
+            ds.iter()
+                .find(|f| f.ten == ten && f.duoi == duoi)
+                .ok_or_else(|| anyhow!("không thấy {ten}{duoi} trong nhóm 0008"))
+        };
+        let b = cd::doc_tep(&nhom, tim(".staticinfobody")?)?;
+        let h = cd::doc_tep(&nhom, tim(".staticinfoheader")?)?;
+        let ci = doc_chi_muc(&h)
+            .ok_or_else(|| anyhow!("không đọc được chỉ mục {ten} (game đổi cấu trúc)"))?;
+        Ok((b, ci))
+    };
+    let mut bao = Vec::new();
+    // 1. rương: số thực "bán kính hiện" (mặc định 2.0) trong bản ghi TreasureBox / TreasureBox_Sector
+    let (lg, ci) = doc("levelgimmicksceneobjectinfo")?;
+    let mut vt_kc: Vec<usize> = Vec::new();
+    for ten in ["TreasureBox", "TreasureBox_Sector"] {
+        let (_, o, sz) = ci
+            .iter()
+            .find(|x| x.0 == ten)
+            .ok_or_else(|| anyhow!("không thấy bản ghi {ten}"))?;
+        let r = lg
+            .get(*o..*o + *sz)
+            .ok_or_else(|| anyhow!("bản ghi {ten} hỏng"))?;
+        let i = (30..r.len().saturating_sub(4).min(90))
+            .find(|&i| r[i..i + 4] == [0, 0, 0, 0x40])
+            .ok_or_else(|| anyhow!("không thấy bán kính hiện trong {ten} (game đổi cấu trúc)"))?;
+        vt_kc.push(*o + i);
+        bao.push(format!("+ {ten}: bán kính hiện ở byte {}", *o + i));
+    }
+    // 2. biểu tượng bản đồ: lớp bản đồ (byte 36) và cờ tự chuyển lớp vực sâu (byte 38)
+    let (um, ci) = doc("uimaptextureinfo")?;
+    let mut lop: Vec<(usize, String, u8, u8)> = Vec::new();
+    for ten in ["Gimmick_LevelTreasureBox", "Gimmick_LevelTreasureBoxOpened"] {
+        let (_, o, sz) = ci
+            .iter()
+            .find(|x| x.0 == ten)
+            .ok_or_else(|| anyhow!("không thấy biểu tượng {ten}"))?;
+        if *sz < 40 || um.len() < *o + 40 {
+            return Err(anyhow!("biểu tượng {ten} lạ"));
+        }
+        let (l, c) = (um[*o + 36], um[*o + 38]);
+        if l > 5 || c > 1 {
+            return Err(anyhow!(
+                "biểu tượng {ten}: giá trị lạ ({l}/{c}) – game đổi cấu trúc"
+            ));
+        }
+        lop.push((*o, ten.to_string(), l, c));
+        bao.push(format!("+ {ten}: lớp {l}, tự chuyển {c}"));
+    }
+    std::fs::create_dir_all(thu_ra)?;
+    for m in [15u32, 30, 50, 100, 200, 500, 1000, 2000, 3000] {
+        let f = hex_bytes(&(m as f32).to_le_bytes());
+        let c1: Vec<serde_json::Value> = vt_kc
+                .iter()
+                .map(|o| serde_json::json!({"offset": o, "label": format!("Rương: khoảng hiện trên bản đồ -> {m} m"), "original": "00000040", "patched": f}))
+                .collect();
+        let mut c2: Vec<serde_json::Value> = Vec::new();
+        for (o, n, l, c) in &lop {
+            c2.push(serde_json::json!({"offset": o + 36, "label": format!("{n}: lớp bản đồ {l} -> 5"), "original": format!("{l:02X}"), "patched": "05"}));
+            c2.push(serde_json::json!({"offset": o + 38, "label": format!("{n}: tắt tự chuyển lớp vực sâu"), "original": format!("{c:02X}"), "patched": "00"}));
+        }
+        let j = serde_json::json!({
+            "name": format!("Hiện rương trên bản đồ – {m}m"), "version": "CD2.06", "author": "Việt Hóa",
+            "description": format!("Rương chưa mở hiện trong bán kính {m} m trên bản đồ. Chỉ bật MỘT bản."),
+            "dmm_v3upgrade_disable": "true",
+            "patches": [
+                {"game_file": "gamedata/levelgimmicksceneobjectinfo.staticinfobody", "changes": c1},
+                {"game_file": "gamedata/uimaptextureinfo.staticinfobody", "changes": c2}
+            ]
+        });
+        duong_dan::ghi_file(
+            &thu_ra.join(format!("RuongHien_{m}m.json")),
+            serde_json::to_string_pretty(&j)?.as_bytes(),
+        )?;
+    }
+    Ok(bao)
+}
+
+fn hex_bytes(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{x:02X}")).collect()
+}
+
 /// Ô chứa đồ: (tên Việt, tên bản ghi, loại "tui" = tối đa an toàn 732 | "kho" = 1440)
 const O_CHUA: &[(&str, &str, &str)] = &[
     ("Túi đồ (balo)", "Character", "tui"),
@@ -310,7 +437,10 @@ pub struct OChua {
 /// Bố cục game 2.06: tên bản ghi nằm trong file header
 /// [u16 số bản ghi]{[u16 mã][u32 dài][tên][u32 vị trí][u32 cỡ]}; bản ghi = [u16 mã][...][3 byte cờ][u16 mặc định][4 byte][u16 tối đa].
 fn tim_theo_header(b: &[u8], h: &[u8], ten: &str) -> Option<(usize, usize)> {
-    let rd32 = |o: usize| h.get(o..o + 4).map(|x| u32::from_le_bytes(x.try_into().unwrap()) as usize);
+    let rd32 = |o: usize| {
+        h.get(o..o + 4)
+            .map(|x| u32::from_le_bytes(x.try_into().unwrap()) as usize)
+    };
     let n = u16::from_le_bytes([*h.first()?, *h.get(1)?]) as usize;
     let mut p = 2;
     for _ in 0..n {
@@ -320,7 +450,8 @@ fn tim_theo_header(b: &[u8], h: &[u8], ten: &str) -> Option<(usize, usize)> {
         p += 14 + l;
         if nm == ten.as_bytes() {
             let r = b.get(o..o + c)?;
-            let i = (6..16.min(r.len().saturating_sub(3))).find(|&i| r[i..i + 3] == [1, 1, 1] || r[i..i + 3] == [1, 0, 1])?;
+            let i = (6..16.min(r.len().saturating_sub(3)))
+                .find(|&i| r[i..i + 3] == [1, 1, 1] || r[i..i + 3] == [1, 0, 1])?;
             let a = o + i + 3;
             return (a + 8 <= b.len()).then_some((a, a + 6));
         }
@@ -337,11 +468,20 @@ pub fn tim_o_chua(b: &[u8], header: Option<&[u8]>) -> (Vec<OChua>, Vec<String>) 
         if let Some((vd, vm)) = header.and_then(|h| tim_theo_header(b, h, ten)) {
             let (md, td) = (u16_at(vd), u16_at(vm));
             if !(1 <= md && md <= td && td <= 5000) {
-                bao_cao.push(format!("- {ten_viet}: số ô lạ ({md}/{td}) – game đổi cấu trúc"));
+                bao_cao.push(format!(
+                    "- {ten_viet}: số ô lạ ({md}/{td}) – game đổi cấu trúc"
+                ));
                 continue;
             }
             bao_cao.push(format!("+ {ten_viet}: {md} ô (tối đa {td})"));
-            kq.push(OChua { ten_viet, vt_mac_dinh: vd, mac_dinh: md, vt_toi_da: vm, toi_da: td, loai });
+            kq.push(OChua {
+                ten_viet,
+                vt_mac_dinh: vd,
+                mac_dinh: md,
+                vt_toi_da: vm,
+                toi_da: td,
+                loai,
+            });
             continue;
         }
         let vt = b.windows(ma.len()).enumerate().find_map(|(i, w)| {
@@ -471,17 +611,27 @@ mod tests {
 
 /// Chỉ ĐỌC game: giải nén bảng thú cưỡi / minigame thuần hóa ngựa ra `thu_ra` để phân tích
 /// (nhóm 0008: bảng tĩnh; 0014: kịch bản rodeo; 0012: giao diện minigame ngựa).
-pub fn xuat_bang_thu_cuoi(thu_muc_game: &Path, thu_ra: &Path, bao: &dyn Fn(&str)) -> Result<Vec<String>> {
-    const BANG: [&str; 4] = ["vehicleinfo", "minigamedatainfo", "characterinfo", "knowledgeinfo"];
+pub fn xuat_bang_thu_cuoi(
+    thu_muc_game: &Path,
+    thu_ra: &Path,
+    bao: &dyn Fn(&str),
+) -> Result<Vec<String>> {
+    const BANG: [&str; 4] = [
+        "vehicleinfo",
+        "minigamedatainfo",
+        "characterinfo",
+        "knowledgeinfo",
+    ];
     std::fs::create_dir_all(thu_ra)?;
     let mut ra = Vec::new();
-    let mut ghi = |nhom: &Path, f: &cd::TepPamt, tien_to: &str, ra: &mut Vec<String>| -> Result<()> {
-        bao(&format!("Đang xuất {}{}...", f.ten, f.duoi));
-        let ten = format!("{tien_to}{}{}", f.ten, f.duoi);
-        std::fs::write(thu_ra.join(&ten), cd::doc_tep(nhom, f)?)?;
-        ra.push(ten);
-        Ok(())
-    };
+    let mut ghi =
+        |nhom: &Path, f: &cd::TepPamt, tien_to: &str, ra: &mut Vec<String>| -> Result<()> {
+            bao(&format!("Đang xuất {}{}...", f.ten, f.duoi));
+            let ten = format!("{tien_to}{}{}", f.ten, f.duoi);
+            std::fs::write(thu_ra.join(&ten), cd::doc_tep(nhom, f)?)?;
+            ra.push(ten);
+            Ok(())
+        };
     let n8 = thu_muc_game.join("0008");
     for f in cd::doc_pamt(&n8.join("0.pamt"))? {
         let ten = f.ten.strip_prefix("bin").unwrap_or(&f.ten);
@@ -493,8 +643,14 @@ pub fn xuat_bang_thu_cuoi(thu_muc_game: &Path, thu_ra: &Path, bao: &dyn Fn(&str)
     match cd::doc_pamt(&n14.join("0.pamt")) {
         Ok(ds) => {
             for f in ds {
-                if f.ten.contains("minigame_rodeo") && [".paseq", ".paseqc", ".pastage"].contains(&f.duoi.as_str()) {
-                    let t = if f.thu_muc.contains("binary__") { "bin_" } else { "goc_" };
+                if f.ten.contains("minigame_rodeo")
+                    && [".paseq", ".paseqc", ".pastage"].contains(&f.duoi.as_str())
+                {
+                    let t = if f.thu_muc.contains("binary__") {
+                        "bin_"
+                    } else {
+                        "goc_"
+                    };
                     ghi(&n14, &f, t, &mut ra)?;
                 }
             }
@@ -516,13 +672,29 @@ pub fn xuat_bang_thu_cuoi(thu_muc_game: &Path, thu_ra: &Path, bao: &dyn Fn(&str)
     }
     // bảng rương / biểu tượng bản đồ (làm mod kiểu TreasureSeeker): tìm ở mọi nhóm
     if let Ok(rd) = std::fs::read_dir(thu_muc_game) {
-        let mut nhom: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| p.join("0.pamt").is_file()).collect();
+        let mut nhom: Vec<PathBuf> = rd
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.join("0.pamt").is_file())
+            .collect();
         nhom.sort();
         for n in nhom {
-            let Ok(ds) = cd::doc_pamt(&n.join("0.pamt")) else { continue };
+            let Ok(ds) = cd::doc_pamt(&n.join("0.pamt")) else {
+                continue;
+            };
             for f in ds {
-                let co = ["levelgimmicksceneobjectinfo", "uimaptextureinfo", "inventory"].contains(&f.ten.as_str());
-                if co && (f.duoi == ".staticinfobody" || f.duoi == ".staticinfoheader" || f.duoi == ".pabgb" || f.duoi == ".pabgh") {
+                let co = [
+                    "levelgimmicksceneobjectinfo",
+                    "uimaptextureinfo",
+                    "inventory",
+                ]
+                .contains(&f.ten.as_str());
+                if co
+                    && (f.duoi == ".staticinfobody"
+                        || f.duoi == ".staticinfoheader"
+                        || f.duoi == ".pabgb"
+                        || f.duoi == ".pabgh")
+                {
                     ghi(&n, &f, "ruong_", &mut ra)?;
                 }
             }
