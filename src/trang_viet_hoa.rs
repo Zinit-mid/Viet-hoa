@@ -1018,12 +1018,8 @@ impl TrangVietHoa {
                     ui.selectable_value(&mut self.gioi_han, g, format!("{g:.0} USD"));
                 }
             });
-            if !dich::claude::co_khoa() {
-                ui.label(
-                    RichText::new("Claude đang tắt hoặc chưa có mã API (Cài đặt > Mã API).")
-                        .small()
-                        .weak(),
-                );
+            if let Some(ly) = dich::claude::ly_do_khong_dung() {
+                ui.label(RichText::new(ly).small().color(Color32::YELLOW));
             }
             ui.add_space(4.0);
             ui.label(RichText::new("Tự dịch bằng Excel:").small());

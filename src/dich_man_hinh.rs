@@ -203,7 +203,7 @@ fn thuc_hien_dich(job: ViecDich, st: &TT, gui: &Sender<Hien>) {
             luc,
         });
     };
-    let che_do = if che_do == "claude" && !dich::claude::co_khoa() {
+    let che_do = if che_do == "claude" && !dich::claude::co_bat() {
         "offline_claude".to_string()
     } else {
         che_do
@@ -540,7 +540,7 @@ fn cap_nhat_doan(
         });
     }
     // Đoạn tồn tại ≥ 2 lần quét: Claude dịch lô (lưu bộ nhớ)
-    if che_do != "google" && che_do != "offline" && dich::claude::co_khoa() {
+    if che_do != "google" && che_do != "offline" && dich::claude::co_bat() {
         let lo: Vec<String> = doan
             .iter_mut()
             .filter(|p| p.lan_thay >= 2 && !p.da_claude)

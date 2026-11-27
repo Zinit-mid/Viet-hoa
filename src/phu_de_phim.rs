@@ -277,47 +277,75 @@ impl ViecPhim {
                 s
             })
         });
+        let stdout = con.stdout.take().unwrap();
+        let con = std::sync::Mutex::new(con);
+        let xong = AtomicBool::new(false);
         let mut kq = PyKq::default();
         let mut cuoi: Vec<String> = Vec::new();
         let mut nk = std::fs::OpenOptions::new().create(true).append(true).open(self.tm.join("nhat_ky.txt"))?;
-        for dong in BufReader::new(con.stdout.take().unwrap()).lines() {
-            let d = dong.unwrap_or_default();
-            use std::io::Write;
-            let _ = writeln!(nk, "{d}");
-            if dung.load(Ordering::Relaxed) {
-                let _ = con.kill();
-                let _ = con.wait();
-                bail!("đã dừng");
-            }
-            let (k, v) = d.split_once(' ').unwrap_or((d.as_str(), ""));
-            let so = |s: &str| s.parse::<f64>().unwrap_or(0.0);
-            match k {
-                "TAI" => tien_do("tai", so(v), 100.0),
-                "FILE" => kq.file = serde_json::from_str(v).ok(),
-                "TIEN" => {
-                    let mut t = v.split_whitespace();
-                    tien_do("nghe", so(t.next().unwrap_or("0")), so(t.next().unwrap_or("0")));
-                }
-                "THIET_BI" => {
-                    kq.thiet_bi = Some(v.to_string());
-                    bao(if v == "cuda" { "Đang nghe tiếng bằng card màn hình..." } else { "Đang nghe tiếng bằng CPU (chậm hơn nhiều)..." });
-                }
-                "KHONG_CUDA" => kq.khong_cuda = true,
-                "GIAI_MA" => bao("Đang tách âm thanh khỏi phim..."),
-                "NGON_NGU" => kq.ngon_ngu = v.split_whitespace().next().map(String::from),
-                _ if !d.trim().is_empty() => {
-                    cuoi.push(d.clone());
-                    if cuoi.len() > 5 {
-                        cuoi.remove(0);
+        let mut bi_dung = false;
+        std::thread::scope(|sc| {
+            // Canh nút Dừng riêng: bấm Dừng là giết tiến trình ngay, không đợi nó in thêm dòng
+            // (trước đây lúc tải / nạp mô hình im lặng thì bấm Dừng không có tác dụng).
+            sc.spawn(|| {
+                while !xong.load(Ordering::Relaxed) {
+                    if dung.load(Ordering::Relaxed) {
+                        let _ = con.lock().unwrap().kill();
+                        return;
                     }
+                    std::thread::sleep(std::time::Duration::from_millis(250));
                 }
-                _ => {}
+            });
+            for dong in BufReader::new(stdout).lines() {
+                let d = dong.unwrap_or_default();
+                use std::io::Write;
+                let _ = writeln!(nk, "{d}");
+                let (k, v) = d.split_once(' ').unwrap_or((d.as_str(), ""));
+                let so = |s: &str| s.parse::<f64>().unwrap_or(0.0);
+                match k {
+                    "TAI" => tien_do("tai", so(v), 100.0),
+                    "FILE" => kq.file = serde_json::from_str(v).ok(),
+                    "CACH" => bao("Đang tải phim về..."),
+                    "LOI_TAI" => bao("Cách tải này lỗi, thử cách khác..."),
+                    "NAP_MO_HINH" => bao("Đang nạp AI nghe tiếng vào card màn hình..."),
+                    "TAI_MO_HINH" => bao("Lần đầu: đang tải mô hình AI nghe tiếng (~1,6 GB), chờ vài phút..."),
+                    "TIEN" => {
+                        let mut t = v.split_whitespace();
+                        tien_do("nghe", so(t.next().unwrap_or("0")), so(t.next().unwrap_or("0")));
+                    }
+                    "THIET_BI" => {
+                        kq.thiet_bi = Some(v.to_string());
+                        bao(if v == "cuda" { "Đang nghe tiếng bằng card màn hình..." } else { "Đang nghe tiếng bằng CPU (chậm hơn nhiều)..." });
+                    }
+                    "KHONG_CUDA" => kq.khong_cuda = true,
+                    "GIAI_MA" => bao("Đang tách âm thanh khỏi phim..."),
+                    "NGON_NGU" => kq.ngon_ngu = v.split_whitespace().next().map(String::from),
+                    _ if !d.trim().is_empty() => {
+                        cuoi.push(d.clone());
+                        if cuoi.len() > 5 {
+                            cuoi.remove(0);
+                        }
+                    }
+                    _ => {}
+                }
             }
+            bi_dung = dung.load(Ordering::Relaxed);
+            xong.store(true, Ordering::Relaxed);
+        });
+        let mut con = con.into_inner().unwrap();
+        if bi_dung {
+            let _ = con.kill();
+            let _ = con.wait();
+            bail!("đã dừng");
         }
         let st = con.wait()?;
         let loi = loi.and_then(|h| h.join().ok()).unwrap_or_default();
         if st.code() == Some(3) && kq.khong_cuda {
             return Ok(kq);
+        }
+        if st.code() == Some(4) {
+            let l: Vec<&str> = loi.lines().rev().take(2).collect();
+            bail!("không tải được phim từ link này (YouTube hay đổi cách chặn). Hãy tải phim về máy bằng cách khác rồi chọn file phim. Chi tiết: {}", l.into_iter().rev().collect::<Vec<_>>().join(" "));
         }
         if !st.success() {
             let l: Vec<&str> = loi.lines().rev().take(3).collect();

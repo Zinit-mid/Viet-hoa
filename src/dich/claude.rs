@@ -21,10 +21,26 @@ pub static KHOA_HONG: AtomicBool = AtomicBool::new(false);
 /// Người dùng bật / tắt Claude (Ctrl+Shift+C, cấu hình "claude_bat").
 pub static BAT: AtomicBool = AtomicBool::new(true);
 
+/// Có mã và mã chưa bị từ chối → dùng được cho việc dịch dài (Việt hóa, phụ đề phim...).
+/// Công tắc BAT chỉ áp cho dịch màn hình trực tiếp (xem `co_bat`).
 pub fn co_khoa() -> bool {
-    BAT.load(Ordering::Relaxed)
-        && !KHOA_HONG.load(Ordering::Relaxed)
-        && cau_hinh::doc_khoa("khoa_api.txt").is_some()
+    !KHOA_HONG.load(Ordering::Relaxed) && cau_hinh::doc_khoa("khoa_api.txt").is_some()
+}
+
+/// Dùng Claude cho dịch màn hình trực tiếp: có mã + công tắc đang bật.
+pub fn co_bat() -> bool {
+    BAT.load(Ordering::Relaxed) && co_khoa()
+}
+
+/// Lý do chưa dùng được Claude (để báo đúng cho người dùng); None = dùng được.
+pub fn ly_do_khong_dung() -> Option<&'static str> {
+    if cau_hinh::doc_khoa("khoa_api.txt").is_none() {
+        Some("Chưa có mã API Claude (Cài đặt > Mã API).")
+    } else if KHOA_HONG.load(Ordering::Relaxed) {
+        Some("Claude đã từ chối mã API (sai mã hoặc hết tiền). Vào Cài đặt > Mã API, dán mã mới rồi bấm Lưu mã.")
+    } else {
+        None
+    }
 }
 
 fn goi(he_thong: &str, noi_dung: &str, toi_da: u32) -> Result<String> {

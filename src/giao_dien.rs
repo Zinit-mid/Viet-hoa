@@ -611,11 +611,10 @@ impl App {
                 if !dich::offline::co_the_dung() {
                     ui.label(RichText::new("Chưa có Python riêng / mô hình offline > tạm dùng Google. Vào Cài đặt > Tải công cụ.").color(Color32::YELLOW));
                 }
-                if !dich::claude::co_khoa() {
-                    ui.label(
-                        RichText::new("Claude đang tắt hoặc chưa có mã API (Cài đặt > Mã API).")
-                            .weak(),
-                    );
+                if let Some(ly) = dich::claude::ly_do_khong_dung() {
+                    ui.label(RichText::new(ly).color(Color32::YELLOW));
+                } else if !dich::claude::BAT.load(Ordering::Relaxed) {
+                    ui.label(RichText::new("Claude đang TẮT cho dịch màn hình (bấm Ctrl+Shift+C để bật). Việt hóa game và phụ đề phim vẫn dùng Claude bình thường.").weak());
                 }
             });
             the(ui, "KHUNG CHỮ DỊCH", |ui| {

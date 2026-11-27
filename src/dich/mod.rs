@@ -80,7 +80,7 @@ pub fn tim_da_luu(chu: &str) -> Option<String> {
     if let Some(v) = bo_nho(|b| b.tim("claude", chu)) {
         return Some(sua(v));
     }
-    if !claude::co_khoa() {
+    if !claude::co_bat() {
         return bo_nho(|b| b.tim("google", chu)).map(sua);
     }
     None
@@ -125,7 +125,7 @@ pub fn dich_nhanh(chu: &str, che_do: &str) -> Option<(String, May)> {
     if let Some(v) = the::tu_menu(chu) {
         return Some((v, May::DaLuu));
     }
-    if che_do == "claude" && claude::co_khoa() {
+    if che_do == "claude" && claude::co_bat() {
         match claude::dich(chu) {
             Ok(v) if hop_le(chu, &v) => {
                 luu("claude", chu, &v);
@@ -149,7 +149,7 @@ pub fn dich_nhanh(chu: &str, che_do: &str) -> Option<(String, May)> {
 
 /// Claude dịch ngầm để lưu (chế độ offline_claude). Trả bản Claude nếu có.
 pub fn claude_luu_ngam(chu: &str) -> Option<String> {
-    if !claude::co_khoa() || bo_nho(|b| b.tim("claude", chu)).is_some() {
+    if !claude::co_bat() || bo_nho(|b| b.tim("claude", chu)).is_some() {
         return None;
     }
     match claude::dich(chu) {
@@ -316,7 +316,7 @@ pub fn dich_nhieu(cac_cau: &[String], dung_claude: bool) -> Vec<Option<String>> 
     };
 
     let can = con_thieu(&ra);
-    if !can.is_empty() && dung_claude && claude::co_khoa() {
+    if !can.is_empty() && dung_claude && claude::co_bat() {
         let cau: Vec<String> = can.iter().map(|&i| cac_cau[i].clone()).collect();
         match claude::dich_lo(&cau, claude::HUONG_DAN) {
             Ok(v) => {
