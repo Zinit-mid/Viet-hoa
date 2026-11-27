@@ -21,6 +21,97 @@ pub fn mo_hinh() -> String {
     cau_hinh::doc_khoa("ai_local_mo_hinh.txt").unwrap_or_else(|| MAC_DINH.to_string())
 }
 
+/// Tìm app AI để tự mở: đường dẫn người dùng đã lưu → Ollama → app có tên "AI Local Studio" trong các thư mục cài đặt thường gặp.
+fn tim_app_ai() -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    if let Some(p) = cau_hinh::doc_khoa("ai_local_app.txt") {
+        let p = PathBuf::from(p.trim().trim_matches('"'));
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+    let la = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+    let mut thu_muc: Vec<PathBuf> = Vec::new();
+    if let Some(la) = &la {
+        let o = la.join("Programs").join("Ollama");
+        for f in ["ollama app.exe", "ollama.exe"] {
+            if o.join(f).is_file() {
+                return Some(o.join(f));
+            }
+        }
+        thu_muc.push(la.join("Programs"));
+    }
+    for e in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Some(d) = std::env::var_os(e) {
+            thu_muc.push(PathBuf::from(d));
+        }
+    }
+    // thư mục con có tên chứa "ai local" / "ailocal" / "local studio"
+    for goc in thu_muc {
+        let Ok(rd) = std::fs::read_dir(&goc) else {
+            continue;
+        };
+        for d in rd.flatten() {
+            let ten = d
+                .file_name()
+                .to_string_lossy()
+                .to_lowercase()
+                .replace([' ', '-', '_'], "");
+            if ten.contains("ailocal") || ten.contains("localstudio") {
+                if let Ok(exe) = std::fs::read_dir(d.path()) {
+                    if let Some(f) = exe.flatten().map(|e| e.path()).find(|p| {
+                        p.extension().is_some_and(|x| x == "exe")
+                            && !p.to_string_lossy().to_lowercase().contains("unins")
+                    }) {
+                        return Some(f);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Nếu Ollama chưa chạy thì tự mở app AI rồi đợi tối đa ~60 giây.
+pub fn tu_mo(bao: &dyn Fn(&str)) -> Result<()> {
+    if san_sang() {
+        return Ok(());
+    }
+    let Some(exe) = tim_app_ai() else {
+        bail!("chưa tìm thấy app AI trên máy – dán đường dẫn file .exe của app AI vào ô \"App AI\" bên dưới rồi bấm Lưu");
+    };
+    bao(&format!(
+        "Đang mở {}...",
+        exe.file_name()
+            .map(|f| f.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+    let mut lenh = std::process::Command::new(&exe);
+    if exe
+        .file_name()
+        .is_some_and(|f| f.to_string_lossy().eq_ignore_ascii_case("ollama.exe"))
+    {
+        lenh.arg("serve");
+    }
+    if let Some(d) = exe.parent() {
+        lenh.current_dir(d);
+    }
+    {
+        use std::os::windows::process::CommandExt;
+        lenh.creation_flags(0x0800_0000); // CREATE_NO_WINDOW (app có cửa sổ riêng vẫn hiện bình thường)
+    }
+    lenh.spawn()
+        .map_err(|e| anyhow!("không mở được {}: {e}", exe.display()))?;
+    for i in 0..30 {
+        std::thread::sleep(Duration::from_secs(2));
+        if san_sang() {
+            return Ok(());
+        }
+        bao(&format!("Đang đợi AI khởi động... {}s", (i + 1) * 2));
+    }
+    bail!("đã mở app nhưng AI chưa sẵn sàng sau 60 giây – nếu app có nút bật máy chủ / tải mô hình thì bấm trong app rồi thử lại")
+}
+
 /// Ollama đang chạy và trả lời.
 pub fn san_sang() -> bool {
     ureq::get(&format!("{URL}/api/tags"))
@@ -262,6 +353,7 @@ pub struct TrangAi {
     loi_dan: String,
     chat: Arc<Mutex<Chat>>,
     o_nhap: String,
+    duong_app: String,
     o_truoc: String,
     kieu_go: crate::go_viet::Kieu,
 }
@@ -278,6 +370,7 @@ impl Default for TrangAi {
             loi_dan: String::new(),
             chat: Arc::new(Mutex::new(Chat::default())),
             o_nhap: String::new(),
+            duong_app: cau_hinh::doc_khoa("ai_local_app.txt").unwrap_or_default(),
             o_truoc: String::new(),
             kieu_go: crate::go_viet::Kieu::Vni,
         }
@@ -444,7 +537,7 @@ impl TrangAi {
             let kq = if DANG_LONG_TIENG.load(Ordering::SeqCst) {
                 Err(anyhow!("đang lồng tiếng – AI tạm tắt để nhường card đồ họa, lồng tiếng xong hỏi lại nhé"))
             } else {
-                tro_chuyen(&ls, &bc)
+                tu_mo(&|_| {}).and_then(|_| tro_chuyen(&ls, &bc))
             };
             let mut g = c.lock().unwrap_or_else(|e| e.into_inner());
             g.dang_nghi = false;
@@ -621,6 +714,17 @@ impl TrangAi {
                 );
             }
             ui.horizontal_wrapped(|ui| {
+                ui.label("App AI (.exe):");
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.duong_app)
+                        .desired_width(320.0)
+                        .hint_text("để trống = tự tìm Ollama / AI Local Studio"),
+                );
+                if ui.button("Lưu").clicked() {
+                    let _ = cau_hinh::luu_khoa("ai_local_app.txt", self.duong_app.trim());
+                }
+            });
+            ui.horizontal_wrapped(|ui| {
                 ui.label("Mô hình:");
                 ui.add(egui::TextEdit::singleline(&mut self.mo_hinh).desired_width(200.0));
                 if ui.button("Lưu").clicked() && !self.mo_hinh.trim().is_empty() {
@@ -630,14 +734,11 @@ impl TrangAi {
                     .add_enabled(!ban, egui::Button::new("Kiểm tra kết nối"))
                     .clicked()
                 {
-                    self.nen("Đang kiểm tra...", |_| {
-                        if san_sang() {
-                            Ok(format!("Ollama đang chạy. Mô hình: {}", mo_hinh()))
-                        } else {
-                            Err(anyhow!(
-                                "chưa thấy Ollama – mở app Ollama hoặc AI Local Studio rồi thử lại"
-                            ))
-                        }
+                    self.nen("Đang kiểm tra...", |tt| {
+                        tu_mo(&|m| {
+                            tt.lock().unwrap_or_else(|e| e.into_inner()).thong_bao = m.to_string()
+                        })?;
+                        Ok(format!("Ollama đang chạy. Mô hình: {}", mo_hinh()))
                     });
                 }
                 if ui

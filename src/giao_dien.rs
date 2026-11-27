@@ -63,6 +63,7 @@ impl Muc {
             ],
             Muc::LongTieng => &[
                 ("Lồng tiếng game", Trang::LongTieng, None),
+                ("Lồng tiếng phim", Trang::PhuDePhim, Some("THUYẾT MINH")),
                 ("Giọng mẫu", Trang::GiongMau, None),
                 ("Clone giọng", Trang::CloneGiong, None),
             ],
