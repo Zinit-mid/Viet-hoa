@@ -567,6 +567,9 @@ impl TrangVietHoa {
                 {
                     lam = Some("long_b");
                 }
+                if crate::kieu::nut_tien_do(ui, "viet_hoa", "Sao lưu lồng tiếng ra thư mục...", "Đang sao lưu", crate::kieu::XANH_BIEN, !ban) {
+                    lam = Some("sao_luu");
+                }
             });
             ui.label(RichText::new("Cần dịch chữ trước (các đợt). Giọng mẫu lấy từ chính giọng gốc của từng người (hoặc giọng riêng trong giong_rieng\\phan_bo.json). Rất lâu và nặng (hàng chục GB): tắt game, đóng VieNeu, cắm sạc. Chạy lại = làm tiếp. Xong ra Desktop file LongTieng_*.zip > DMM Import, bật, Mount Mods.").small().weak());
         });
@@ -626,6 +629,59 @@ impl TrangVietHoa {
                         }
                     })
                 });
+            }
+            Some("sao_luu") => {
+                if let Some(dich) = rfd::FileDialog::new().set_title("Chọn thư mục để sao lưu lồng tiếng").pick_folder() {
+                    self.chay_cd("Đang sao lưu lồng tiếng", move |cd, bc| {
+                        let lv = crate::viet_hoa::tomb_raider::thu_muc_lam_viec(&cd.thu_muc_game);
+                        let ra = dich.join("SaoLuu_LongTieng");
+                        let mut so = 0usize;
+                        let mut ghi: Vec<String> = Vec::new();
+                        let mut cho: Vec<(std::path::PathBuf, std::path::PathBuf)> = Vec::new();
+                        for t in ["LongTieng_NhanVat.zip", "LongTieng_DanThuong.zip"] {
+                            let nguon = duong_dan::desktop().join(t);
+                            if nguon.is_file() {
+                                cho.push((nguon, ra.join(t)));
+                                ghi.push(t.to_string());
+                            }
+                        }
+                        for ph in ["A", "B"] {
+                            for e in std::fs::read_dir(lv.join(ph)).into_iter().flatten().flatten() {
+                                let ten = e.file_name().to_string_lossy().to_string();
+                                if ten.starts_with("_wem") && e.path().is_dir() {
+                                    let mut c = vec![e.path()];
+                                    while let Some(d) = c.pop() {
+                                        for f in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+                                            let fp = f.path();
+                                            if fp.is_dir() {
+                                                c.push(fp);
+                                            } else if let Ok(rel) = fp.strip_prefix(lv.join(ph)) {
+                                                cho.push((fp.clone(), ra.join(ph).join(rel)));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        let tong = cho.len();
+                        if tong == 0 {
+                            return Err("chưa có file lồng tiếng nào để sao lưu (lồng xong mới có)".into());
+                        }
+                        for (i, (a, b)) in cho.into_iter().enumerate() {
+                            if let Some(d) = b.parent() {
+                                std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
+                            }
+                            std::fs::copy(&a, &b).map_err(|e| format!("{}: {e}", a.display()))?;
+                            so += 1;
+                            if i % 200 == 0 {
+                                bc.tien_do(i, tong, 0.0);
+                                bc.bao(&format!("Đang chép {i}/{tong}"));
+                            }
+                        }
+                        duong_dan::mo_explorer(&ra);
+                        Ok(format!("Đã sao lưu {so} file vào {} (gói zip: {})", ra.display(), if ghi.is_empty() { "chưa có".into() } else { ghi.join(", ") }))
+                    });
+                }
             }
             Some("goi") => self.chay_cd("Đang xuất gói cho DMM", |cd, _| {
                 let p = duong_dan::desktop().join(vcd::TEN_GOI);
