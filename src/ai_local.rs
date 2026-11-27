@@ -159,6 +159,10 @@ struct Tt {
 }
 
 pub struct TrangAi {
+    games: Vec<crate::viet_hoa::tim_game::Game>,
+    da_tim: bool,
+    dang_tim: Arc<Mutex<Option<Vec<crate::viet_hoa::tim_game::Game>>>>,
+    chon: usize,
     tt: Arc<Mutex<Tt>>,
     mo_hinh: String,
     loi_dan: String,
@@ -166,7 +170,7 @@ pub struct TrangAi {
 
 impl Default for TrangAi {
     fn default() -> Self {
-        Self { tt: Arc::new(Mutex::new(Tt::default())), mo_hinh: mo_hinh(), loi_dan: String::new() }
+        Self { games: Vec::new(), da_tim: false, dang_tim: Arc::new(Mutex::new(None)), chon: 0, tt: Arc::new(Mutex::new(Tt::default())), mo_hinh: mo_hinh(), loi_dan: String::new() }
     }
 }
 
@@ -186,44 +190,76 @@ fn gioi_tinh_giong(ten_giong: &str) -> Option<bool> {
     }
 }
 
-/// Báo cáo: AI nghĩ nhân vật nam / nữ, so với giọng đang gán. Ghi CSV ra Desktop (không tự đổi gì).
-fn kiem_tra_gioi_tinh(tt: &Arc<Mutex<Tt>>) -> Result<String> {
+type Hang = (String, Vec<String>, String, Option<f64>, bool);
+
+/// Gom (người nói, câu mẫu, giọng đang gán, cao độ gốc, khóa tay) của một game.
+fn gom_nhan_vat(g: &crate::viet_hoa::tim_game::Game, tt: &Arc<Mutex<Tt>>) -> Result<Vec<Hang>> {
     use crate::viet_hoa::crimson_desert::CrimsonDesert;
-    let bao = |s: String| tt.lock().unwrap_or_else(|e| e.into_inner()).thong_bao = s;
-    let g = crate::viet_hoa::tim_game::tim_tat_ca()
-        .into_iter()
-        .find(|g| g.ten.to_lowercase().contains("crimson"))
-        .ok_or_else(|| anyhow!("không thấy game Crimson Desert trên máy"))?;
-    bao("Đang đọc danh sách nhân vật...".into());
-    let cd = CrimsonDesert::nap(&g.thu_muc)?;
-    let k = cd.ke_hoach_long_tieng('A', &|_| {})?;
     let lv = crate::viet_hoa::tomb_raider::thu_muc_lam_viec(&g.thu_muc);
-    let pb: serde_json::Value = std::fs::read(lv.join("giong_rieng").join("phan_bo.json"))
-        .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default();
-    let tay = pb.get("_tay").map(|v| v.to_string()).unwrap_or_default();
-    let hz: std::collections::BTreeMap<String, Option<f64>> = std::fs::read(lv.join("A").join("_cao_do_goc.json"))
-        .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default();
-    let tong = k.len();
+    let mau_cau = |ds: Vec<String>| -> Vec<String> {
+        ds.into_iter().filter(|c| c.chars().count() > 12).take(6).map(|c| c.chars().take(160).collect()).collect()
+    };
+    let mut ra: Vec<Hang> = Vec::new();
+    if g.ten.to_lowercase().contains("crimson") {
+        tt.lock().unwrap_or_else(|e| e.into_inner()).thong_bao = "Đang đọc danh sách nhân vật...".into();
+        let cd = CrimsonDesert::nap(&g.thu_muc)?;
+        let k = cd.ke_hoach_long_tieng('A', &|_| {})?;
+        let pb: serde_json::Value = std::fs::read(lv.join("giong_rieng").join("phan_bo.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        let tay = pb.get("_tay").map(|v| v.to_string()).unwrap_or_default();
+        let hz: std::collections::BTreeMap<String, Option<f64>> = std::fs::read(lv.join("A").join("_cao_do_goc.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        for (ten, ds) in &k {
+            let gan = pb.get("A").and_then(|a| a.get(ten)).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let mau = mau_cau(ds.iter().filter_map(|c| c.en.clone()).collect());
+            ra.push((ten.clone(), mau, gan, hz.get(ten).copied().flatten(), tay.contains(&format!("\"{ten}\""))));
+        }
+    } else {
+        // game khác: dùng danh sách file âm thanh đã quét ở mục Lồng tiếng game
+        let d = crate::viet_hoa::long_tieng_chung::thu_muc_lv(&lv, &g.ten);
+        let clips: Vec<crate::viet_hoa::long_tieng_chung::Clip> = std::fs::read(d.join("clips.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        if clips.is_empty() {
+            bail!("game này chưa quét file âm thanh – vào Lồng tiếng > Lồng tiếng game, chọn game rồi bấm Quét file âm thanh, sau đó quay lại đây");
+        }
+        let gan: std::collections::HashMap<String, String> =
+            std::fs::read(d.join("gan.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let mut theo: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+        for c in &clips {
+            if let Some(en) = &c.en {
+                theo.entry(c.nguoi.clone()).or_default().push(en.clone());
+            }
+        }
+        for (ten, ds) in theo {
+            let v = gan.get(&ten).cloned().unwrap_or_default();
+            ra.push((ten, mau_cau(ds), v, None, false));
+        }
+    }
+    Ok(ra)
+}
+
+/// Báo cáo: AI nghĩ nhân vật nam / nữ, so với giọng đang gán. Ghi CSV ra Desktop (không tự đổi gì). Dùng cho mọi game.
+fn kiem_tra_gioi_tinh(tt: &Arc<Mutex<Tt>>, g: &crate::viet_hoa::tim_game::Game) -> Result<String> {
+    let bao = |s: String| tt.lock().unwrap_or_else(|e| e.into_inner()).thong_bao = s;
+    let hang = gom_nhan_vat(g, tt)?;
+    let tong = hang.len();
+    if tong == 0 {
+        bail!("không thấy nhân vật nào có câu thoại tiếng Anh");
+    }
     let mut dong = vec!["nguoi_noi,ai_doan,giong_dang_gan,gioi_tinh_giong,cao_do_goc_hz,khoa_tay,nghi_sai,cau_mau".to_string()];
     let mut nghi = 0usize;
-    for (i, (ten, ds)) in k.iter().enumerate() {
+    for (i, (ten, mau, gan, hz, khoa)) in hang.iter().enumerate() {
         if DANG_LONG_TIENG.load(Ordering::SeqCst) {
             bail!("đang lồng tiếng – dừng kiểm tra AI");
         }
         bao(format!("AI đang xem nhân vật {}/{tong}: {ten}", i + 1));
-        let mau: Vec<String> = ds
-            .iter()
-            .filter_map(|c| c.en.clone())
-            .filter(|c| c.chars().count() > 12)
-            .take(6)
-            .map(|c| c.chars().take(160).collect())
-            .collect();
-        let ai = if mau.is_empty() { None } else { gioi_tinh(ten, &mau)? };
-        let gan = pb.get("A").and_then(|a| a.get(ten)).and_then(|v| v.as_str()).unwrap_or("");
+        let ai = if mau.is_empty() { None } else { gioi_tinh(ten, mau)? };
         let gt_giong = gioi_tinh_giong(gan);
         let sai = matches!((ai, gt_giong), (Some(a), Some(b)) if a != b);
         if sai {
@@ -234,15 +270,14 @@ fn kiem_tra_gioi_tinh(tt: &Arc<Mutex<Tt>>) -> Result<String> {
             Some(false) => "nam",
             None => "?",
         };
-        let khoa = tay.contains(&format!("\"{ten}\""));
         dong.push(format!(
             "{},{},{},{},{},{},{},{}",
             csv(ten),
             txt(ai),
             csv(gan),
             txt(gt_giong),
-            hz.get(ten).copied().flatten().map(|x| format!("{x:.0}")).unwrap_or_default(),
-            if khoa { "co" } else { "" },
+            hz.map(|x| format!("{x:.0}")).unwrap_or_default(),
+            if *khoa { "co" } else { "" },
             if sai { "NGHI SAI" } else { "" },
             csv(&mau.first().cloned().unwrap_or_default())
         ));
@@ -252,7 +287,7 @@ fn kiem_tra_gioi_tinh(tt: &Arc<Mutex<Tt>>) -> Result<String> {
     b.extend(dong.join("\r\n").as_bytes());
     crate::duong_dan::ghi_file(&p, &b)?;
     crate::duong_dan::mo_explorer(&p);
-    Ok(format!("Xong {tong} nhân vật, {nghi} nghi sai giọng. Báo cáo: Desktop\\AI_kiem_tra_gioi_tinh.csv (cột nghi_sai). App không tự đổi gì – bạn xem rồi gán lại ở mục Giọng mẫu."))
+    Ok(format!("Xong {tong} nhân vật của {}, {nghi} nghi sai giọng. Báo cáo: Desktop\\AI_kiem_tra_gioi_tinh.csv (cột nghi_sai). App không tự đổi gì – bạn xem rồi gán lại ở mục Giọng mẫu.", g.ten))
 }
 
 impl TrangAi {
@@ -331,10 +366,33 @@ impl TrangAi {
                 }
             });
         });
-        crate::kieu::khoi(ui, "KIỂM TRA GIỚI TÍNH NHÂN VẬT (Crimson Desert, phần A)", |ui| {
-            ui.label("AI đọc tên + vài câu thoại từng nhân vật rồi so với giọng đang gán, xuất danh sách nghi sai ra Desktop. Mất vài phút.");
-            if ui.add_enabled(!ban && !long_tieng, egui::Button::new("Bắt đầu kiểm tra")).clicked() {
-                self.nen("Đang kiểm tra giới tính...", |tt| kiem_tra_gioi_tinh(tt));
+        if !self.da_tim {
+            self.da_tim = true;
+            let o = self.dang_tim.clone();
+            std::thread::spawn(move || *o.lock().unwrap_or_else(|e| e.into_inner()) = Some(crate::viet_hoa::tim_game::tim_tat_ca()));
+        }
+        if let Some(g) = self.dang_tim.lock().unwrap_or_else(|e| e.into_inner()).take() {
+            self.games = g;
+        }
+        crate::kieu::khoi(ui, "KIỂM TRA GIỚI TÍNH NHÂN VẬT (mọi game)", |ui| {
+            ui.label("Chọn game. AI đọc tên + vài câu thoại từng nhân vật rồi so với giọng đang gán, xuất danh sách nghi sai ra Desktop. Crimson Desert đọc thẳng từ game; game khác cần đã quét file âm thanh ở Lồng tiếng game.");
+            if self.games.is_empty() {
+                ui.label("Đang tìm game trên máy...");
+                ui.ctx().request_repaint_after(Duration::from_millis(300));
+            } else {
+                if self.chon >= self.games.len() {
+                    self.chon = 0;
+                }
+                let ten = self.games[self.chon].ten.clone();
+                egui::ComboBox::from_id_salt("ai_game").selected_text(ten).width(360.0).show_ui(ui, |ui| {
+                    for (i, g) in self.games.iter().enumerate() {
+                        ui.selectable_value(&mut self.chon, i, &g.ten);
+                    }
+                });
+                if ui.add_enabled(!ban && !long_tieng, egui::Button::new("Bắt đầu kiểm tra")).clicked() {
+                    let g = self.games[self.chon].clone();
+                    self.nen("Đang kiểm tra giới tính...", move |tt| kiem_tra_gioi_tinh(tt, &g));
+                }
             }
         });
         crate::kieu::khoi(ui, "GIẢI THÍCH LỖI", |ui| {
