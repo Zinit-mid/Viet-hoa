@@ -486,8 +486,8 @@ pub fn xuat_bang_thu_cuoi(thu_muc_game: &Path, thu_ra: &Path, bao: &dyn Fn(&str)
         for n in nhom {
             let Ok(ds) = cd::doc_pamt(&n.join("0.pamt")) else { continue };
             for f in ds {
-                let co = f.ten == "levelgimmicksceneobjectinfo" || f.ten == "uimaptextureinfo";
-                if co && (f.duoi == ".pabgb" || f.duoi == ".pabgh") {
+                let co = ["levelgimmicksceneobjectinfo", "uimaptextureinfo", "inventory"].contains(&f.ten.as_str());
+                if co && (f.duoi == ".staticinfobody" || f.duoi == ".staticinfoheader" || f.duoi == ".pabgb" || f.duoi == ".pabgh") {
                     ghi(&n, &f, "ruong_", &mut ra)?;
                 }
             }
