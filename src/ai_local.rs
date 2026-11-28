@@ -168,52 +168,146 @@ pub fn xa_vram() -> Result<()> {
     Ok(())
 }
 
-fn hoi(he_thong: &str, noi_dung: &str) -> Result<String> {
-    let _g = DangDung::vao()?;
-    let than = serde_json::json!({
-        "model": mo_hinh(),
-        "stream": false,
-        "think": false,
-        "keep_alive": "2m",
-        "options": {"temperature": 0.2, "num_ctx": 4096},
-        "messages": [
-            {"role": "system", "content": he_thong},
-            {"role": "user", "content": noi_dung},
-        ],
-    });
-    let tra: serde_json::Value = ureq::post(&format!("{URL}/api/chat"))
-        .timeout(Duration::from_secs(300))
-        .send_json(than)
-        .map_err(|e| {
-            anyhow!("không gọi được Ollama ({e}) – mở app Ollama / AI Local Studio trước")
-        })?
-        .into_json()?;
-    let mut s = tra["message"]["content"].as_str().unwrap_or("").to_string();
+/// Dùng chung một cỡ ngữ cảnh cho mọi lời gọi: đổi cỡ giữa chừng làm Ollama nạp lại mô hình.
+const NUM_CTX: u32 = 8192;
+/// Hướng dẫn dùng app, gửi kèm cho trợ lý chat và phần giải thích lỗi.
+const HUONG_DAN_APP: &str = include_str!("huong_dan_chat.md");
+
+/// Dạng câu trả lời mong muốn.
+enum Dang {
+    /// chữ tự do
+    TuDo,
+    /// đúng theo JSON schema (tùy chọn "format" của Ollama)
+    Mau(serde_json::Value),
+}
+
+fn mau_mang(n: usize) -> Dang {
+    Dang::Mau(serde_json::json!({
+        "type": "array", "items": {"type": "string"}, "minItems": n, "maxItems": n,
+    }))
+}
+
+fn bo_suy_luan(mut s: String) -> String {
     if let (Some(a), Some(b)) = (s.find("<think>"), s.find("</think>")) {
         if b > a {
             s.replace_range(a..b + 8, "");
         }
     }
-    Ok(s.trim().to_string())
+    s.trim().to_string()
 }
 
-/// Dịch một lô câu Anh → Việt (giữ thẻ do `offline_lo` lo).
-pub fn dich_lo(cau: &[String]) -> Result<Vec<String>> {
-    let vao = serde_json::to_string(cau)?;
-    let r = hoi(
-        "Bạn là người dịch game từ tiếng Anh sang tiếng Việt, giọng tự nhiên, ngắn gọn. Giữ nguyên tên riêng. \
-         Nhận một mảng JSON các câu; trả về DUY NHẤT một mảng JSON cùng số phần tử, cùng thứ tự, mỗi phần tử là bản dịch.",
-        &vao,
-    )?;
-    let (a, b) = (r.find('['), r.rfind(']'));
-    let (Some(a), Some(b)) = (a, b) else {
-        bail!("AI trả lời không đúng dạng")
-    };
-    let v: Vec<String> = serde_json::from_str(&r[a..=b])?;
-    if v.len() != cau.len() {
-        bail!("AI trả {} câu, cần {}", v.len(), cau.len());
+/// Một lời gọi /api/chat.
+fn goi(
+    he_thong: &str,
+    noi_dung: &str,
+    mau: Option<&serde_json::Value>,
+    suy_luan: bool,
+) -> std::result::Result<String, Box<ureq::Error>> {
+    let mut than = serde_json::json!({
+        "model": mo_hinh(),
+        "stream": false,
+        "think": suy_luan,
+        "keep_alive": "2m",
+        "options": {"temperature": 0.2, "num_ctx": NUM_CTX},
+        "messages": [
+            {"role": "system", "content": he_thong},
+            {"role": "user", "content": noi_dung},
+        ],
+    });
+    if let Some(m) = mau {
+        than["format"] = m.clone();
     }
-    Ok(v)
+    let tra: serde_json::Value = ureq::post(&format!("{URL}/api/chat"))
+        .timeout(Duration::from_secs(if suy_luan { 600 } else { 300 }))
+        .send_json(than)
+        .map_err(Box::new)?
+        .into_json()
+        .unwrap_or_default();
+    Ok(bo_suy_luan(
+        tra["message"]["content"].as_str().unwrap_or("").to_string(),
+    ))
+}
+
+fn loi_goi(e: Box<ureq::Error>) -> anyhow::Error {
+    anyhow!("không gọi được Ollama ({e}) – mở app Ollama / AI Local Studio trước")
+}
+
+fn hoi(he_thong: &str, noi_dung: &str, dang: Dang) -> Result<String> {
+    let _g = DangDung::vao()?;
+    let mau = match &dang {
+        Dang::TuDo => None,
+        Dang::Mau(m) => Some(m),
+    };
+    match goi(he_thong, noi_dung, mau, false) {
+        Ok(s) => Ok(s),
+        // Ollama cũ / mô hình không nhận "format" → gọi lại kiểu thường
+        Err(e) if mau.is_some() && matches!(*e, ureq::Error::Status(..)) => {
+            goi(he_thong, noi_dung, None, false).map_err(loi_goi)
+        }
+        Err(e) => Err(loi_goi(e)),
+    }
+}
+
+/// Việc khó: cho mô hình suy luận trước. Trả None nếu lỗi / trả lời trống (mô hình không hỗ trợ...).
+fn hoi_suy_luan(he_thong: &str, noi_dung: &str) -> Result<Option<String>> {
+    let _g = DangDung::vao()?;
+    Ok(goi(he_thong, noi_dung, None, true)
+        .ok()
+        .filter(|s| !s.is_empty()))
+}
+
+/// Phần bối cảnh gửi kèm khi dịch: hướng dẫn riêng của game / phim + tên riêng có trong lô.
+pub fn boi_canh_dich(huong_dan: &str, ten_rieng: &[String]) -> String {
+    let mut s = String::new();
+    if !huong_dan.trim().is_empty() {
+        s.push_str("BỐI CẢNH VÀ VĂN PHONG:\n");
+        s.push_str(huong_dan.trim());
+        s.push_str("\n\n");
+    }
+    if !ten_rieng.is_empty() {
+        s.push_str(&format!("Giữ nguyên: {}\n\n", ten_rieng.join(", ")));
+    }
+    s
+}
+
+/// Tên riêng người dùng ghi trong từ điển (tu_dien.json) có xuất hiện trong `van_ban`.
+fn ten_trong_tu_dien(van_ban: &str) -> Vec<String> {
+    let v: serde_json::Value = std::fs::read(crate::duong_dan::file_du_lieu("tu_dien.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default();
+    v["ten_rieng"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str())
+                .filter(|t| !t.is_empty() && van_ban.contains(*t))
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+const VI_DU_DICH: &str = "Ví dụ văn phong:\n\
+\"You shouldn't be here.\" -> \"Ngươi không nên ở đây.\" (cổ trang) hoặc \"Anh không nên ở đây.\" (hiện đại)\n\
+\"Give me a hand, will you?\" -> \"Giúp một tay được không?\"\n\
+\"Not on my watch.\" -> \"Còn lâu, chừng nào tôi còn ở đây.\"\n";
+
+/// Dịch một lô câu Anh → Việt (giữ thẻ do `offline_lo` lo).
+pub fn dich_lo(cau: &[String], huong_dan: &str, ten_rieng: &[String]) -> Result<Vec<String>> {
+    let vao = serde_json::to_string(cau)?;
+    let mut ten = ten_rieng.to_vec();
+    ten.extend(ten_trong_tu_dien(&vao));
+    ten.sort();
+    ten.dedup();
+    let he_thong = format!(
+        "{}{VI_DU_DICH}\nNHIỆM VỤ: bạn dịch từ tiếng Anh sang tiếng Việt, tự nhiên, ngắn gọn, xưng hô nhất quán. Giữ nguyên tên riêng. \
+         Giữ NGUYÊN các mã dạng ZQ0, ZQ1... (không dịch, không bỏ). \
+         Nhận một mảng JSON các câu; trả về DUY NHẤT một mảng JSON cùng số phần tử, cùng thứ tự, mỗi phần tử là bản dịch.",
+        boi_canh_dich(huong_dan, &ten)
+    );
+    let r = hoi(&he_thong, &vao, mau_mang(cau.len()))?;
+    mang_json(&r, cau.len())
 }
 
 /// Đoán giới tính nhân vật từ tên + vài câu thoại. Some(true) = nữ, Some(false) = nam, None = không rõ.
@@ -226,6 +320,7 @@ pub fn gioi_tinh(ten: &str, cau_mau: &[String]) -> Result<Option<bool>> {
     let r = hoi(
         "Đoán giới tính nhân vật game. Chỉ trả lời đúng MỘT từ: nam, nu, hoac khong_ro. Không giải thích.",
         &nd,
+        Dang::Mau(serde_json::json!({"type": "string", "enum": ["nam", "nu", "khong_ro"]})),
     )?
     .to_lowercase();
     Ok(if r.contains("khong") {
@@ -252,18 +347,28 @@ fn mang_json(r: &str, n: usize) -> Result<Vec<String>> {
 }
 
 /// Soát bản dịch: cặp (tiếng Anh, bản dịch hiện có) → bản dịch đã sửa (tốt thì giữ nguyên).
-pub fn sua_dich(cap: &[(String, String)]) -> Result<Vec<String>> {
+pub fn sua_dich(
+    cap: &[(String, String)],
+    huong_dan: &str,
+    ten_rieng: &[String],
+) -> Result<Vec<String>> {
     let vao = serde_json::to_string(
         &cap.iter()
             .map(|(en, vi)| serde_json::json!({"en": en, "vi": vi}))
             .collect::<Vec<_>>(),
     )?;
-    let r = hoi(
+    let mut ten = ten_rieng.to_vec();
+    ten.extend(ten_trong_tu_dien(&vao));
+    ten.sort();
+    ten.dedup();
+    let he_thong = format!(
+        "{}NHIỆM VỤ (thay cho mọi yêu cầu về dạng dữ liệu ở trên): {}",
+        boi_canh_dich(huong_dan, &ten),
         "Bạn là biên tập viên dịch game / phụ đề phim Anh-Việt. Nhận mảng JSON các đối tượng {en, vi}. Với mỗi cặp: nếu bản dịch vi đã tốt thì giữ NGUYÊN; \
          nếu sai nghĩa, cứng, còn sót tiếng Anh hoặc chưa dịch thì sửa lại tự nhiên, ngắn gọn. Giữ nguyên tên riêng và mọi thẻ như {..}, <..>, [..], %s. \
-         Trả về DUY NHẤT một mảng JSON các chuỗi tiếng Việt, cùng số phần tử, cùng thứ tự.",
-        &vao,
-    )?;
+         Trả về DUY NHẤT một mảng JSON các chuỗi tiếng Việt, cùng số phần tử, cùng thứ tự."
+    );
+    let r = hoi(&he_thong, &vao, mau_mang(cap.len()))?;
     mang_json(&r, cap.len())
 }
 
@@ -278,6 +383,7 @@ pub fn rut_gon(cau: &[(String, f64)]) -> Result<Vec<String>> {
         "Bạn viết lời thuyết minh phim tiếng Việt. Nhận mảng JSON {vi, giay}. Mỗi câu phải đọc xong trong số giây cho phép (người đọc khoảng 13 chữ cái mỗi giây). \
          Hãy rút gọn câu vi cho vừa, giữ ý chính và giọng văn, giữ tên riêng. Trả về DUY NHẤT một mảng JSON các chuỗi, cùng số phần tử, cùng thứ tự.",
         &vao,
+        mau_mang(cau.len()),
     )?;
     mang_json(&r, cau.len())
 }
@@ -308,22 +414,29 @@ pub fn chia_nguoi(
             vi.replace('\n', " ")
         ));
     }
-    let r = hoi(
+    let he_thong =
         "Bạn phân vai cho thoại phim để lồng tiếng. Với MỖI câu (tiếng Anh | tiếng Việt), đoán người nói dựa trên nội dung, \
          cách xưng hô, đối đáp qua lại. Đặt nhãn dạng \"Nam 1\", \"Nam 2\", \"Nữ 1\", \"Nữ 2\", \"Trẻ em\", \"Kể chuyện\" – cùng một người \
          phải luôn cùng nhãn (dùng lại nhãn đã có), tối đa 6 nhãn khác nhau. Không chắc thì gán người nói gần nhất hợp lý. \
-         Trả về DUY NHẤT một mảng JSON các chuỗi nhãn, cùng số phần tử, cùng thứ tự.",
-        &vao,
-    )?;
+         Trả về DUY NHẤT một mảng JSON các chuỗi nhãn, cùng số phần tử, cùng thứ tự.";
+    if let Some(r) = hoi_suy_luan(he_thong, &vao)? {
+        if let Ok(v) = mang_json(&r, cau.len()) {
+            return Ok(v);
+        }
+    }
+    let r = hoi(he_thong, &vao, mau_mang(cau.len()))?;
     mang_json(&r, cau.len())
 }
 
 pub fn giai_thich_loi(loi: &str) -> Result<String> {
-    hoi(
+    let he_thong = format!(
         "Bạn giúp người dùng không rành kỹ thuật của app Việt hóa game. Đọc thông báo lỗi và trả lời bằng tiếng Việt, \
-         ngắn gọn: (1) lỗi nghĩa là gì, (2) 2-3 bước cụ thể nên làm. Không bịa tên nút không có.",
-        loi,
-    )
+         ngắn gọn: (1) lỗi nghĩa là gì, (2) 2-3 bước cụ thể nên làm. Không bịa tên nút không có.\n\n{HUONG_DAN_APP}"
+    );
+    if let Some(r) = hoi_suy_luan(&he_thong, loi)? {
+        return Ok(r);
+    }
+    hoi(&he_thong, loi, Dang::TuDo)
 }
 
 /// Trò chuyện nhiều lượt (như nhắn tin). `lich_su`: (true = người dùng, nội dung). `boi_canh`: lỗi / tình hình hiện tại của app.
@@ -333,6 +446,8 @@ pub fn tro_chuyen(lich_su: &[(bool, String)], boi_canh: &str) -> Result<String> 
         Người dùng không rành kỹ thuật, nhắn bằng tiếng Việt. Trả lời tiếng Việt, ngắn gọn, chia bước đánh số, nói rõ bấm nút nào ở đâu. \
         Không bịa tên nút hay tính năng không có. Nếu không chắc nguyên nhân, nói thẳng là chưa chắc, hỏi thêm một điều cần biết (hoặc bảo chụp màn hình / báo lỗi cho người phát triển app)."
         .to_string();
+    he_thong.push_str("\n\n");
+    he_thong.push_str(HUONG_DAN_APP);
     if !boi_canh.trim().is_empty() {
         he_thong.push_str("\n\nTình hình hiện tại của app (thông báo / lỗi gần đây):\n");
         he_thong.push_str(boi_canh.trim());
@@ -347,7 +462,7 @@ pub fn tro_chuyen(lich_su: &[(bool, String)], boi_canh: &str) -> Result<String> 
         .timeout(Duration::from_secs(300))
         .send_json(serde_json::json!({
             "model": mo_hinh(), "stream": false, "think": false, "keep_alive": "5m",
-            "options": {"temperature": 0.4, "num_ctx": 8192}, "messages": tin,
+            "options": {"temperature": 0.4, "num_ctx": NUM_CTX}, "messages": tin,
         }))
         .map_err(|e| {
             anyhow!("không gọi được Ollama ({e}) – mở app Ollama / AI Local Studio trước")

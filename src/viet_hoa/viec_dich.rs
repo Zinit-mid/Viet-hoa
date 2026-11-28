@@ -471,7 +471,9 @@ impl ViecDich {
             if self.dung.load(Ordering::SeqCst) {
                 break;
             }
-            match crate::ai_local::sua_dich(lo) {
+            let en: Vec<&str> = lo.iter().map(|(en, _)| en.as_str()).collect();
+            let ten: Vec<String> = self.bang_ten.trong(&en.join("\n")).into_iter().collect();
+            match crate::ai_local::sua_dich(lo, &self.huong_dan, &ten) {
                 Ok(moi) => {
                     loi_lien_tiep = 0;
                     let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
@@ -888,8 +890,10 @@ impl ViecDich {
                 "{} câu còn lại – thử bằng AI local...",
                 con_hong.len()
             ));
+            let (huong_dan, bang_ten) = (self.huong_dan.clone(), self.bang_ten.clone());
             let dich_ai = |cau: &[String]| -> Result<Vec<String>> {
-                let ra = crate::ai_local::dich_lo(cau)?;
+                let ten: Vec<String> = bang_ten.trong(&cau.join("\n")).into_iter().collect();
+                let ra = crate::ai_local::dich_lo(cau, &huong_dan, &ten)?;
                 Ok(ra
                     .into_iter()
                     .zip(cau)

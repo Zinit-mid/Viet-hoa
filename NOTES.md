@@ -132,3 +132,9 @@ Giao diện mới (kính tối tím hơi đen, nút neon, thanh trượt, viền
 - **Bản đồ Crimson Desert** (`trang_ban_do.rs`, chuyển từ ban_do_cd.py) + nút **Xuất bảng thú cưỡi** (`crimson_desert::xuat_bang_thu_cuoi`, chỉ đọc game).
 - **Chưa làm:** mod "dễ bắt ngựa" (timeScale trong `rodeominigameview` nhóm 0012) chưa có trong app – cần file `ui_rodeominigameview*.uibinary/.html` xuất ra để vá; app cũ cũng chưa có.
 - Phát hành: đẩy `main` có version mới trong Cargo.toml là workflow tự build + đăng Release (không cần tag).
+
+## v0.4.0 (28/11/2026) – AI local thông minh hơn
+- Dịch / soát bản dịch gửi kèm `huong_dan` của game/phim, tên riêng (BangTen + tu_dien.json) và ví dụ văn phong. Chưa có tên người nói ở đường dịch này.
+- Dùng `format` (JSON schema) của Ollama; lỗi HTTP thì gọi lại kiểu thường.
+- Trợ lý chat + giải thích lỗi đọc `src/huong_dan_chat.md` (nhúng trong exe). Đổi tên nút thì sửa file này.
+- Bật suy luận cho chia người nói và giải thích lỗi, hỏng thì tự gọi lại không suy luận. num_ctx chung 8192.
