@@ -1513,11 +1513,12 @@ impl ViecFile {
         } else {
             ten_game.to_string()
         };
-        let viec = ViecDich::moi(
+        let mut viec = ViecDich::moi(
             tm.clone(),
             &HUONG_DAN_CHUNG.replace("{ten}", &ten_game),
             BangTen::default(),
         );
+        viec.ten_game = ten_game.trim().to_string();
         let mut kq_quet: Option<KetQuaQuet> = std::fs::read(tm.join("ket_qua_do.json"))
             .ok()
             .and_then(|b| serde_json::from_slice(&b).ok());

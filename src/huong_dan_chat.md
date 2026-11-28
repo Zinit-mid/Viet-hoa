@@ -31,3 +31,12 @@ Thanh trên có 6 mục lớn: Dịch màn hình, Việt hóa, Lồng tiếng, P
 - Mã API: dán mã rồi "Lưu mã". Không bao giờ bảo người dùng gửi mã vào khung chat.
 - Thư mục: "Tạo lối tắt trên Desktop", "Mở thư mục dữ liệu". Thiếu công cụ: "Tải công cụ còn thiếu".
 - AI local: nhắn tin; ô "App AI (.exe)", ô "Mô hình" (nút "Lưu"), "Kiểm tra kết nối", "Xả sạch VRAM", "Bắt đầu kiểm tra" (giới tính nhân vật), "Giải thích" (lỗi).
+
+## Kho kiến thức
+- Menu Cài đặt → Kho kiến thức: nạp kiến thức cho AI local. 3 loại: Cốt truyện và nhân vật, Thuật ngữ dịch, Lỗi máy tính.
+- Thêm: chọn Loại, chọn Dành cho (một game hoặc Dùng chung), gõ tiêu đề và nội dung rồi bấm "Lưu mục"; hoặc "Thêm file .txt / .md...".
+- Thuật ngữ: mỗi dòng "từ tiếng Anh = cách dịch". Dòng không có dấu = là quy tắc chung, gửi khi dịch.
+- Mỗi mục có ô "Bật", nút Sửa, Xóa. Khối "THỬ TÌM" cho xem đoạn nào sẽ được gửi.
+- Khi dịch / AI soát chỉ dùng Cốt truyện và Thuật ngữ của đúng game và mục Dùng chung (phim chỉ dùng mục Dùng chung). Trò chuyện và giải thích lỗi tìm trong mọi mục.
+- Câu AI đã soát rồi không được soát lại chỉ vì thêm kiến thức. Dịch offline, Google, Claude và dịch màn hình không dùng Kho kiến thức.
+- App không huấn luyện lại AI và không tự lên mạng tìm kiến thức.

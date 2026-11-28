@@ -172,6 +172,17 @@ pub fn xa_vram() -> Result<()> {
 const NUM_CTX: u32 = 8192;
 /// Hướng dẫn dùng app, gửi kèm cho trợ lý chat và phần giải thích lỗi.
 const HUONG_DAN_APP: &str = include_str!("huong_dan_chat.md");
+/// Dòng app tự thêm dưới câu trả lời (không gửi lại cho mô hình).
+const DAU_TAI_LIEU: &str = "\n\n— Tài liệu trong Kho kiến thức đã gửi kèm: ";
+
+/// Ghi rõ app đã gửi mục nào (app tự ghi, không để AI tự khai).
+fn ghi_nguon(tra_loi: String, muc: &[String]) -> String {
+    if muc.is_empty() {
+        tra_loi
+    } else {
+        format!("{tra_loi}{DAU_TAI_LIEU}{}", muc.join("; "))
+    }
+}
 
 /// Dạng câu trả lời mong muốn.
 enum Dang {
@@ -429,14 +440,15 @@ pub fn chia_nguoi(
 }
 
 pub fn giai_thich_loi(loi: &str) -> Result<String> {
+    let (kien_thuc, muc) = crate::kho_kien_thuc::cho_cau_hoi(loi);
     let he_thong = format!(
         "Bạn giúp người dùng không rành kỹ thuật của app Việt hóa game. Đọc thông báo lỗi và trả lời bằng tiếng Việt, \
-         ngắn gọn: (1) lỗi nghĩa là gì, (2) 2-3 bước cụ thể nên làm. Không bịa tên nút không có.\n\n{HUONG_DAN_APP}"
+         ngắn gọn: (1) lỗi nghĩa là gì, (2) 2-3 bước cụ thể nên làm. Không bịa tên nút không có.\n\n{HUONG_DAN_APP}\n\n{kien_thuc}"
     );
     if let Some(r) = hoi_suy_luan(&he_thong, loi)? {
-        return Ok(r);
+        return Ok(ghi_nguon(r, &muc));
     }
-    hoi(&he_thong, loi, Dang::TuDo)
+    Ok(ghi_nguon(hoi(&he_thong, loi, Dang::TuDo)?, &muc))
 }
 
 /// Trò chuyện nhiều lượt (như nhắn tin). `lich_su`: (true = người dùng, nội dung). `boi_canh`: lỗi / tình hình hiện tại của app.
@@ -452,8 +464,22 @@ pub fn tro_chuyen(lich_su: &[(bool, String)], boi_canh: &str) -> Result<String> 
         he_thong.push_str("\n\nTình hình hiện tại của app (thông báo / lỗi gần đây):\n");
         he_thong.push_str(boi_canh.trim());
     }
+    // tìm kiến thức theo 2 câu hỏi gần nhất của người dùng
+    let hoi_gan: Vec<&str> = lich_su
+        .iter()
+        .rev()
+        .filter(|(nguoi, _)| *nguoi)
+        .take(2)
+        .map(|(_, nd)| nd.as_str())
+        .collect();
+    let (kien_thuc, muc) = crate::kho_kien_thuc::cho_cau_hoi(&hoi_gan.join("\n"));
+    if !kien_thuc.is_empty() {
+        he_thong.push_str("\n\n");
+        he_thong.push_str(&kien_thuc);
+    }
     let mut tin = vec![serde_json::json!({"role": "system", "content": he_thong})];
     for (nguoi, nd) in lich_su.iter().rev().take(20).rev() {
+        let nd = nd.split(DAU_TAI_LIEU).next().unwrap_or_default();
         tin.push(
             serde_json::json!({"role": if *nguoi { "user" } else { "assistant" }, "content": nd}),
         );
@@ -474,7 +500,7 @@ pub fn tro_chuyen(lich_su: &[(bool, String)], boi_canh: &str) -> Result<String> 
             s.replace_range(a..b + 8, "");
         }
     }
-    Ok(s.trim().to_string())
+    Ok(ghi_nguon(s.trim().to_string(), &muc))
 }
 
 #[derive(Default)]

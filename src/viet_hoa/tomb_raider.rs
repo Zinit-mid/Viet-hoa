@@ -5,6 +5,7 @@
 //!   TR2013: game không đọc gói mod → tạo lại patch2.000.tiger (giữ bản gốc bigfile._orig.patch2.000.tiger).
 //!   Shadow: gói mod riêng v5 + .specmasks.toc.
 
+use crate::viet_hoa::tim_game::LoaiGame;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -912,6 +913,14 @@ impl TombRaider {
             BangTen::tao(ten_rieng(loai).iter().copied()),
         );
         viec.the = the_tr;
+        viec.ten_game = crate::kho_kien_thuc::ten_game(
+            match loai {
+                LoaiTr::Rise => LoaiGame::Rise,
+                LoaiTr::Tr2013 => LoaiGame::Tr2013,
+                LoaiTr::Shadow => LoaiGame::Shadow,
+            },
+            "",
+        );
         let mut x = TombRaider {
             loai,
             thu_muc_game: thu_muc_game.to_path_buf(),

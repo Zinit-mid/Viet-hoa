@@ -370,6 +370,14 @@ pub trait BaoCao: Sync {
     fn tien_do(&self, xong: usize, tong: usize, usd: f64);
 }
 
+/// Hướng dẫn của game / phim + phần Kho kiến thức liên quan tới lô câu này.
+fn kem_kien_thuc(huong_dan: &str, game: &str, tieng_anh: &str) -> String {
+    format!(
+        "{huong_dan}\n\n{}",
+        crate::kho_kien_thuc::cho_dich(game, tieng_anh)
+    )
+}
+
 /// Kết quả bước AI soát.
 #[derive(Default)]
 pub struct KetQuaSoat {
@@ -387,6 +395,8 @@ pub struct ViecDich {
     /// file đo chi phí thật (ước tính lần sau)
     pub duong_do_luong: PathBuf,
     pub huong_dan: String,
+    /// tên game (theo `kho_kien_thuc::ten_game`) để lấy đúng mục Kho kiến thức; rỗng = chỉ mục dùng chung
+    pub ten_game: String,
     pub bang_ten: BangTen,
     /// cách lấy thẻ để kiểm bản dịch (mặc định the_cua)
     pub the: fn(&str) -> Vec<String>,
@@ -409,6 +419,7 @@ impl ViecDich {
             duong_do_luong: thu_muc.join("do_luong_chi_phi.json"),
             duong_bo_nho,
             huong_dan: huong_dan.to_string(),
+            ten_game: String::new(),
             bang_ten,
             the: the_cua,
             bo_nho: Arc::new(Mutex::new(bo_nho)),
@@ -608,7 +619,8 @@ impl ViecDich {
     fn soat_lo(&self, lo: &[(String, String)]) -> Result<Vec<(String, String, String)>> {
         let en: Vec<&str> = lo.iter().map(|(en, _)| en.as_str()).collect();
         let ten: Vec<String> = self.bang_ten.trong(&en.join("\n")).into_iter().collect();
-        let moi = crate::ai_local::sua_dich(lo, &self.huong_dan, &ten)?;
+        let huong_dan = kem_kien_thuc(&self.huong_dan, &self.ten_game, &en.join("\n"));
+        let moi = crate::ai_local::sua_dich(lo, &huong_dan, &ten)?;
         let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
         let mut ra = Vec::new();
         for ((en, cu), m) in lo.iter().zip(moi) {
@@ -1005,8 +1017,10 @@ impl ViecDich {
                 con_hong.len()
             ));
             let (huong_dan, bang_ten) = (self.huong_dan.clone(), self.bang_ten.clone());
+            let game = self.ten_game.clone();
             let dich_ai = |cau: &[String]| -> Result<Vec<String>> {
                 let ten: Vec<String> = bang_ten.trong(&cau.join("\n")).into_iter().collect();
+                let huong_dan = kem_kien_thuc(&huong_dan, &game, &cau.join("\n"));
                 let ra = crate::ai_local::dich_lo(cau, &huong_dan, &ten)?;
                 Ok(ra
                     .into_iter()

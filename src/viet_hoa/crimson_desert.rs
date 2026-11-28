@@ -145,10 +145,12 @@ impl CrimsonDesert {
         );
         let du_lieu = Self::thu_muc_du_lieu();
         std::fs::create_dir_all(&du_lieu)?;
+        let mut viec = ViecDich::moi(du_lieu, HUONG_DAN, bang_ten);
+        viec.ten_game = "Crimson Desert".into();
         Ok(Self {
             thu_muc_game: thu_muc_game.to_path_buf(),
             nhom,
-            viec: ViecDich::moi(du_lieu, HUONG_DAN, bang_ten),
+            viec,
         })
     }
 

@@ -143,3 +143,9 @@ Giao diện mới (kính tối tím hơi đen, nút neon, thanh trượt, viền
 - `ViecDich::ai_soat`: câu đã soát ghi ở `ai_da_soat.json`; bản trước khi AI sửa lần đầu ở `bo_nho_dich.json.truoc_ai`; bỏ qua câu sửa tay (so với `.truoc_sua`).
 - Báo cáo trước/sau: Desktop `AI_soat_<game>.csv`. Mặc định tắt; "dừng để xem" mặc định bật.
 - Giới hạn: file giọng đã tạo không tự đọc lại khi chữ đổi.
+
+## v0.6.0 (28/11/2026) – Kho kiến thức
+- `kho_tim.rs` (chỉ std, thử bằng `rustc --test`), `kho_kien_thuc.rs` (lưu `du_lieu\kho_kien_thuc.json`, bản trước ở `.json.bak`; file hỏng thì không ghi đè), `trang_kho.rs`.
+- Dịch / soát: nối phần liên quan vào `huong_dan` (≤ 1800 ký tự); chat / giải thích lỗi ≤ 2500 ký tự. `ViecDich.ten_game` quyết định mục nào được dùng.
+- Dòng "Tài liệu đã gửi kèm" do app ghi, không chứng minh AI đã dùng.
+- Chưa thử với Ollama thật và trên Windows.

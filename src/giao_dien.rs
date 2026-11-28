@@ -79,6 +79,7 @@ impl Muc {
                 ("Công cụ đi kèm", Trang::CaiDat, Some("CÔNG CỤ ĐI KÈM")),
                 ("Giao diện", Trang::CaiDat, Some("GIAO DIỆN")),
                 ("AI local", Trang::AiLocal, None),
+                ("Kho kiến thức", Trang::KhoKienThuc, None),
             ],
         }
     }
@@ -93,6 +94,7 @@ enum Trang {
     SuaDich,
     BanDo,
     AiLocal,
+    KhoKienThuc,
     GiongMau,
     LongTieng,
     CloneGiong,
@@ -117,6 +119,7 @@ pub struct App {
     sua_dich: crate::trang_sua_dich::TrangSuaDich,
     ban_do: crate::trang_ban_do::TrangBanDo,
     ai: crate::ai_local::TrangAi,
+    kho: crate::trang_kho::TrangKho,
     tu_dong: crate::trang_tu_dong::TrangTuDong,
     cap_nhat: crate::cap_nhat::CapNhat,
     long_tieng: crate::trang_long_tieng::TrangLongTieng,
@@ -158,6 +161,7 @@ impl App {
             sua_dich: Default::default(),
             ban_do: Default::default(),
             ai: Default::default(),
+            kho: Default::default(),
             tu_dong: Default::default(),
             cap_nhat: {
                 crate::cap_nhat::don_dep();
@@ -562,6 +566,7 @@ impl eframe::App for App {
                         Trang::SuaDich => self.sua_dich.ve(ui),
                         Trang::BanDo => self.ban_do.ve(ui),
                         Trang::AiLocal => self.ai.ve(ui),
+                        Trang::KhoKienThuc => self.kho.ve(ui),
                         Trang::GiongMau => self.giong_mau.ve(ui),
                         Trang::LongTieng => self.long_tieng.ve(ui),
                         Trang::CloneGiong => self.clone_giong.ve(ui),
