@@ -4,7 +4,7 @@
 //!   kiểm thẻ, lô hỏng thì chia đôi) | Offline (giữ thẻ <..> {..} [EMPTY], xuống dòng)
 //!   → bộ nhớ {tiếng Anh: tiếng Việt} (ghi .tam rồi đổi tên).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -370,6 +370,17 @@ pub trait BaoCao: Sync {
     fn tien_do(&self, xong: usize, tong: usize, usd: f64);
 }
 
+/// Kết quả bước AI soát.
+#[derive(Default)]
+pub struct KetQuaSoat {
+    /// (tiếng Anh, bản cũ, bản AI sửa)
+    pub thay_doi: Vec<(String, String, String)>,
+    /// số câu AI chưa soát được vì lỗi
+    pub loi: usize,
+    /// AI lỗi liên tiếp giữa chừng
+    pub dung_vi_loi: Option<String>,
+}
+
 pub struct ViecDich {
     /// file bộ nhớ {tiếng Anh: tiếng Việt}
     pub duong_bo_nho: PathBuf,
@@ -471,23 +482,10 @@ impl ViecDich {
             if self.dung.load(Ordering::SeqCst) {
                 break;
             }
-            let en: Vec<&str> = lo.iter().map(|(en, _)| en.as_str()).collect();
-            let ten: Vec<String> = self.bang_ten.trong(&en.join("\n")).into_iter().collect();
-            match crate::ai_local::sua_dich(lo, &self.huong_dan, &ten) {
-                Ok(moi) => {
+            match self.soat_lo(lo) {
+                Ok(thay_doi) => {
                     loi_lien_tiep = 0;
-                    let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
-                    for ((en, cu), m) in lo.iter().zip(moi) {
-                        let m = crate::dich::ap_dung_sua(m.trim());
-                        if !m.is_empty()
-                            && m != *cu
-                            && (self.the)(en) == (self.the)(&m)
-                            && !crate::dich::the::bi_lap(en, &m)
-                        {
-                            bn.insert(en.clone(), m);
-                            sua += 1;
-                        }
-                    }
+                    sua += thay_doi.len();
                 }
                 Err(e) => {
                     loi_lien_tiep += 1;
@@ -509,6 +507,122 @@ impl ViecDich {
         }
         self.luu()?;
         Ok(sua)
+    }
+
+    /// Câu người dùng đã sửa tay ở trang Sửa bản dịch (khác bản sao lưu .truoc_sua) – AI không được đụng.
+    fn cau_sua_tay(&self) -> HashSet<String> {
+        let sao = PathBuf::from(format!("{}.truoc_sua", self.duong_bo_nho.display()));
+        let cu: BTreeMap<String, String> = std::fs::read(sao)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        let bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
+        cu.into_iter()
+            .filter(|(en, vi)| bn.get(en).is_some_and(|moi| moi != vi))
+            .map(|(en, _)| en)
+            .collect()
+    }
+
+    /// Bước "AI soát" của Làm tự động: soát bản dịch trong bộ nhớ, nhớ câu đã soát (dừng rồi bấm lại là làm tiếp).
+    /// `toan_bo` = false: chỉ câu nghi dở. Bỏ qua câu đã sửa tay. Không tự đặt lại cờ dừng.
+    pub fn ai_soat(&mut self, toan_bo: bool, bc: &dyn BaoCao) -> Result<KetQuaSoat> {
+        let file_da_soat = self.duong_bo_nho.with_file_name("ai_da_soat.json");
+        let mut da_soat: BTreeSet<String> = std::fs::read(&file_da_soat)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        let ung_vien: Vec<(String, String)> = if toan_bo {
+            let bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
+            bn.iter()
+                .filter(|(en, _)| en.chars().count() >= 12 && en.split_whitespace().count() >= 3)
+                .map(|(en, vi)| (en.clone(), vi.clone()))
+                .collect()
+        } else {
+            self.cau_nghi_van(usize::MAX)
+        };
+        let sua_tay = self.cau_sua_tay();
+        let cap: Vec<(String, String)> = ung_vien
+            .into_iter()
+            .filter(|(en, _)| !da_soat.contains(en) && !sua_tay.contains(en))
+            .collect();
+        let tong = cap.len();
+        let mut kq = KetQuaSoat::default();
+        if tong == 0 {
+            return Ok(kq);
+        }
+        // giữ một bản bộ nhớ dịch trước khi AI đụng vào
+        self.luu()?;
+        let truoc_ai = self.duong_bo_nho.with_extension("json.truoc_ai");
+        if !truoc_ai.exists() {
+            std::fs::copy(&self.duong_bo_nho, &truoc_ai)?;
+        }
+        let (mut xong, mut loi_lien_tiep) = (0usize, 0usize);
+        let mut lan_luu = Instant::now();
+        for lo in cap.chunks(8) {
+            if self.dung.load(Ordering::SeqCst) {
+                break;
+            }
+            match self.soat_lo(lo) {
+                Ok(thay_doi) => {
+                    loi_lien_tiep = 0;
+                    kq.thay_doi.extend(thay_doi);
+                    da_soat.extend(lo.iter().map(|(en, _)| en.clone()));
+                }
+                Err(e) => {
+                    loi_lien_tiep += 1;
+                    kq.loi += lo.len();
+                    if loi_lien_tiep >= 5 || (xong == 0 && loi_lien_tiep >= 2) {
+                        self.luu_soat(&file_da_soat, &da_soat)?;
+                        // vẫn ghi báo cáo cho những câu đã sửa trước khi lỗi
+                        return if kq.thay_doi.is_empty() {
+                            Err(e)
+                        } else {
+                            kq.dung_vi_loi = Some(e.to_string());
+                            Ok(kq)
+                        };
+                    }
+                }
+            }
+            xong += lo.len();
+            bc.tien_do(xong, tong, 0.0);
+            bc.bao(&format!(
+                "AI soát {xong}/{tong} câu • đã sửa {}",
+                kq.thay_doi.len()
+            ));
+            if lan_luu.elapsed().as_secs() > 30 {
+                self.luu_soat(&file_da_soat, &da_soat)?;
+                lan_luu = Instant::now();
+            }
+        }
+        self.luu_soat(&file_da_soat, &da_soat)?;
+        Ok(kq)
+    }
+
+    fn luu_soat(&self, file: &std::path::Path, da_soat: &BTreeSet<String>) -> Result<()> {
+        self.luu()?;
+        duong_dan::ghi_file(file, &serde_json::to_vec(da_soat)?)?;
+        Ok(())
+    }
+
+    /// Soát một lô; ghi câu sửa được (còn đủ thẻ) vào bộ nhớ. → (tiếng Anh, bản cũ, bản mới).
+    fn soat_lo(&self, lo: &[(String, String)]) -> Result<Vec<(String, String, String)>> {
+        let en: Vec<&str> = lo.iter().map(|(en, _)| en.as_str()).collect();
+        let ten: Vec<String> = self.bang_ten.trong(&en.join("\n")).into_iter().collect();
+        let moi = crate::ai_local::sua_dich(lo, &self.huong_dan, &ten)?;
+        let mut bn = self.bo_nho.lock().unwrap_or_else(|e| e.into_inner());
+        let mut ra = Vec::new();
+        for ((en, cu), m) in lo.iter().zip(moi) {
+            let m = crate::dich::ap_dung_sua(m.trim());
+            if !m.is_empty()
+                && m != *cu
+                && (self.the)(en) == (self.the)(&m)
+                && !crate::dich::the::bi_lap(en, &m)
+            {
+                bn.insert(en.clone(), m.clone());
+                ra.push((en.clone(), cu.clone(), m));
+            }
+        }
+        Ok(ra)
     }
 
     pub fn cau_can_dich<'a>(&self, ds: impl IntoIterator<Item = &'a str>) -> Vec<String> {

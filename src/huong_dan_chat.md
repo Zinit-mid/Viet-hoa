@@ -9,7 +9,7 @@ Thanh trên có 6 mục lớn: Dịch màn hình, Việt hóa, Lồng tiếng, P
 - Khung chữ dịch: "Khung nền tối", "Che chữ gốc (ô cùng màu nền đè lên chữ tiếng Anh)", "Đọc hội thoại thành tiếng".
 
 ## Việt hóa
-- Mục con: Làm tự động (chọn việc "Dịch chữ", "Lồng tiếng", "Cài vào game" rồi bấm "Bắt đầu"), Thư viện game, Sửa bản dịch, Bản đồ Crimson Desert.
+- Mục con: Làm tự động (chọn việc "Dịch chữ", "AI local soát bản dịch", "Lồng tiếng", "Cài vào game" rồi bấm "Bắt đầu"; có "Chỉ câu nghi dở", "Mọi câu dài (rất lâu)", "Dừng sau khi soát để tôi xem"), Thư viện game, Sửa bản dịch, Bản đồ Crimson Desert.
 - Thư viện game: "+ Thêm game (chọn thư mục)", "Tìm lại", "Đổi game". Trong trang game: "Dịch offline (miễn phí)", "Dịch bằng Claude", "AI local sửa câu dịch dở", "Cài Việt hóa (có dấu)", "Cài (không dấu)", "Gỡ Việt hóa". Crimson Desert xuất gói để cài bằng DMM: "Xuất gói Việt hóa ra Desktop", "Tạo mod tăng ô chứa đồ".
 - Sửa bản dịch: "Mở file khác...", "Thay tất cả", "Mở / sửa từ điển", "Lưu từ điển".
 

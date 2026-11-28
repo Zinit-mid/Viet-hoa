@@ -41,6 +41,9 @@ impl Default for TrangTuDong {
                 long_tieng: true,
                 cai: true,
                 khong_dau: false,
+                ai_soat: false,
+                soat_het: false,
+                dung_de_duyet: true,
             },
             tt: Arc::new(Mutex::new(Tt::default())),
             dung: Arc::new(AtomicBool::new(false)),
@@ -191,6 +194,21 @@ impl TrangTuDong {
                 }
             });
             ui.horizontal_wrapped(|ui| {
+                crate::kieu::cong_tac(ui, &mut self.t.ai_soat, "AI local soát bản dịch");
+                if self.t.ai_soat {
+                    ui.selectable_value(&mut self.t.soat_het, false, "Chỉ câu nghi dở");
+                    ui.selectable_value(&mut self.t.soat_het, true, "Mọi câu dài (rất lâu)");
+                    crate::kieu::cong_tac(
+                        ui,
+                        &mut self.t.dung_de_duyet,
+                        "Dừng sau khi soát để tôi xem",
+                    );
+                }
+            });
+            if self.t.ai_soat {
+                ui.label(RichText::new("Cần mở Ollama. Thứ tự: dịch → AI soát → lồng tiếng. Câu đã sửa tay ở Sửa bản dịch được giữ nguyên. Đoạn đã có file giọng từ trước sẽ KHÔNG được đọc lại dù chữ đổi.").small().weak());
+            }
+            ui.horizontal_wrapped(|ui| {
                 ui.label("Máy dịch:");
                 ui.selectable_value(&mut self.t.claude, false, "Offline (miễn phí)");
                 ui.selectable_value(
@@ -219,7 +237,7 @@ impl TrangTuDong {
                 "Bắt đầu",
                 "Đang làm",
                 crate::kieu::TIM,
-                !ban && (self.t.dich || self.t.long_tieng || self.t.cai),
+                !ban && (self.t.dich || self.t.ai_soat || self.t.long_tieng || self.t.cai),
             ) {
                 self.chay(g.clone());
             }

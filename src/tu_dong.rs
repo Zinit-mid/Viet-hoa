@@ -25,6 +25,12 @@ pub struct TuyChon {
     pub long_tieng: bool,
     pub cai: bool,
     pub khong_dau: bool,
+    /// AI local soát bản dịch sau bước dịch, trước khi lồng tiếng / cài
+    pub ai_soat: bool,
+    /// soát mọi câu (rất lâu) thay vì chỉ câu nghi dở
+    pub soat_het: bool,
+    /// AI có sửa thì dừng lại cho người dùng xem trước
+    pub dung_de_duyet: bool,
 }
 
 pub struct Bc<'a> {
@@ -51,6 +57,70 @@ fn dich_cau(viec: &mut ViecDich, ds: Vec<String>, t: &TuyChon, bc: &Bc) -> Resul
     } else {
         viec.chay_offline(ds, bc)
     }
+}
+
+/// Ghi các câu AI đã sửa ra Desktop (thêm vào cuối nếu file đã có). → đường dẫn.
+fn ghi_bao_cao(ten_game: &str, ds: &[(String, String, String)]) -> Result<std::path::PathBuf> {
+    let ten: String = ten_game
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect();
+    let p = duong_dan::desktop().join(format!("AI_soat_{ten}.csv"));
+    let mut b = std::fs::read(&p).unwrap_or_default();
+    if b.is_empty() {
+        b.extend([0xEF, 0xBB, 0xBF]);
+        b.extend(b"tieng_anh,ban_cu,ban_ai_sua\r\n");
+    }
+    let o = |s: &str| format!("\"{}\"", s.replace('"', "\"\""));
+    for (en, cu, moi) in ds {
+        b.extend(format!("{},{},{}\r\n", o(en), o(cu), o(moi)).as_bytes());
+    }
+    duong_dan::ghi_file(&p, &b)?;
+    Ok(p)
+}
+
+/// Bước AI soát. → Some(thông báo) nếu phải dừng quy trình ở đây.
+fn soat_ai(
+    viec: &mut ViecDich,
+    game: &Game,
+    t: &TuyChon,
+    bc: &Bc,
+    ra: &mut Vec<String>,
+) -> Result<Option<String>> {
+    let da_dung = "Đã dừng – bấm lại để làm tiếp.";
+    if viec.dung.load(Ordering::SeqCst) {
+        return Ok(Some(da_dung.into()));
+    }
+    if !t.ai_soat {
+        return Ok(None);
+    }
+    crate::ai_local::tu_mo(&|m| (bc.bao)(m))?;
+    (bc.bao)("AI local đang chọn câu để soát...");
+    let kq = viec.ai_soat(t.soat_het, bc)?;
+    let n = kq.thay_doi.len();
+    let mut dong = format!("AI soát: sửa {n} câu");
+    if kq.loi > 0 {
+        dong.push_str(&format!(", {} câu chưa soát được", kq.loi));
+    }
+    if n > 0 {
+        let p = ghi_bao_cao(&game.ten, &kq.thay_doi)?;
+        dong.push_str(&format!(". Xem trước / sau: {}", p.display()));
+    }
+    if viec.dung.load(Ordering::SeqCst) {
+        return Ok(Some(format!("{da_dung}\n{dong}")));
+    }
+    if let Some(e) = kq.dung_vi_loi {
+        return Ok(Some(format!(
+            "AI bị lỗi giữa chừng ({e}). Bấm Bắt đầu để làm tiếp.\n{dong}"
+        )));
+    }
+    if n > 0 && t.dung_de_duyet && (t.long_tieng || t.cai) {
+        return Ok(Some(format!(
+            "{dong}\nĐã dừng để bạn xem. Muốn đổi câu nào thì vào Việt hóa > Sửa bản dịch. Xong bấm Bắt đầu lại để làm tiếp."
+        )));
+    }
+    ra.push(dong);
+    Ok(None)
 }
 
 fn chua_xong(dung: &AtomicBool, viec: &ViecDich) -> String {
@@ -83,6 +153,11 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
                         return Ok(chua_xong(dung, &cd.viec));
                     }
                 }
+            }
+            if let Some(tb) = soat_ai(&mut cd.viec, game, t, bc, &mut ra)? {
+                return Ok(tb);
+            }
+            if t.dich || t.ai_soat {
                 let p = duong_dan::desktop().join(vcd::TEN_GOI);
                 let n = cd.xuat_goi(&p)?;
                 ra.push(format!("Gói chữ ({n} câu) ra Desktop: {}", vcd::TEN_GOI));
@@ -133,6 +208,9 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
                     return Ok(chua_xong(dung, &x.viec));
                 }
             }
+            if let Some(tb) = soat_ai(&mut x.viec, game, t, bc, &mut ra)? {
+                return Ok(tb);
+            }
             if t.long_tieng && loai != LoaiTr::Shadow {
                 let _ai = crate::ai_local::KhoaLongTieng::vao()?;
                 let kq = x.long_tieng(false, 4.0, dung, bc.bao, &|a, b, s| {
@@ -178,6 +256,9 @@ pub fn chay(game: &Game, t: &TuyChon, dung: &Arc<AtomicBool>, bc: &Bc) -> Result
                 if !dich_cau(&mut v.viec, ds, t, bc)? {
                     return Ok(chua_xong(dung, &v.viec));
                 }
+            }
+            if let Some(tb) = soat_ai(&mut v.viec, game, t, bc, &mut ra)? {
+                return Ok(tb);
             }
             if t.cai {
                 bao("Đang ghi vào game (có sao lưu bản gốc)...");
@@ -242,6 +323,9 @@ mod test {
             long_tieng: false,
             cai: true,
             khong_dau: false,
+            ai_soat: false,
+            soat_het: false,
+            dung_de_duyet: false,
         };
         let dung = Arc::new(AtomicBool::new(false));
         let kq = chay(

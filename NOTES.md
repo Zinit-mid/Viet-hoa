@@ -138,3 +138,8 @@ Giao diện mới (kính tối tím hơi đen, nút neon, thanh trượt, viền
 - Dùng `format` (JSON schema) của Ollama; lỗi HTTP thì gọi lại kiểu thường.
 - Trợ lý chat + giải thích lỗi đọc `src/huong_dan_chat.md` (nhúng trong exe). Đổi tên nút thì sửa file này.
 - Bật suy luận cho chia người nói và giải thích lỗi, hỏng thì tự gọi lại không suy luận. num_ctx chung 8192.
+
+## v0.5.0 (28/11/2026) – Làm tự động: dịch → AI soát → lồng tiếng
+- `ViecDich::ai_soat`: câu đã soát ghi ở `ai_da_soat.json`; bản trước khi AI sửa lần đầu ở `bo_nho_dich.json.truoc_ai`; bỏ qua câu sửa tay (so với `.truoc_sua`).
+- Báo cáo trước/sau: Desktop `AI_soat_<game>.csv`. Mặc định tắt; "dừng để xem" mặc định bật.
+- Giới hạn: file giọng đã tạo không tự đọc lại khi chữ đổi.
